@@ -1,0 +1,186 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Truck Load Optimizer</title>
+<link rel="stylesheet" href="style.css">
+<script>
+/* Run before body renders to avoid flash */
+(function(){
+  if(localStorage.getItem('theme')==='light') document.documentElement.classList.add('light');
+})();
+</script>
+</head>
+<body>
+
+<div class="header">
+  <span class="header-icon">🚛</span>
+  <div>
+    <h1>Truck Load Optimizer</h1>
+    <div class="sub">Multi-carrier · multi-customer · route cost intelligence · 3D bin packing</div>
+  </div>
+  <label class="unit-toggle">
+    <input type="checkbox" id="metricToggle" onchange="toggleUnits()"> Metric (m / kg)
+  </label>
+  <button class="btn-theme" id="theme-btn" onclick="toggleTheme()" title="Toggle light / dark mode"></button>
+  <button class="btn-print" onclick="printReport()" title="Export to PDF via browser print dialog">🖨 Print / PDF</button>
+</div>
+
+<!-- Shown only when printing -->
+<div class="print-only" id="print-header" style="padding:8px 0 12px; border-bottom:2px solid #e2e8f0; margin-bottom:14px;">
+  <div style="font-size:10pt;color:#64748b;margin-top:3px" id="print-meta"></div>
+</div>
+
+<div class="layout">
+  <!-- ══ SIDEBAR ══ -->
+  <div class="sidebar">
+    <div class="tabs">
+      <button class="tab-btn active" id="tab-btn-trucks"    onclick="showTab('trucks')">🚛 Fleet</button>
+      <button class="tab-btn"        id="tab-btn-carriers"  onclick="showTab('carriers')">🏢 Carriers</button>
+      <button class="tab-btn"        id="tab-btn-customers" onclick="showTab('customers')">👥 Customers</button>
+      <button class="tab-btn"        id="tab-btn-items"     onclick="showTab('items')">📦 Items</button>
+    </div>
+
+    <!-- ── FLEET TAB ── -->
+    <div class="tab-panel active" id="tab-trucks">
+      <div class="add-form">
+        <div class="add-form-title">+ Add Own-Fleet Truck</div>
+        <div class="form-grid">
+          <div class="form-group full"><label>Name</label>
+            <input type="text" id="t-name" value="Semi Truck 1"></div>
+          <div class="form-group"><label id="lbl-tl">Length (ft)</label>
+            <input type="number" id="t-length" value="53" min="0.5" step="0.5"></div>
+          <div class="form-group"><label id="lbl-tw">Width (ft)</label>
+            <input type="number" id="t-width" value="8.5" min="0.5" step="0.5"></div>
+          <div class="form-group"><label id="lbl-th">Height (ft)</label>
+            <input type="number" id="t-height" value="9" min="0.5" step="0.5"></div>
+          <div class="form-group"><label id="lbl-tmw">Max Weight (lbs)</label>
+            <input type="number" id="t-maxwt" value="44000" min="1"></div>
+          <div class="form-group"><label>Base Rate ($)</label>
+            <input type="number" id="t-baserate" value="600" min="0" step="10" placeholder="$ per trip"></div>
+          <div class="form-group"><label>Rate / Mile ($)</label>
+            <input type="number" id="t-rpermile" value="3.50" min="0" step="0.05" placeholder="$ / mile"></div>
+        </div>
+        <button class="btn btn-primary btn-full" onclick="addTruck()">Add Truck</button>
+      </div>
+      <div id="truck-list"></div>
+    </div>
+
+    <!-- ── CARRIERS TAB ── -->
+    <div class="tab-panel" id="tab-carriers">
+      <div class="add-form">
+        <div class="add-form-title">+ Add External Carrier</div>
+        <div class="form-grid">
+          <div class="form-group full"><label>Carrier Name</label>
+            <input type="text" id="ca-name" placeholder="e.g. FastFreight LLC"></div>
+        </div>
+        <button class="btn btn-primary btn-full" onclick="addCarrier()">Add Carrier</button>
+      </div>
+      <div style="font-size:11px;color:var(--text2);margin-bottom:10px;padding:7px 9px;background:rgba(139,92,246,0.07);border-radius:6px;border:1px solid rgba(139,92,246,0.2)">
+        ℹ️ External carriers appear in route cost comparisons. Add their truck types and rates to see if they beat your own fleet.
+      </div>
+      <div id="carrier-list"></div>
+    </div>
+
+    <!-- ── CUSTOMERS TAB ── -->
+    <div class="tab-panel" id="tab-customers">
+      <div class="add-form">
+        <div class="add-form-title">+ Add Customer</div>
+        <div class="form-grid">
+          <div class="form-group full"><label>Customer Name</label>
+            <input type="text" id="c-name" placeholder="e.g. Acme Corp"></div>
+          <div class="form-group"><label>Delivery Stop # <span style="font-weight:400;text-transform:none;font-size:10px">(1=first)</span></label>
+            <input type="number" id="c-stop" value="1" min="1" step="1"></div>
+          <div class="form-group"><label>Color</label>
+            <input type="color" id="c-color" value="#3b82f6" style="height:34px;padding:2px 4px;cursor:pointer"></div>
+          <div class="form-group full"><label>Destination Zone / City</label>
+            <input type="text" id="c-zone" placeholder="e.g. Chicago Metro"></div>
+          <div class="form-group"><label id="lbl-cdist">Distance (mi)</label>
+            <input type="number" id="c-distance" value="0" min="0" step="10" placeholder="Miles from depot"></div>
+          <div class="form-group"><label style="visibility:hidden">x</label>
+            <div style="font-size:10px;color:var(--text2);padding-top:8px">From depot to this zone</div>
+          </div>
+          <div class="form-group"><label>Payment Terms</label>
+            <select id="c-pay-terms">
+              <option value="cod">COD</option>
+              <option value="net30" selected>Net 30</option>
+              <option value="net60">Net 60</option>
+              <option value="net90">Net 90</option>
+            </select></div>
+          <div class="form-group"><label>Payment Method</label>
+            <select id="c-pay-method">
+              <option value="invoice" selected>Invoice</option>
+              <option value="bank">Bank Transfer</option>
+              <option value="card">Credit Card</option>
+              <option value="check">Check</option>
+              <option value="cod">COD</option>
+            </select></div>
+          <div class="form-group"><label>Invoice Amount ($)</label>
+            <input type="number" id="c-invoice" value="0" min="0" step="50" placeholder="0"></div>
+        </div>
+        <button class="btn btn-primary btn-full" onclick="addCustomer()">Add Customer</button>
+      </div>
+      <div style="font-size:11px;color:var(--text2);margin-bottom:10px;padding:7px 9px;background:rgba(59,130,246,0.07);border-radius:6px;border:1px solid rgba(59,130,246,0.2)">
+        ℹ️ Stop 1 = first drop-off (near truck doors). Customers with the same <strong>Zone</strong> are grouped for carrier cost comparison and consolidation analysis.
+      </div>
+      <div id="customer-list"></div>
+    </div>
+
+    <!-- ── ITEMS TAB ── -->
+    <div class="tab-panel" id="tab-items">
+      <div class="add-form">
+        <div class="add-form-title">+ Add Item Type</div>
+        <div class="form-grid">
+          <div class="form-group full"><label>Item Name</label>
+            <input type="text" id="i-name" placeholder="e.g. Pallet A"></div>
+          <div class="form-group full"><label>Customer</label>
+            <select id="i-customer"><option value="">— Unassigned —</option></select></div>
+          <div class="form-group"><label id="lbl-il">Length (ft)</label>
+            <input type="number" id="i-length" value="4" min="0.1" step="0.5"></div>
+          <div class="form-group"><label id="lbl-iw">Width (ft)</label>
+            <input type="number" id="i-width" value="4" min="0.1" step="0.5"></div>
+          <div class="form-group"><label id="lbl-ih">Height (ft)</label>
+            <input type="number" id="i-height" value="4" min="0.1" step="0.5"></div>
+          <div class="form-group"><label id="lbl-iwt">Weight (lbs)</label>
+            <input type="number" id="i-weight" value="500" min="0" step="1"></div>
+          <div class="form-group"><label>Quantity</label>
+            <input type="number" id="i-qty" value="10" min="1"></div>
+          <div class="form-group full"><label class="chk-label">
+            <input type="checkbox" id="i-rotate" checked> Allow rotation (all orientations)
+          </label></div>
+        </div>
+        <button class="btn btn-primary btn-full" onclick="addItem()">Add Item</button>
+      </div>
+      <div id="item-catalog"></div>
+      <div id="item-list"></div>
+    </div>
+
+    <div class="opt-bar">
+      <div class="save-status" id="save-status"></div>
+      <div class="data-bar">
+        <button class="btn-data" onclick="exportJSON()" title="Download all data as a JSON file">📥 Export</button>
+        <label class="btn-data" title="Load data from a previously exported JSON file" style="cursor:pointer">
+          📂 Import<input type="file" accept=".json" onchange="importJSON(this)" style="display:none">
+        </label>
+        <button class="btn-data btn-data-danger" onclick="clearAll()" title="Clear all data and start fresh">🗑 Clear</button>
+      </div>
+      <div class="opt-counts" id="opt-counts">0 items · 0 trucks · 0 customers · 0 carriers</div>
+      <button class="btn-optimize" onclick="runOptimize()">⚡ Optimize &amp; Analyze Routes</button>
+    </div>
+  </div>
+
+  <!-- ══ MAIN CONTENT ══ -->
+  <div class="main" id="main">
+    <div class="empty-state" id="empty-state">
+      <div class="empty-icon">🚛</div>
+      <h3>Ready to Optimize</h3>
+      <p>Add fleet trucks, external carriers, customers (with zones), and items — then click <strong>Optimize &amp; Analyze Routes</strong>.</p>
+    </div>
+    <div id="results" style="display:none"></div>
+  </div>
+</div>
+
+<script src="app.js"></script>
+</body>
+</html>
