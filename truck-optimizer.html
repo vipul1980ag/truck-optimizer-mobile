@@ -1,0 +1,1458 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Truck Load Optimizer</title>
+<style>
+:root {
+  --bg: #0f172a; --surface: #1e293b; --surface2: #334155;
+  --border: #475569; --text: #f1f5f9; --text2: #94a3b8;
+  --primary: #3b82f6; --primary-h: #2563eb;
+  --success: #22c55e; --warning: #f59e0b; --danger: #ef4444; --r: 8px;
+}
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body { font-family: 'Segoe UI', system-ui, sans-serif; background: var(--bg); color: var(--text); min-height: 100vh; font-size: 14px; }
+
+.header { background: var(--surface); border-bottom: 1px solid var(--border); padding: 10px 20px; display: flex; align-items: center; gap: 12px; }
+.header-icon { font-size: 26px; }
+.header h1 { font-size: 18px; font-weight: 800; }
+.header .sub { color: var(--text2); font-size: 11px; margin-top: 2px; }
+.unit-toggle { margin-left: auto; display: flex; align-items: center; gap: 8px; font-size: 12px; color: var(--text2); cursor: pointer; }
+.unit-toggle input { cursor: pointer; accent-color: var(--primary); }
+
+.layout { display: grid; grid-template-columns: 350px 1fr; height: calc(100vh - 53px); }
+
+/* Sidebar */
+.sidebar { background: var(--surface); border-right: 1px solid var(--border); display: flex; flex-direction: column; overflow: hidden; }
+.tabs { display: flex; border-bottom: 1px solid var(--border); }
+.tab-btn { flex: 1; padding: 8px 2px; background: none; border: none; color: var(--text2); cursor: pointer; font-size: 11px; font-weight: 600; border-bottom: 2px solid transparent; transition: all 0.15s; white-space: nowrap; }
+.tab-btn.active { color: var(--primary); border-bottom-color: var(--primary); background: rgba(59,130,246,0.06); }
+.tab-btn:hover:not(.active) { color: var(--text); background: var(--surface2); }
+
+.tab-panel { flex: 1; overflow-y: auto; padding: 12px; display: none; }
+.tab-panel.active { display: block; }
+
+/* Forms */
+.add-form { background: rgba(59,130,246,0.06); border: 1px dashed var(--primary); border-radius: var(--r); padding: 11px; margin-bottom: 12px; }
+.add-form-title { font-size: 12px; font-weight: 700; color: var(--primary); margin-bottom: 9px; }
+.form-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 7px; }
+.form-group { display: flex; flex-direction: column; gap: 3px; }
+.form-group.full { grid-column: 1 / -1; }
+label { font-size: 11px; font-weight: 600; color: var(--text2); text-transform: uppercase; letter-spacing: 0.3px; }
+input[type="text"], input[type="number"], select {
+  background: var(--bg); border: 1px solid var(--border); border-radius: 6px;
+  padding: 6px 8px; color: var(--text); font-size: 13px; width: 100%;
+  outline: none; transition: border-color 0.15s;
+}
+input:focus, select:focus { border-color: var(--primary); }
+select option { background: var(--surface2); }
+.chk-label { display: flex; align-items: center; gap: 6px; cursor: pointer; font-size: 12px; color: var(--text2); }
+input[type="checkbox"] { width: auto; cursor: pointer; accent-color: var(--primary); }
+
+/* Buttons */
+.btn { padding: 5px 10px; border-radius: 6px; border: none; cursor: pointer; font-size: 12px; font-weight: 600; transition: all 0.15s; display: inline-flex; align-items: center; gap: 4px; }
+.btn-primary { background: var(--primary); color: #fff; }
+.btn-primary:hover { background: var(--primary-h); }
+.btn-sm { padding: 3px 7px; font-size: 11px; }
+.btn-success { background: var(--success); color: #fff; }
+.btn-success:hover { opacity: 0.85; }
+.btn-danger { background: transparent; color: var(--danger); border: 1px solid rgba(239,68,68,0.4); }
+.btn-danger:hover { background: rgba(239,68,68,0.15); }
+.btn-full { width: 100%; justify-content: center; padding: 8px; margin-top: 8px; }
+
+/* Entity cards */
+.entity-card { background: var(--surface2); border: 1px solid var(--border); border-radius: var(--r); padding: 9px 11px; margin-bottom: 7px; }
+.entity-header { display: flex; justify-content: space-between; align-items: flex-start; }
+.entity-name { font-weight: 700; font-size: 13px; }
+.entity-dims { font-size: 11px; color: var(--text2); margin-top: 2px; }
+.color-swatch { width: 13px; height: 13px; border-radius: 3px; flex-shrink: 0; }
+.stop-badge { display: inline-block; padding: 1px 6px; border-radius: 10px; font-size: 10px; font-weight: 700; margin-left: 6px; }
+
+/* Carrier truck list inside sidebar card */
+.ct-list { margin-top: 8px; border-top: 1px solid rgba(71,85,105,0.4); padding-top: 8px; }
+.ct-row { display: flex; align-items: center; justify-content: space-between; font-size: 11px; color: var(--text2); padding: 3px 0; }
+.ct-row-name { font-weight: 600; color: var(--text); }
+.ct-add-form { margin-top: 8px; background: rgba(34,197,94,0.06); border: 1px dashed rgba(34,197,94,0.4); border-radius: 6px; padding: 9px; }
+.ct-add-form .form-grid { grid-template-columns: 1fr 1fr; }
+
+/* Optimize bar */
+.opt-bar { padding: 11px 12px; border-top: 1px solid var(--border); background: var(--surface); }
+.opt-counts { text-align: center; font-size: 11px; color: var(--text2); margin-bottom: 8px; }
+.btn-optimize { width: 100%; padding: 11px; background: linear-gradient(135deg, #3b82f6, #8b5cf6); color: #fff; border: none; border-radius: var(--r); cursor: pointer; font-size: 15px; font-weight: 800; letter-spacing: 0.3px; transition: opacity 0.15s, transform 0.1s; }
+.btn-optimize:hover { opacity: 0.9; }
+.btn-optimize:active { transform: scale(0.98); }
+
+/* Main */
+.main { overflow-y: auto; padding: 16px; background: var(--bg); }
+.empty-state { text-align: center; padding: 80px 20px; color: var(--text2); }
+.empty-icon { font-size: 52px; margin-bottom: 16px; }
+.empty-state h3 { font-size: 20px; color: var(--text); margin-bottom: 8px; }
+
+/* Summary */
+.summary-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(148px, 1fr)); gap: 10px; margin-bottom: 16px; }
+.sum-card { background: var(--surface); border: 1px solid var(--border); border-radius: var(--r); padding: 13px 15px; }
+.sum-label { font-size: 11px; font-weight: 700; color: var(--text2); text-transform: uppercase; letter-spacing: 0.4px; margin-bottom: 3px; }
+.sum-val { font-size: 24px; font-weight: 800; }
+.sum-sub { font-size: 11px; color: var(--text2); margin-top: 2px; }
+
+/* ── Route Analysis ───────────────────────────────── */
+.route-analysis {
+  background: var(--surface); border: 1px solid var(--border);
+  border-radius: var(--r); padding: 16px; margin-bottom: 16px;
+}
+.ra-header { display: flex; align-items: baseline; gap: 10px; margin-bottom: 14px; }
+.ra-header h3 { font-size: 16px; font-weight: 800; }
+.ra-header .sub { font-size: 12px; color: var(--text2); }
+
+.zone-chips { display: flex; flex-wrap: wrap; gap: 10px; margin-bottom: 16px; }
+.zone-chip {
+  background: var(--surface2); border: 1px solid var(--border);
+  border-radius: var(--r); padding: 10px 14px; min-width: 160px;
+}
+.zone-chip-name { font-weight: 800; font-size: 14px; margin-bottom: 4px; }
+.zone-chip-sub { font-size: 11px; color: var(--text2); margin-bottom: 2px; }
+.zone-chip-cost { font-size: 13px; font-weight: 700; color: var(--success); margin-top: 4px; }
+.zone-chip-nocost { font-size: 12px; color: var(--text2); margin-top: 4px; }
+.zone-chip-warn { font-size: 12px; color: var(--danger); margin-top: 4px; font-weight: 700; }
+
+/* Per-zone table */
+.zone-table-section { margin-bottom: 14px; }
+.zone-table-hdr {
+  display: flex; align-items: center; gap: 8px;
+  font-size: 13px; font-weight: 700; color: var(--text);
+  margin-bottom: 7px; padding-bottom: 6px;
+  border-bottom: 1px solid var(--border);
+}
+.zone-table-hdr .meta { font-size: 11px; font-weight: 400; color: var(--text2); }
+.zone-dist { font-size: 11px; padding: 2px 7px; border-radius: 10px; background: rgba(59,130,246,0.15); color: #93c5fd; font-weight: 700; }
+
+.carrier-table { width: 100%; border-collapse: collapse; font-size: 12px; margin-bottom: 4px; }
+.carrier-table th { background: rgba(51,65,85,0.6); padding: 5px 9px; text-align: left; font-weight: 700; font-size: 11px; color: var(--text2); text-transform: uppercase; letter-spacing: 0.3px; border-bottom: 1px solid var(--border); }
+.carrier-table td { padding: 5px 9px; border-bottom: 1px solid rgba(71,85,105,0.2); vertical-align: middle; }
+.carrier-table tr:last-child td { border-bottom: none; }
+.carrier-table tr.row-best td { background: rgba(34,197,94,0.06); }
+.carrier-table tr.row-no td { opacity: 0.5; }
+.cell-green { color: #86efac; font-weight: 700; }
+.cell-yellow { color: #fcd34d; font-weight: 700; }
+.cell-red { color: #fca5a5; font-weight: 700; }
+.cell-cost { font-weight: 700; font-size: 13px; }
+.badge-own { background: rgba(59,130,246,0.2); color: #93c5fd; font-size: 10px; font-weight: 700; padding: 1px 5px; border-radius: 4px; margin-right: 4px; }
+.badge-ext { background: rgba(139,92,246,0.2); color: #c4b5fd; font-size: 10px; font-weight: 700; padding: 1px 5px; border-radius: 4px; margin-right: 4px; }
+.status-tag { padding: 2px 7px; border-radius: 10px; font-size: 11px; font-weight: 700; white-space: nowrap; }
+.status-best { background: rgba(34,197,94,0.2); color: #86efac; }
+.status-ok { background: rgba(59,130,246,0.15); color: #93c5fd; }
+.status-no { background: rgba(239,68,68,0.15); color: #fca5a5; }
+
+/* Consolidation */
+.consolidation-section { margin-top: 14px; padding-top: 14px; border-top: 1px solid var(--border); }
+.consolidation-hdr { font-size: 13px; font-weight: 800; margin-bottom: 4px; }
+.consolidation-sub { font-size: 11px; color: var(--text2); margin-bottom: 10px; }
+.opp-card {
+  background: rgba(34,197,94,0.07); border: 1px solid rgba(34,197,94,0.25);
+  border-radius: var(--r); padding: 10px 14px; margin-bottom: 8px;
+}
+.opp-zones { display: flex; align-items: center; gap: 6px; margin-bottom: 5px; flex-wrap: wrap; }
+.zone-tag { background: var(--surface2); border: 1px solid var(--border); border-radius: 6px; padding: 2px 9px; font-size: 12px; font-weight: 700; }
+.savings-badge { background: rgba(34,197,94,0.25); color: #86efac; border-radius: 10px; padding: 2px 10px; font-size: 12px; font-weight: 800; margin-left: 6px; }
+.opp-detail { font-size: 12px; color: var(--text2); }
+.opp-detail strong { color: var(--text); }
+
+/* ── Truck result (bin packing) ───────────────────── */
+.truck-result { background: var(--surface); border: 1px solid var(--border); border-radius: var(--r); margin-bottom: 14px; overflow: hidden; }
+.tr-header { padding: 11px 15px; background: var(--surface2); display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid var(--border); }
+.tr-name { font-weight: 700; font-size: 15px; }
+.tr-pills { display: flex; gap: 7px; flex-wrap: wrap; }
+.pill { padding: 3px 9px; border-radius: 20px; font-size: 11px; font-weight: 700; }
+.pill-blue { background: rgba(59,130,246,0.2); color: #93c5fd; }
+.pill-green { background: rgba(34,197,94,0.2); color: #86efac; }
+.pill-yellow { background: rgba(245,158,11,0.2); color: #fcd34d; }
+.pill-red { background: rgba(239,68,68,0.2); color: #fca5a5; }
+.tr-body { padding: 13px 15px; }
+
+/* Progress */
+.prog-row { display: flex; align-items: center; gap: 10px; margin-bottom: 8px; }
+.prog-label { font-size: 11px; color: var(--text2); width: 90px; flex-shrink: 0; }
+.prog-bar { flex: 1; height: 7px; background: var(--surface2); border-radius: 4px; overflow: hidden; }
+.prog-fill { height: 100%; border-radius: 4px; transition: width 0.5s ease; }
+.prog-pct { font-size: 12px; font-weight: 700; width: 38px; text-align: right; }
+
+/* Visualizations */
+.viz-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 12px; }
+.viz-box { border: 1px solid var(--border); border-radius: 6px; overflow: hidden; }
+.viz-title { background: var(--surface2); padding: 5px 10px; font-size: 11px; font-weight: 700; color: var(--text2); text-transform: uppercase; letter-spacing: 0.4px; }
+.viz-box canvas { display: block; width: 100%; background: #07101e; }
+.viz-legend { background: var(--surface2); padding: 6px 10px; display: flex; flex-wrap: wrap; gap: 8px; border-top: 1px solid var(--border); }
+.legend-item { display: flex; align-items: center; gap: 5px; font-size: 11px; color: var(--text2); }
+.legend-dot { width: 10px; height: 10px; border-radius: 2px; flex-shrink: 0; }
+
+/* Tables */
+.items-table { width: 100%; border-collapse: collapse; font-size: 12px; }
+.items-table th { background: var(--surface2); padding: 6px 10px; text-align: left; font-weight: 700; font-size: 11px; color: var(--text2); text-transform: uppercase; letter-spacing: 0.3px; border-bottom: 1px solid var(--border); }
+.items-table td { padding: 6px 10px; border-bottom: 1px solid rgba(71,85,105,0.25); vertical-align: middle; }
+.items-table tr:last-child td { border-bottom: none; }
+.color-dot { width: 10px; height: 10px; border-radius: 50%; display: inline-block; margin-right: 5px; vertical-align: middle; }
+
+/* Customer delivery section */
+.customer-section { background: rgba(139,92,246,0.07); border: 1px solid rgba(139,92,246,0.3); border-radius: var(--r); padding: 12px; margin-bottom: 14px; }
+.cust-section-title { font-size: 12px; font-weight: 700; color: #c4b5fd; margin-bottom: 10px; display: flex; align-items: center; gap: 6px; }
+.cust-delivery-row { display: flex; align-items: center; gap: 8px; padding: 7px 0; border-bottom: 1px solid rgba(71,85,105,0.2); }
+.cust-delivery-row:last-child { border-bottom: none; padding-bottom: 0; }
+.cust-stop { font-size: 12px; font-weight: 800; color: var(--text2); width: 60px; flex-shrink: 0; }
+
+/* Warnings */
+.unplaced { background: rgba(239,68,68,0.08); border: 1px solid rgba(239,68,68,0.3); border-radius: var(--r); padding: 12px; margin-bottom: 14px; }
+.unplaced-title { color: #fca5a5; font-weight: 700; margin-bottom: 7px; font-size: 13px; }
+.split-warn { background: rgba(245,158,11,0.1); border: 1px solid rgba(245,158,11,0.3); border-radius: var(--r); padding: 10px 12px; margin-bottom: 12px; font-size: 12px; color: #fcd34d; }
+
+.section-hdr { font-size: 12px; font-weight: 700; color: var(--text2); text-transform: uppercase; letter-spacing: 0.4px; margin: 12px 0 7px; }
+.no-items { text-align: center; color: var(--text2); font-size: 12px; padding: 14px 0; }
+.divider { border: none; border-top: 1px solid var(--border); margin: 14px 0; }
+
+/* Scrollbar */
+::-webkit-scrollbar { width: 5px; }
+::-webkit-scrollbar-track { background: var(--surface); }
+::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
+::-webkit-scrollbar-thumb:hover { background: #64748b; }
+
+/* Print button */
+.btn-print { padding: 7px 14px; border-radius: 6px; border: 1px solid rgba(255,255,255,0.15); background: rgba(255,255,255,0.08); color: var(--text); cursor: pointer; font-size: 12px; font-weight: 600; display: flex; align-items: center; gap: 6px; transition: background 0.15s; white-space: nowrap; }
+.btn-print:hover { background: rgba(255,255,255,0.15); }
+
+/* Print-only header block — hidden on screen */
+.print-only { display: none; }
+
+/* ══ PRINT / PDF STYLES ══════════════════════════════════════════════ */
+@page { size: A4 landscape; margin: 1.2cm 1.5cm; }
+
+@media print {
+  * { -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; }
+
+  body { background: #fff !important; color: #111 !important; font-size: 10pt; }
+
+  /* Show print-only elements */
+  .print-only { display: block !important; }
+
+  /* Hide interactive chrome */
+  .sidebar, .unit-toggle, .btn-print, .btn-optimize, .opt-bar, .tabs,
+  .empty-state, .add-form, #empty-state { display: none !important; }
+
+  /* Full-width layout */
+  .header { background: #1e3a5f !important; color: #fff !important; padding: 8px 16px !important; border-bottom: none !important; page-break-after: avoid; }
+  .header h1 { font-size: 14pt !important; color: #fff !important; }
+  .header .sub { color: #94a3b8 !important; }
+  .layout { display: block !important; height: auto !important; }
+  .main { overflow: visible !important; padding: 10px 0 0 !important; }
+  #results { display: block !important; }
+
+  /* Summary cards */
+  .summary-grid { grid-template-columns: repeat(4, 1fr) !important; gap: 8px !important; page-break-after: avoid; margin-bottom: 10px !important; }
+  .sum-card { background: #f8fafc !important; border: 1px solid #e2e8f0 !important; padding: 8px 12px !important; }
+  .sum-label { color: #64748b !important; }
+  .sum-val { font-size: 18pt !important; }
+  .sum-sub { color: #64748b !important; }
+
+  /* Route analysis box */
+  .route-analysis { background: #f8fafc !important; border: 1px solid #e2e8f0 !important; padding: 12px !important; margin-bottom: 10px !important; page-break-inside: avoid; }
+  .ra-header h3 { color: #1e293b !important; font-size: 12pt !important; }
+  .ra-header .sub { color: #64748b !important; }
+  .zone-chips { gap: 6px !important; margin-bottom: 10px !important; }
+  .zone-chip { background: #f1f5f9 !important; border: 1px solid #e2e8f0 !important; padding: 7px 10px !important; }
+  .zone-chip-name { color: #1e293b !important; font-size: 10pt !important; }
+  .zone-chip-sub { color: #64748b !important; }
+  .zone-chip-cost { color: #166534 !important; }
+  .zone-chip-warn { color: #dc2626 !important; }
+  .zone-table-hdr { color: #1e293b !important; border-bottom-color: #e2e8f0 !important; }
+  .zone-dist { background: #dbeafe !important; color: #1e40af !important; }
+  .carrier-table { font-size: 8.5pt !important; }
+  .carrier-table th { background: #f1f5f9 !important; color: #475569 !important; border-bottom-color: #e2e8f0 !important; }
+  .carrier-table td { border-bottom-color: #f1f5f9 !important; }
+  .carrier-table tr.row-best td { background: #f0fdf4 !important; }
+  .carrier-table tr.row-no td { opacity: 0.6 !important; }
+  .badge-own { background: #dbeafe !important; color: #1e40af !important; }
+  .badge-ext { background: #ede9fe !important; color: #6d28d9 !important; }
+  .status-best { background: #dcfce7 !important; color: #166534 !important; }
+  .status-ok   { background: #dbeafe !important; color: #1e40af !important; }
+  .status-no   { background: #fee2e2 !important; color: #991b1b !important; }
+  .cell-green  { color: #166534 !important; }
+  .cell-yellow { color: #92400e !important; }
+  .cell-red    { color: #991b1b !important; }
+  .consolidation-section { border-top-color: #e2e8f0 !important; }
+  .consolidation-hdr { color: #1e293b !important; }
+  .consolidation-sub { color: #64748b !important; }
+  .opp-card { background: #f0fdf4 !important; border-color: #bbf7d0 !important; }
+  .opp-detail { color: #374151 !important; }
+  .savings-badge { background: #bbf7d0 !important; color: #166534 !important; }
+  .zone-tag { background: #f1f5f9 !important; color: #1e293b !important; border-color: #e2e8f0 !important; }
+
+  /* Warnings */
+  .split-warn { background: #fffbeb !important; border-color: #fde68a !important; color: #92400e !important; page-break-inside: avoid; }
+  .unplaced { background: #fef2f2 !important; border-color: #fecaca !important; page-break-inside: avoid; }
+  .unplaced-title { color: #dc2626 !important; }
+
+  /* Load plan heading */
+  .load-plan-heading { color: #1e293b !important; }
+
+  /* Per-truck card */
+  .truck-result { background: #f8fafc !important; border: 1px solid #e2e8f0 !important; page-break-inside: avoid; break-inside: avoid; margin-bottom: 10px !important; }
+  .tr-header { background: #e2e8f0 !important; padding: 8px 12px !important; }
+  .tr-name { color: #1e293b !important; font-size: 11pt !important; }
+  .tr-body { padding: 8px 12px !important; }
+  .pill-green  { background: #dcfce7 !important; color: #166534 !important; }
+  .pill-blue   { background: #dbeafe !important; color: #1e40af !important; }
+  .pill-yellow { background: #fef9c3 !important; color: #854d0e !important; }
+  .pill-red    { background: #fee2e2 !important; color: #991b1b !important; }
+
+  /* Progress bars */
+  .prog-row { margin-bottom: 4px !important; }
+  .prog-label { color: #64748b !important; font-size: 9pt !important; }
+  .prog-bar { background: #e2e8f0 !important; height: 5px !important; }
+  .prog-pct { font-size: 9pt !important; }
+
+  /* Viz: two columns, reduced height */
+  .viz-grid { grid-template-columns: 1fr 1fr !important; gap: 6px !important; margin-bottom: 8px !important; }
+  .viz-box canvas { max-height: 130px !important; object-fit: contain; }
+  .viz-title { background: #e2e8f0 !important; color: #475569 !important; font-size: 8pt !important; }
+  .viz-legend { background: #f1f5f9 !important; padding: 4px 8px !important; gap: 6px !important; }
+  .legend-item { color: #475569 !important; font-size: 8pt !important; }
+
+  /* Customer section */
+  .customer-section { background: #f5f3ff !important; border-color: #ddd6fe !important; padding: 8px 10px !important; margin-bottom: 8px !important; }
+  .cust-section-title { color: #6d28d9 !important; }
+  .cust-stop { color: #64748b !important; }
+
+  /* Items table */
+  .section-hdr { color: #64748b !important; }
+  .items-table th { background: #f1f5f9 !important; color: #475569 !important; border-bottom-color: #e2e8f0 !important; }
+  .items-table td { border-bottom-color: #f1f5f9 !important; }
+}
+</style>
+</head>
+<body>
+
+<div class="header">
+  <span class="header-icon">🚛</span>
+  <div>
+    <h1>Truck Load Optimizer</h1>
+    <div class="sub">Multi-carrier · multi-customer · route cost intelligence · 3D bin packing</div>
+  </div>
+  <label class="unit-toggle">
+    <input type="checkbox" id="metricToggle" onchange="toggleUnits()"> Metric (m / kg)
+  </label>
+  <button class="btn-print" onclick="printReport()" title="Export to PDF via browser print dialog">🖨 Print / PDF</button>
+</div>
+
+<!-- Shown only when printing -->
+<div class="print-only" id="print-header" style="padding:8px 0 12px; border-bottom:2px solid #e2e8f0; margin-bottom:14px;">
+  <div style="font-size:10pt;color:#64748b;margin-top:3px" id="print-meta"></div>
+</div>
+
+<div class="layout">
+  <!-- ══ SIDEBAR ══ -->
+  <div class="sidebar">
+    <div class="tabs">
+      <button class="tab-btn active" id="tab-btn-trucks"    onclick="showTab('trucks')">🚛 Fleet</button>
+      <button class="tab-btn"        id="tab-btn-carriers"  onclick="showTab('carriers')">🏢 Carriers</button>
+      <button class="tab-btn"        id="tab-btn-customers" onclick="showTab('customers')">👥 Customers</button>
+      <button class="tab-btn"        id="tab-btn-items"     onclick="showTab('items')">📦 Items</button>
+    </div>
+
+    <!-- ── FLEET TAB ── -->
+    <div class="tab-panel active" id="tab-trucks">
+      <div class="add-form">
+        <div class="add-form-title">+ Add Own-Fleet Truck</div>
+        <div class="form-grid">
+          <div class="form-group full"><label>Name</label>
+            <input type="text" id="t-name" value="Semi Truck 1"></div>
+          <div class="form-group"><label id="lbl-tl">Length (ft)</label>
+            <input type="number" id="t-length" value="53" min="0.5" step="0.5"></div>
+          <div class="form-group"><label id="lbl-tw">Width (ft)</label>
+            <input type="number" id="t-width" value="8.5" min="0.5" step="0.5"></div>
+          <div class="form-group"><label id="lbl-th">Height (ft)</label>
+            <input type="number" id="t-height" value="9" min="0.5" step="0.5"></div>
+          <div class="form-group"><label id="lbl-tmw">Max Weight (lbs)</label>
+            <input type="number" id="t-maxwt" value="44000" min="1"></div>
+          <div class="form-group"><label>Base Rate ($)</label>
+            <input type="number" id="t-baserate" value="600" min="0" step="10" placeholder="$ per trip"></div>
+          <div class="form-group"><label>Rate / Mile ($)</label>
+            <input type="number" id="t-rpermile" value="3.50" min="0" step="0.05" placeholder="$ / mile"></div>
+        </div>
+        <button class="btn btn-primary btn-full" onclick="addTruck()">Add Truck</button>
+      </div>
+      <div id="truck-list"></div>
+    </div>
+
+    <!-- ── CARRIERS TAB ── -->
+    <div class="tab-panel" id="tab-carriers">
+      <div class="add-form">
+        <div class="add-form-title">+ Add External Carrier</div>
+        <div class="form-grid">
+          <div class="form-group full"><label>Carrier Name</label>
+            <input type="text" id="ca-name" placeholder="e.g. FastFreight LLC"></div>
+        </div>
+        <button class="btn btn-primary btn-full" onclick="addCarrier()">Add Carrier</button>
+      </div>
+      <div style="font-size:11px;color:var(--text2);margin-bottom:10px;padding:7px 9px;background:rgba(139,92,246,0.07);border-radius:6px;border:1px solid rgba(139,92,246,0.2)">
+        ℹ️ External carriers appear in route cost comparisons. Add their truck types and rates to see if they beat your own fleet.
+      </div>
+      <div id="carrier-list"></div>
+    </div>
+
+    <!-- ── CUSTOMERS TAB ── -->
+    <div class="tab-panel" id="tab-customers">
+      <div class="add-form">
+        <div class="add-form-title">+ Add Customer</div>
+        <div class="form-grid">
+          <div class="form-group full"><label>Customer Name</label>
+            <input type="text" id="c-name" placeholder="e.g. Acme Corp"></div>
+          <div class="form-group"><label>Delivery Stop # <span style="font-weight:400;text-transform:none;font-size:10px">(1=first)</span></label>
+            <input type="number" id="c-stop" value="1" min="1" step="1"></div>
+          <div class="form-group"><label>Color</label>
+            <input type="color" id="c-color" value="#3b82f6" style="height:34px;padding:2px 4px;cursor:pointer"></div>
+          <div class="form-group full"><label>Destination Zone / City</label>
+            <input type="text" id="c-zone" placeholder="e.g. Chicago Metro"></div>
+          <div class="form-group"><label id="lbl-cdist">Distance (mi)</label>
+            <input type="number" id="c-distance" value="0" min="0" step="10" placeholder="Miles from depot"></div>
+          <div class="form-group"><label style="visibility:hidden">x</label>
+            <div style="font-size:10px;color:var(--text2);padding-top:8px">From depot to this zone</div>
+          </div>
+        </div>
+        <button class="btn btn-primary btn-full" onclick="addCustomer()">Add Customer</button>
+      </div>
+      <div style="font-size:11px;color:var(--text2);margin-bottom:10px;padding:7px 9px;background:rgba(59,130,246,0.07);border-radius:6px;border:1px solid rgba(59,130,246,0.2)">
+        ℹ️ Stop 1 = first drop-off (near truck doors). Customers with the same <strong>Zone</strong> are grouped for carrier cost comparison and consolidation analysis.
+      </div>
+      <div id="customer-list"></div>
+    </div>
+
+    <!-- ── ITEMS TAB ── -->
+    <div class="tab-panel" id="tab-items">
+      <div class="add-form">
+        <div class="add-form-title">+ Add Item Type</div>
+        <div class="form-grid">
+          <div class="form-group full"><label>Item Name</label>
+            <input type="text" id="i-name" placeholder="e.g. Pallet A"></div>
+          <div class="form-group full"><label>Customer</label>
+            <select id="i-customer"><option value="">— Unassigned —</option></select></div>
+          <div class="form-group"><label id="lbl-il">Length (ft)</label>
+            <input type="number" id="i-length" value="4" min="0.1" step="0.5"></div>
+          <div class="form-group"><label id="lbl-iw">Width (ft)</label>
+            <input type="number" id="i-width" value="4" min="0.1" step="0.5"></div>
+          <div class="form-group"><label id="lbl-ih">Height (ft)</label>
+            <input type="number" id="i-height" value="4" min="0.1" step="0.5"></div>
+          <div class="form-group"><label id="lbl-iwt">Weight (lbs)</label>
+            <input type="number" id="i-weight" value="500" min="0" step="1"></div>
+          <div class="form-group"><label>Quantity</label>
+            <input type="number" id="i-qty" value="10" min="1"></div>
+          <div class="form-group full"><label class="chk-label">
+            <input type="checkbox" id="i-rotate" checked> Allow rotation (all orientations)
+          </label></div>
+        </div>
+        <button class="btn btn-primary btn-full" onclick="addItem()">Add Item</button>
+      </div>
+      <div id="item-list"></div>
+    </div>
+
+    <div class="opt-bar">
+      <div class="opt-counts" id="opt-counts">0 items · 0 trucks · 0 customers · 0 carriers</div>
+      <button class="btn-optimize" onclick="optimize()">⚡ Optimize & Analyze Routes</button>
+    </div>
+  </div>
+
+  <!-- ══ MAIN CONTENT ══ -->
+  <div class="main" id="main">
+    <div class="empty-state" id="empty-state">
+      <div class="empty-icon">🚛</div>
+      <h3>Ready to Optimize</h3>
+      <p>Add fleet trucks, external carriers, customers (with zones), and items — then click <strong>Optimize & Analyze Routes</strong>.</p>
+    </div>
+    <div id="results" style="display:none"></div>
+  </div>
+</div>
+
+<script>
+// ═══════════════════════════════════════════════════
+//  STATE
+// ═══════════════════════════════════════════════════
+let useMetric = false;
+let trucks = [], items = [], customers = [], carriers = [];
+let nextTruckId = 1, nextItemId = 1, nextCustomerId = 1, nextCarrierId = 1, nextCarrierTruckId = 1;
+let colorIdx = 0;
+const CUST_COLORS = ['#3b82f6','#ef4444','#22c55e','#f59e0b','#8b5cf6','#06b6d4','#f97316','#ec4899','#14b8a6','#a855f7','#84cc16','#0ea5e9','#d946ef','#fb923c','#34d399'];
+const RES = 0.5;
+const CORRIDOR_THRESHOLD = 200; // miles: zones within this range can be consolidated
+
+// ═══════════════════════════════════════════════════
+//  UNITS
+// ═══════════════════════════════════════════════════
+function toggleUnits() {
+  useMetric = document.getElementById('metricToggle').checked;
+  const du = useMetric ? 'm' : 'ft', wu = useMetric ? 'kg' : 'lbs', du2 = useMetric ? 'km' : 'mi';
+  [['lbl-tl','Length'],['lbl-tw','Width'],['lbl-th','Height']].forEach(([id,lbl]) => {
+    document.getElementById(id).textContent = `${lbl} (${du})`;
+  });
+  document.getElementById('lbl-tmw').textContent = `Max Weight (${wu})`;
+  [['lbl-il','Length'],['lbl-iw','Width'],['lbl-ih','Height']].forEach(([id,lbl]) => {
+    document.getElementById(id).textContent = `${lbl} (${du})`;
+  });
+  document.getElementById('lbl-iwt').textContent = `Weight (${wu})`;
+  document.getElementById('lbl-cdist').textContent = `Distance (${du2})`;
+  renderSidebar();
+}
+const dimUnit = () => useMetric ? 'm' : 'ft';
+const wtUnit  = () => useMetric ? 'kg' : 'lbs';
+const distUnit = () => useMetric ? 'km' : 'mi';
+
+// ═══════════════════════════════════════════════════
+//  TABS
+// ═══════════════════════════════════════════════════
+function showTab(name) {
+  ['trucks','carriers','customers','items'].forEach(t => {
+    document.getElementById('tab-' + t).classList.toggle('active', t === name);
+    document.getElementById('tab-btn-' + t).classList.toggle('active', t === name);
+  });
+}
+
+// ═══════════════════════════════════════════════════
+//  ADD / REMOVE
+// ═══════════════════════════════════════════════════
+function addTruck() {
+  const name      = val('t-name')     || `Truck ${nextTruckId}`;
+  const length    = num('t-length')   || 53;
+  const width     = num('t-width')    || 8.5;
+  const height    = num('t-height')   || 9;
+  const maxWt     = num('t-maxwt')    || 44000;
+  const baseRate  = num('t-baserate') || 0;
+  const ratePerMi = num('t-rpermile') || 0;
+  trucks.push({ id: nextTruckId++, name, length, width, height, maxWt, baseRate, ratePerMi });
+  document.getElementById('t-name').value = `Semi Truck ${nextTruckId}`;
+  renderSidebar();
+}
+function removeTruck(id) { trucks = trucks.filter(t => t.id !== id); renderSidebar(); }
+
+function addCarrier() {
+  const name = val('ca-name') || `Carrier ${nextCarrierId}`;
+  carriers.push({ id: nextCarrierId++, name, trucks: [] });
+  document.getElementById('ca-name').value = '';
+  renderSidebar();
+}
+function removeCarrier(id) { carriers = carriers.filter(c => c.id !== id); renderSidebar(); }
+
+function toggleCarrierTruckForm(cid) {
+  const el = document.getElementById(`ct-form-${cid}`);
+  if (el) el.style.display = el.style.display === 'none' ? 'block' : 'none';
+}
+
+function addCarrierTruck(cid) {
+  const carrier = carriers.find(c => c.id === cid);
+  if (!carrier) return;
+  const name      = val(`ct-name-${cid}`)     || 'Truck';
+  const length    = num(`ct-length-${cid}`)   || 48;
+  const width     = num(`ct-width-${cid}`)    || 8.5;
+  const height    = num(`ct-height-${cid}`)   || 9;
+  const maxWt     = num(`ct-maxwt-${cid}`)    || 44000;
+  const baseRate  = num(`ct-baserate-${cid}`) || 0;
+  const ratePerMi = num(`ct-rpm-${cid}`)      || 0;
+  carrier.trucks.push({ tid: nextCarrierTruckId++, name, length, width, height, maxWt, baseRate, ratePerMi });
+  // Clear inline form
+  [`ct-name-${cid}`,`ct-length-${cid}`,`ct-width-${cid}`,`ct-height-${cid}`,`ct-maxwt-${cid}`,`ct-baserate-${cid}`,`ct-rpm-${cid}`].forEach(id => {
+    const el = document.getElementById(id); if (el) el.value = '';
+  });
+  renderSidebar();
+}
+function removeCarrierTruck(cid, tid) {
+  const carrier = carriers.find(c => c.id === cid);
+  if (carrier) carrier.trucks = carrier.trucks.filter(t => t.tid !== tid);
+  renderSidebar();
+}
+
+function addCustomer() {
+  const name     = val('c-name')     || `Customer ${nextCustomerId}`;
+  const stop     = parseInt(document.getElementById('c-stop').value) || nextCustomerId;
+  const color    = document.getElementById('c-color').value || CUST_COLORS[colorIdx % CUST_COLORS.length];
+  const zone     = val('c-zone')     || '';
+  const distance = num('c-distance') || 0;
+  colorIdx++;
+  customers.push({ id: nextCustomerId++, name, stop, color, zone, distance });
+  customers.sort((a, b) => a.stop - b.stop);
+  document.getElementById('c-name').value = '';
+  document.getElementById('c-stop').value = customers.length + 1;
+  document.getElementById('c-zone').value = '';
+  renderSidebar();
+}
+function removeCustomer(id) {
+  customers = customers.filter(c => c.id !== id);
+  items.forEach(i => { if (i.customerId === id) i.customerId = null; });
+  renderSidebar();
+}
+
+function addItem() {
+  const name       = val('i-name')   || `Item ${nextItemId}`;
+  const length     = num('i-length') || 4;
+  const width      = num('i-width')  || 4;
+  const height     = num('i-height') || 4;
+  const weight     = num('i-weight') || 0;
+  const qty        = parseInt(document.getElementById('i-qty').value) || 1;
+  const rotate     = document.getElementById('i-rotate').checked;
+  const custId     = document.getElementById('i-customer').value;
+  const customerId = custId ? parseInt(custId) : null;
+  items.push({ id: nextItemId++, name, length, width, height, weight, qty, rotate, customerId });
+  document.getElementById('i-name').value = '';
+  renderSidebar();
+}
+function removeItem(id) { items = items.filter(i => i.id !== id); renderSidebar(); }
+
+// ═══════════════════════════════════════════════════
+//  SIDEBAR RENDER
+// ═══════════════════════════════════════════════════
+function renderSidebar() {
+  // Fleet trucks
+  const tl = document.getElementById('truck-list');
+  tl.innerHTML = trucks.length === 0
+    ? '<div class="no-items">No trucks added yet.</div>'
+    : trucks.map(t => `
+      <div class="entity-card">
+        <div class="entity-header">
+          <div>
+            <div class="entity-name">🚛 ${esc(t.name)}</div>
+            <div class="entity-dims">${t.length}×${t.width}×${t.height} ${dimUnit()} · Max ${fmt(t.maxWt)} ${wtUnit()}</div>
+            <div class="entity-dims">${t.baseRate||t.ratePerMi ? `$${t.baseRate||0} base · $${t.ratePerMi||0}/${distUnit()}` : 'No cost set'}</div>
+          </div>
+          <button class="btn btn-danger" onclick="removeTruck(${t.id})">✕</button>
+        </div>
+      </div>`).join('');
+
+  // Carriers
+  const cl = document.getElementById('carrier-list');
+  cl.innerHTML = carriers.length === 0
+    ? '<div class="no-items">No external carriers added yet.</div>'
+    : carriers.map(c => `
+      <div class="entity-card">
+        <div class="entity-header">
+          <div>
+            <div class="entity-name">🏢 ${esc(c.name)}</div>
+            <div class="entity-dims">${c.trucks.length} truck type${c.trucks.length!==1?'s':''}</div>
+          </div>
+          <div style="display:flex;gap:5px;align-items:center">
+            <button class="btn btn-success btn-sm" onclick="toggleCarrierTruckForm(${c.id})">+ Truck</button>
+            <button class="btn btn-danger btn-sm" onclick="removeCarrier(${c.id})">✕</button>
+          </div>
+        </div>
+        <!-- Inline add-truck form -->
+        <div id="ct-form-${c.id}" class="ct-add-form" style="display:none">
+          <div style="font-size:11px;font-weight:700;color:#86efac;margin-bottom:7px">Add Truck Type</div>
+          <div class="form-grid">
+            <div class="form-group full"><label>Name</label>
+              <input type="text" id="ct-name-${c.id}" placeholder="e.g. 48ft Dry Van"></div>
+            <div class="form-group"><label>${dimUnit()}</label>
+              <input type="number" id="ct-length-${c.id}" placeholder="Length" value="48" step="0.5"></div>
+            <div class="form-group"><label>${dimUnit()}</label>
+              <input type="number" id="ct-width-${c.id}" placeholder="Width" value="8.5" step="0.5"></div>
+            <div class="form-group"><label>${dimUnit()}</label>
+              <input type="number" id="ct-height-${c.id}" placeholder="Height" value="9" step="0.5"></div>
+            <div class="form-group"><label>${wtUnit()}</label>
+              <input type="number" id="ct-maxwt-${c.id}" placeholder="Max weight" value="44000"></div>
+            <div class="form-group"><label>Base $</label>
+              <input type="number" id="ct-baserate-${c.id}" placeholder="Base rate" value="500" step="10"></div>
+            <div class="form-group"><label>$/${distUnit()}</label>
+              <input type="number" id="ct-rpm-${c.id}" placeholder="Per mile" value="3.00" step="0.05"></div>
+          </div>
+          <button class="btn btn-success btn-full" onclick="addCarrierTruck(${c.id})">Add This Truck Type</button>
+        </div>
+        <!-- Truck list -->
+        ${c.trucks.length > 0 ? `<div class="ct-list">
+          ${c.trucks.map(t => `<div class="ct-row">
+            <div><span class="ct-row-name">${esc(t.name)}</span>
+              <span style="margin-left:6px;color:var(--text2)">${t.length}×${t.width}×${t.height} ${dimUnit()} · ${fmt(t.maxWt)} ${wtUnit()}</span>
+              <span style="margin-left:6px;color:#86efac">$${t.baseRate||0}+$${t.ratePerMi||0}/${distUnit()}</span>
+            </div>
+            <button class="btn btn-danger btn-sm" onclick="removeCarrierTruck(${c.id},${t.tid})">✕</button>
+          </div>`).join('')}
+        </div>` : ''}
+      </div>`).join('');
+
+  // Customers
+  const custl = document.getElementById('customer-list');
+  custl.innerHTML = customers.length === 0
+    ? '<div class="no-items">No customers added yet.</div>'
+    : customers.map(c => {
+        const cItems = items.filter(i => i.customerId === c.id);
+        const totalQty = cItems.reduce((s, i) => s + i.qty, 0);
+        return `<div class="entity-card">
+          <div class="entity-header">
+            <div style="display:flex;align-items:flex-start;gap:7px">
+              <div class="color-swatch" style="background:${c.color};margin-top:2px"></div>
+              <div>
+                <div class="entity-name">${esc(c.name)} <span class="stop-badge" style="background:${c.color}22;color:${c.color}">Stop #${c.stop}</span></div>
+                <div class="entity-dims">${c.zone ? `📍 ${esc(c.zone)}` : 'No zone'} ${c.distance ? `· ${c.distance} ${distUnit()}` : ''}</div>
+                <div class="entity-dims">${totalQty} item unit${totalQty!==1?'s':''} assigned</div>
+              </div>
+            </div>
+            <button class="btn btn-danger" onclick="removeCustomer(${c.id})">✕</button>
+          </div>
+        </div>`;
+      }).join('');
+
+  // Items
+  const il = document.getElementById('item-list');
+  il.innerHTML = items.length === 0
+    ? '<div class="no-items">No items added yet.</div>'
+    : items.map(i => {
+        const cust = customers.find(c => c.id === i.customerId);
+        const custBadge = cust
+          ? `<span style="font-size:10px;padding:1px 5px;border-radius:8px;background:${cust.color}22;color:${cust.color};font-weight:700">${esc(cust.name)}</span>`
+          : `<span style="font-size:10px;color:var(--text2)">Unassigned</span>`;
+        const dotColor = cust ? cust.color : '#64748b';
+        return `<div class="entity-card">
+          <div class="entity-header">
+            <div style="display:flex;align-items:flex-start;gap:7px">
+              <div class="color-swatch" style="background:${dotColor};margin-top:2px"></div>
+              <div>
+                <div class="entity-name">${esc(i.name)} ${custBadge}</div>
+                <div class="entity-dims">${i.length}×${i.width}×${i.height} ${dimUnit()} · ${fmt(i.weight)} ${wtUnit()} · Qty ${i.qty}</div>
+                <div class="entity-dims">${i.rotate ? '↻ rotatable' : '⚠ fixed orient.'}</div>
+              </div>
+            </div>
+            <button class="btn btn-danger" onclick="removeItem(${i.id})">✕</button>
+          </div>
+        </div>`;
+      }).join('');
+
+  // Customer dropdown in items tab
+  const sel = document.getElementById('i-customer');
+  const prev = sel.value;
+  sel.innerHTML = '<option value="">— Unassigned —</option>' +
+    customers.map(c => `<option value="${c.id}">${esc(c.name)} (Stop #${c.stop}${c.zone?' · '+c.zone:''})</option>`).join('');
+  sel.value = prev;
+
+  const totalItems = items.reduce((s, i) => s + i.qty, 0);
+  document.getElementById('opt-counts').textContent =
+    `${totalItems} items · ${trucks.length} truck${trucks.length!==1?'s':''} · ${customers.length} customer${customers.length!==1?'s':''} · ${carriers.length} carrier${carriers.length!==1?'s':''}`;
+}
+
+// ═══════════════════════════════════════════════════
+//  PACKING ALGORITHM
+// ═══════════════════════════════════════════════════
+class TruckPacker {
+  constructor(truck) {
+    this.truck = truck;
+    this.placements = [];
+    this.usedWeight = 0;
+    this.gW = Math.ceil(truck.width  / RES) + 1;
+    this.gL = Math.ceil(truck.length / RES) + 1;
+    this.hmap = Array.from({ length: this.gL }, () => new Float32Array(this.gW));
+    this.customerZones = {};
+  }
+
+  orientations(item) {
+    const { length: l, width: w, height: h } = item;
+    const all = [[w,h,l],[l,h,w],[w,l,h],[l,w,h],[h,w,l],[h,l,w]];
+    const seen = new Set();
+    return all.filter(([iw,ih,id]) => {
+      const k = `${iw},${ih},${id}`;
+      if (seen.has(k)) return false; seen.add(k);
+      return iw <= this.truck.width  + 0.001 &&
+             ih <= this.truck.height + 0.001 &&
+             id <= this.truck.length + 0.001;
+    });
+  }
+
+  tryPlace(item) {
+    if (this.usedWeight + item.weight > this.truck.maxWt + 0.001) return null;
+    const orients = item.rotate ? this.orientations(item) : [[item.width, item.height, item.length]];
+    let best = null, bestScore = Infinity;
+
+    for (const [iw, ih, id] of orients) {
+      const gw = Math.max(1, Math.ceil(iw / RES));
+      const gd = Math.max(1, Math.ceil(id / RES));
+      const maxGX = this.gW - gw, maxGZ = this.gL - gd;
+      if (maxGX < 0 || maxGZ < 0) continue;
+
+      for (let gz = 0; gz <= maxGZ; gz++) {
+        for (let gx = 0; gx <= maxGX; gx++) {
+          let maxH = 0, ok = true;
+          outer: for (let dz = 0; dz < gd; dz++) {
+            const row = this.hmap[gz + dz];
+            for (let dx = 0; dx < gw; dx++) {
+              const h2 = row[gx + dx];
+              if (h2 > maxH) { maxH = h2; if (maxH + ih > this.truck.height + 0.001) { ok = false; break outer; } }
+            }
+          }
+          if (ok && maxH + ih <= this.truck.height + 0.001) {
+            const score = maxH * 1e7 + gz * 1e4 + gx;
+            if (score < bestScore) { bestScore = score; best = { x: gx*RES, y: maxH, z: gz*RES, w: iw, h: ih, d: id, gx, gz, gw, gd }; }
+          }
+        }
+      }
+    }
+
+    if (!best) return null;
+    const newTop = best.y + best.h;
+    for (let dz = 0; dz < best.gd; dz++) { const row = this.hmap[best.gz + dz]; for (let dx = 0; dx < best.gw; dx++) row[best.gx + dx] = newTop; }
+    this.usedWeight += item.weight;
+
+    const cid = item.customerId;
+    if (cid != null) {
+      if (!this.customerZones[cid]) this.customerZones[cid] = { minZ: Infinity, maxZ: -Infinity };
+      this.customerZones[cid].minZ = Math.min(this.customerZones[cid].minZ, best.z);
+      this.customerZones[cid].maxZ = Math.max(this.customerZones[cid].maxZ, best.z + best.d);
+    }
+
+    const pl = { itemId: item.id, name: item.name, customerId: cid, x: best.x, y: best.y, z: best.z, w: best.w, h: best.h, d: best.d };
+    this.placements.push(pl);
+    return pl;
+  }
+}
+
+// ═══════════════════════════════════════════════════
+//  ROUTE ANALYSIS
+// ═══════════════════════════════════════════════════
+function analyzeRoutes() {
+  // Cargo per customer (from items)
+  const custCargo = {};
+  for (const item of items) {
+    if (item.customerId == null) continue;
+    if (!custCargo[item.customerId]) custCargo[item.customerId] = { vol: 0, wt: 0 };
+    custCargo[item.customerId].vol += item.length * item.width * item.height * item.qty;
+    custCargo[item.customerId].wt  += item.weight * item.qty;
+  }
+
+  // Group customers by zone (case-insensitive)
+  const zoneMap = {};
+  for (const cust of customers) {
+    const key = (cust.zone || '').trim().toLowerCase() || '(no zone)';
+    const display = cust.zone?.trim() || '(No Zone)';
+    if (!zoneMap[key]) zoneMap[key] = { zone: display, customers: [], distance: 0, totalVol: 0, totalWt: 0 };
+    zoneMap[key].customers.push(cust);
+    zoneMap[key].distance = Math.max(zoneMap[key].distance, cust.distance || 0);
+    const cargo = custCargo[cust.id] || { vol: 0, wt: 0 };
+    zoneMap[key].totalVol += cargo.vol;
+    zoneMap[key].totalWt  += cargo.wt;
+  }
+
+  // Master truck list: own fleet + all external carrier trucks
+  const allOptions = [];
+  for (const t of trucks) {
+    allOptions.push({ carrierName: 'Own Fleet', carrierType: 'own', truckName: t.name,
+      vol: t.length * t.width * t.height, maxWt: t.maxWt, baseRate: t.baseRate || 0, ratePerMi: t.ratePerMi || 0 });
+  }
+  for (const carrier of carriers) {
+    for (const ct of carrier.trucks) {
+      allOptions.push({ carrierName: carrier.name, carrierType: 'external', truckName: ct.name,
+        vol: ct.length * ct.width * ct.height, maxWt: ct.maxWt, baseRate: ct.baseRate || 0, ratePerMi: ct.ratePerMi || 0 });
+    }
+  }
+
+  // Per-zone options
+  const zoneGroups = Object.values(zoneMap).map(zg => {
+    const dist = zg.distance;
+    const options = allOptions.map(t => {
+      const hasCost = (t.baseRate > 0 || t.ratePerMi > 0);
+      const cost = hasCost ? (t.baseRate + dist * t.ratePerMi) : null;
+      const volPct = t.vol > 0 ? Math.round(zg.totalVol / t.vol * 100) : 999;
+      const wtPct  = t.maxWt > 0 ? Math.round(zg.totalWt  / t.maxWt * 100) : 999;
+      const fits = volPct <= 100 && wtPct <= 100;
+      return { carrierName: t.carrierName, carrierType: t.carrierType, truckName: t.truckName, cost, volPct, wtPct, fits };
+    });
+    // Sort: fits first, then cheapest (nulls last)
+    options.sort((a, b) => {
+      if (a.fits !== b.fits) return a.fits ? -1 : 1;
+      if (a.cost == null && b.cost == null) return 0;
+      if (a.cost == null) return 1;
+      if (b.cost == null) return -1;
+      return a.cost - b.cost;
+    });
+    const bestFit = options.find(o => o.fits && o.cost != null);
+    if (bestFit) bestFit.recommended = true;
+    return { ...zg, options, bestFit };
+  });
+
+  // Cross-zone consolidation
+  const consolidations = [];
+  for (let i = 0; i < zoneGroups.length; i++) {
+    for (let j = i + 1; j < zoneGroups.length; j++) {
+      const g1 = zoneGroups[i], g2 = zoneGroups[j];
+      const distDiff = Math.abs(g1.distance - g2.distance);
+      if (distDiff > CORRIDOR_THRESHOLD) continue;
+      const combVol = g1.totalVol + g2.totalVol;
+      const combWt  = g1.totalWt  + g2.totalWt;
+      const maxDist = Math.max(g1.distance, g2.distance);
+      if (!g1.bestFit || !g2.bestFit) continue;
+      const separateCost = g1.bestFit.cost + g2.bestFit.cost;
+      let bestCombined = null;
+      for (const t of allOptions) {
+        if (combVol <= t.vol && combWt <= t.maxWt && (t.baseRate > 0 || t.ratePerMi > 0)) {
+          const cost = t.baseRate + maxDist * t.ratePerMi;
+          if (!bestCombined || cost < bestCombined.cost) {
+            bestCombined = { carrierName: t.carrierName, truckName: t.truckName, cost };
+          }
+        }
+      }
+      if (bestCombined && bestCombined.cost < separateCost) {
+        consolidations.push({
+          zones: [g1.zone, g2.zone], distDiff,
+          separateCost, combinedCost: bestCombined.cost,
+          savings: separateCost - bestCombined.cost,
+          recommendation: bestCombined,
+          g1Best: g1.bestFit, g2Best: g2.bestFit
+        });
+      }
+    }
+  }
+  consolidations.sort((a, b) => b.savings - a.savings);
+  return { zoneGroups, consolidations };
+}
+
+// ═══════════════════════════════════════════════════
+//  ROUTE ANALYSIS RENDERING
+// ═══════════════════════════════════════════════════
+function renderRouteAnalysis(zoneGroups, consolidations) {
+  if (zoneGroups.length === 0) return '';
+  const hasAnyCost = zoneGroups.some(zg => zg.options.some(o => o.cost != null));
+
+  const chips = zoneGroups.map(zg => {
+    const custNames = zg.customers.map(c => `<span class="color-dot" style="background:${c.color}"></span>${esc(c.name)}`).join(' ');
+    let costLine = '';
+    if (zg.bestFit && zg.bestFit.cost != null) {
+      costLine = `<div class="zone-chip-cost">Best: $${Math.round(zg.bestFit.cost).toLocaleString()}/run <span style="font-size:10px;opacity:0.8">(${esc(zg.bestFit.carrierName)})</span></div>`;
+    } else if (zg.options.some(o => o.fits)) {
+      costLine = `<div class="zone-chip-nocost">Fits (no rates set)</div>`;
+    } else {
+      costLine = `<div class="zone-chip-warn">⚠ No truck fits!</div>`;
+    }
+    return `<div class="zone-chip">
+      <div class="zone-chip-name">📍 ${esc(zg.zone)}</div>
+      <div class="zone-chip-sub">${custNames}</div>
+      <div class="zone-chip-sub">${fmt(zg.totalWt)} lbs · ${fmt(zg.totalVol)} ${dimUnit()}³ ${zg.distance ? `· ${zg.distance} ${distUnit()}` : ''}</div>
+      ${costLine}
+    </div>`;
+  }).join('');
+
+  const tables = zoneGroups.map(zg => {
+    const dist = zg.distance;
+    const rows = zg.options.slice(0, 8).map(o => {
+      const rowCls = o.recommended ? 'row-best' : !o.fits ? 'row-no' : '';
+      const statusCls = o.recommended ? 'status-best' : !o.fits ? 'status-no' : 'status-ok';
+      const statusLbl = o.recommended ? '★ Cheapest fit' : !o.fits
+        ? (o.volPct > 100 && o.wtPct > 100 ? 'too small (vol+wt)' : o.volPct > 100 ? 'vol overflow' : 'wt overflow')
+        : 'fits';
+      return `<tr class="${rowCls}">
+        <td><span class="${o.carrierType==='own'?'badge-own':'badge-ext'}">${o.carrierType==='own'?'Own':'Ext'}</span>${esc(o.carrierName)}</td>
+        <td>${esc(o.truckName)}</td>
+        ${hasAnyCost ? `<td class="cell-cost">${o.cost!=null ? '$'+Math.round(o.cost).toLocaleString() : '—'}</td>` : ''}
+        <td class="${o.volPct>100?'cell-red':o.volPct>85?'cell-yellow':'cell-green'}">${o.volPct}%</td>
+        <td class="${o.wtPct>100?'cell-red':o.wtPct>85?'cell-yellow':'cell-green'}">${o.wtPct}%</td>
+        <td><span class="status-tag ${statusCls}">${statusLbl}</span></td>
+      </tr>`;
+    }).join('');
+
+    const custMeta = zg.customers.map(c => esc(c.name)).join(', ');
+    return `<div class="zone-table-section">
+      <div class="zone-table-hdr">
+        📍 ${esc(zg.zone)}
+        ${dist > 0 ? `<span class="zone-dist">${dist} ${distUnit()}</span>` : ''}
+        <span class="meta">— ${custMeta} · ${fmt(zg.totalVol)} ${dimUnit()}³ · ${fmt(zg.totalWt)} lbs</span>
+      </div>
+      <table class="carrier-table">
+        <thead><tr>
+          <th>Carrier</th><th>Truck</th>
+          ${hasAnyCost ? '<th>Trip Cost</th>' : ''}
+          <th>Vol %</th><th>Wt %</th><th>Status</th>
+        </tr></thead>
+        <tbody>${rows}</tbody>
+      </table>
+    </div>`;
+  }).join('');
+
+  const consolidationHtml = consolidations.length > 0 ? `
+    <div class="consolidation-section">
+      <div class="consolidation-hdr">💰 Consolidation Opportunities</div>
+      <div class="consolidation-sub">Zones within the same delivery corridor (≤${CORRIDOR_THRESHOLD} ${distUnit()}) where one truck beats separate runs</div>
+      ${consolidations.map(opp => `
+        <div class="opp-card">
+          <div class="opp-zones">
+            ${opp.zones.map(z => `<span class="zone-tag">📍 ${esc(z)}</span>`).join('<span style="color:var(--text2);margin:0 4px;font-size:13px">+</span>')}
+            <span class="savings-badge">SAVE $${Math.round(opp.savings).toLocaleString()} / run</span>
+            ${opp.distDiff > 0 ? `<span style="font-size:11px;color:var(--text2)">(zones ${opp.distDiff} ${distUnit()} apart)</span>` : ''}
+          </div>
+          <div class="opp-detail">
+            Separate runs: <strong>$${Math.round(opp.g1Best.cost).toLocaleString()}</strong> + <strong>$${Math.round(opp.g2Best.cost).toLocaleString()}</strong> = <strong>$${Math.round(opp.separateCost).toLocaleString()}</strong>
+            <span style="margin:0 8px;color:var(--text2)">→</span>
+            One <strong>${esc(opp.recommendation.truckName)}</strong> (${esc(opp.recommendation.carrierName)}): <strong style="color:var(--success)">$${Math.round(opp.combinedCost).toLocaleString()}</strong>
+          </div>
+        </div>`).join('')}
+    </div>` : '';
+
+  return `<div class="route-analysis">
+    <div class="ra-header">
+      <h3>🗺 Route &amp; Carrier Analysis</h3>
+      <span class="sub">${zoneGroups.length} zone${zoneGroups.length!==1?'s':''} · ${carriers.length} external carrier${carriers.length!==1?'s':''} · comparing ${trucks.length + carriers.reduce((s,c)=>s+c.trucks.length,0)} truck options</span>
+    </div>
+    <div class="zone-chips">${chips}</div>
+    ${tables}
+    ${consolidationHtml}
+  </div>`;
+}
+
+// ═══════════════════════════════════════════════════
+//  OPTIMIZE (main)
+// ═══════════════════════════════════════════════════
+function optimize() {
+  if (trucks.length === 0) { alert('Please add at least one own-fleet truck.'); return; }
+  if (items.length === 0)  { alert('Please add at least one item.'); return; }
+
+  const allItems = [];
+  for (const item of items) for (let i = 0; i < item.qty; i++) allItems.push({ ...item });
+  allItems.sort((a, b) => (b.length * b.width * b.height) - (a.length * a.width * a.height));
+
+  const packers   = trucks.map(t => new TruckPacker(t));
+  const unplaced  = [];
+  const splitWarn = [];
+
+  const custMap = {};
+  const unassignedItems = [];
+  for (const item of allItems) {
+    if (item.customerId == null) { unassignedItems.push(item); continue; }
+    if (!custMap[item.customerId]) custMap[item.customerId] = [];
+    custMap[item.customerId].push(item);
+  }
+  Object.values(custMap).forEach(arr => arr.sort((a, b) => (b.length * b.width * b.height) - (a.length * a.width * a.height)));
+
+  const sortedCusts = [...customers].sort((a, b) => b.stop - a.stop);
+
+  for (const cust of sortedCusts) {
+    const custItems = custMap[cust.id] || [];
+    if (custItems.length === 0) continue;
+    const custTruckMap = {};
+    for (const item of custItems) {
+      let placed = false;
+      const preferred = Object.keys(custTruckMap).map(Number);
+      const others = packers.map((_, i) => i).filter(i => !(i in custTruckMap));
+      for (const ti of [...new Set([...preferred, ...others])]) {
+        if (packers[ti].tryPlace(item)) { custTruckMap[ti] = (custTruckMap[ti] || 0) + 1; placed = true; break; }
+      }
+      if (!placed) unplaced.push(item);
+    }
+    if (Object.keys(custTruckMap).length > 1) {
+      splitWarn.push({ name: cust.name, trucks: Object.keys(custTruckMap).map(i => trucks[i]?.name) });
+    }
+  }
+
+  unassignedItems.sort((a, b) => (b.length * b.width * b.height) - (a.length * a.width * a.height));
+  for (const item of unassignedItems) {
+    let placed = false;
+    for (const packer of packers) { if (packer.tryPlace(item)) { placed = true; break; } }
+    if (!placed) unplaced.push(item);
+  }
+
+  renderResults(packers, unplaced, splitWarn);
+}
+
+// ═══════════════════════════════════════════════════
+//  RENDER RESULTS
+// ═══════════════════════════════════════════════════
+function renderResults(packers, unplaced, splitWarn) {
+  document.getElementById('empty-state').style.display = 'none';
+  const resultsEl = document.getElementById('results');
+  resultsEl.style.display = 'block';
+
+  const totalVol   = trucks.reduce((s, t) => s + t.length * t.width * t.height, 0);
+  const usedVol    = packers.reduce((s, p) => s + p.placements.reduce((sv, pl) => sv + pl.w * pl.h * pl.d, 0), 0);
+  const totalWt    = trucks.reduce((s, t) => s + t.maxWt, 0);
+  const usedWt     = packers.reduce((s, p) => s + p.usedWeight, 0);
+  const totalItems = items.reduce((s, i) => s + i.qty, 0);
+  const placed     = totalItems - unplaced.length;
+  const vPct = totalVol > 0 ? Math.round(usedVol / totalVol * 100) : 0;
+  const wPct = totalWt  > 0 ? Math.round(usedWt  / totalWt  * 100) : 0;
+
+  // Route analysis
+  const analysis = analyzeRoutes();
+  const routeHtml = renderRouteAnalysis(analysis.zoneGroups, analysis.consolidations);
+
+  let html = `
+  <div style="margin-bottom:16px">
+    <h2 style="font-size:19px;font-weight:800;margin-bottom:3px">Optimization Results</h2>
+    <div style="color:var(--text2);font-size:11px">3D bin packing · delivery-stop ordering · ${customers.length} customer${customers.length!==1?'s':''} · ${carriers.length} external carrier${carriers.length!==1?'s':''} compared</div>
+  </div>
+
+  <div class="summary-grid">
+    <div class="sum-card">
+      <div class="sum-label">Volume Used</div>
+      <div class="sum-val" style="color:${vPct>85?'#22c55e':vPct>55?'#f59e0b':'#3b82f6'}">${vPct}%</div>
+      <div class="sum-sub">${fmt(usedVol)} / ${fmt(totalVol)} ${dimUnit()}³</div>
+    </div>
+    <div class="sum-card">
+      <div class="sum-label">Weight Used</div>
+      <div class="sum-val" style="color:${wPct>90?'#ef4444':wPct>70?'#f59e0b':'#22c55e'}">${wPct}%</div>
+      <div class="sum-sub">${fmt(usedWt)} / ${fmt(totalWt)} ${wtUnit()}</div>
+    </div>
+    <div class="sum-card">
+      <div class="sum-label">Items Placed</div>
+      <div class="sum-val" style="color:${unplaced.length===0?'#22c55e':'#f59e0b'}">${placed}/${totalItems}</div>
+      <div class="sum-sub">${unplaced.length>0?unplaced.length+' items unplaced':'All placed ✓'}</div>
+    </div>
+    <div class="sum-card">
+      <div class="sum-label">Consolidation</div>
+      <div class="sum-val">${analysis.consolidations.length > 0 ? analysis.consolidations.length : '—'}</div>
+      <div class="sum-sub">${analysis.consolidations.length > 0
+        ? `$${Math.round(analysis.consolidations.reduce((s,c)=>s+c.savings,0)).toLocaleString()} possible savings`
+        : 'No opportunities found'}</div>
+    </div>
+  </div>
+
+  ${routeHtml}`;
+
+  if (splitWarn.length > 0) {
+    html += `<div class="split-warn">⚠️ <strong>${splitWarn.length} customer${splitWarn.length!==1?'s':''} split across multiple trucks:</strong>
+      ${splitWarn.map(s=>`<div style="margin-top:3px">• ${esc(s.name)} → ${s.trucks.map(esc).join(' + ')}</div>`).join('')}
+    </div>`;
+  }
+
+  if (unplaced.length > 0) {
+    const grouped = {};
+    unplaced.forEach(i => { grouped[i.name] = (grouped[i.name] || 0) + 1; });
+    html += `<div class="unplaced">
+      <div class="unplaced-title">⚠️ ${unplaced.length} Item${unplaced.length!==1?'s':''} Could Not Be Placed</div>
+      <div style="font-size:12px;color:var(--text2)">
+        ${Object.entries(grouped).map(([n,c]) => {
+          const cu = customers.find(cu => cu.id === items.find(i=>i.name===n)?.customerId);
+          return `<span style="margin-right:10px"><span class="color-dot" style="background:${cu?.color||'#64748b'}"></span>${n}: ${c}${cu?` <span style="font-size:10px;color:${cu.color}">(${cu.name})</span>`:''}</span>`;
+        }).join('')}
+      </div>
+      <div style="font-size:11px;color:var(--text2);margin-top:6px">Tip: Add more trucks, increase capacity, or check carrier options above.</div>
+    </div>`;
+  }
+
+  // ── Per-truck load plans ──
+  html += `<div class="load-plan-heading" style="margin:18px 0 8px"><h3 style="font-size:15px;font-weight:800">📦 Load Plans</h3><div style="font-size:11px;color:var(--text2)">Physical bin packing per own-fleet truck</div></div>`;
+
+  packers.forEach((packer, idx) => {
+    const truck = packer.truck;
+    const truckVol = truck.length * truck.width * truck.height;
+    const usedV = packer.placements.reduce((s, p) => s + p.w * p.h * p.d, 0);
+    const vp = truckVol > 0 ? Math.round(usedV / truckVol * 100) : 0;
+    const wp = truck.maxWt > 0 ? Math.round(packer.usedWeight / truck.maxWt * 100) : 0;
+    const pillV = vp > 85 ? 'pill-green' : vp > 50 ? 'pill-yellow' : 'pill-blue';
+    const pillW = wp > 90 ? 'pill-red' : wp > 70 ? 'pill-yellow' : 'pill-green';
+
+    const custPlacementMap = {};
+    packer.placements.forEach(p => {
+      const cid = p.customerId;
+      if (!custPlacementMap[cid]) custPlacementMap[cid] = { count: 0, vol: 0 };
+      custPlacementMap[cid].count++;
+      custPlacementMap[cid].vol += p.w * p.h * p.d;
+    });
+    const truckCusts = Object.entries(custPlacementMap).map(([cid, data]) => {
+      const cust = cid === 'null' ? null : customers.find(c => c.id === parseInt(cid));
+      const zone = packer.customerZones[cid];
+      return { cust, ...data, zone };
+    }).sort((a, b) => (a.cust?.stop ?? 999) - (b.cust?.stop ?? 999));
+
+    const colorMap = {};
+    packer.placements.forEach(p => {
+      const c = customers.find(cu => cu.id === p.customerId);
+      colorMap[p.customerId] = c ? c.color : '#64748b';
+    });
+    const custZones = Object.entries(packer.customerZones).map(([cid, zone]) => {
+      const c = customers.find(cu => cu.id === parseInt(cid));
+      return { color: c ? c.color : '#64748b', label: c ? `${c.name}${c.zone?' ('+c.zone+')':''}` : 'N/A', ...zone };
+    });
+
+    const canTopId = `cv-top-${idx}`, canSideId = `cv-side-${idx}`, canFrontId = `cv-front-${idx}`;
+
+    const deliveryRows = truckCusts.map(tc => {
+      const color = tc.cust ? tc.cust.color : '#64748b';
+      const label = tc.cust ? tc.cust.name : 'Unassigned';
+      const stop  = tc.cust ? `Stop #${tc.cust.stop}` : '—';
+      const zone  = tc.cust?.zone ? `📍 ${tc.cust.zone}` : '';
+      const zoneDepth = tc.zone ? ` · z=${fmt(tc.zone.minZ)}–${fmt(tc.zone.maxZ)} ${dimUnit()}` : '';
+      return `<div class="cust-delivery-row">
+        <div class="cust-stop">${stop}</div>
+        <div style="display:flex;align-items:center;gap:6px;flex:1">
+          <div class="color-swatch" style="background:${color}"></div>
+          <span style="font-weight:600;font-size:12px">${esc(label)}</span>
+          <span style="font-size:11px;color:var(--text2)">${zone}${zoneDepth}</span>
+        </div>
+        <div style="font-size:11px;color:var(--text2)">${tc.count} item${tc.count!==1?'s':''} · ${fmt(tc.vol)} ${dimUnit()}³</div>
+      </div>`;
+    }).join('');
+
+    const legendItems = truckCusts.map(tc => ({
+      color: tc.cust ? tc.cust.color : '#64748b',
+      label: tc.cust ? `${tc.cust.name}${tc.cust.zone?' ('+tc.cust.zone+')':''}` : 'Unassigned'
+    }));
+
+    const iGroups = {};
+    packer.placements.forEach(p => {
+      const key = `${p.customerId}::${p.name}`;
+      if (!iGroups[key]) iGroups[key] = { customerId: p.customerId, name: p.name, color: colorMap[p.customerId], count: 0 };
+      iGroups[key].count++;
+    });
+
+    html += `
+    <div class="truck-result">
+      <div class="tr-header">
+        <div>
+          <div class="tr-name">🚛 ${esc(truck.name)}</div>
+          <div style="font-size:11px;color:var(--text2);margin-top:2px">${truck.length}×${truck.width}×${truck.height} ${dimUnit()} · ${fmt(truck.maxWt)} ${wtUnit()} · ${packer.placements.length} items · ${truckCusts.length} customer${truckCusts.length!==1?'s':''}</div>
+        </div>
+        <div class="tr-pills">
+          <span class="pill ${pillV}">Vol ${vp}%</span>
+          <span class="pill ${pillW}">Wt ${wp}%</span>
+          <span class="pill pill-blue">${packer.placements.length} items</span>
+        </div>
+      </div>
+      <div class="tr-body">
+        <div class="prog-row">
+          <div class="prog-label">Volume</div>
+          <div class="prog-bar"><div class="prog-fill" style="width:${vp}%;background:${vp>85?'var(--success)':vp>50?'var(--warning)':'var(--primary)'}"></div></div>
+          <div class="prog-pct" style="color:${vp>85?'#22c55e':vp>50?'#f59e0b':'#3b82f6'}">${vp}%</div>
+        </div>
+        <div class="prog-row">
+          <div class="prog-label">Weight</div>
+          <div class="prog-bar"><div class="prog-fill" style="width:${wp}%;background:${wp>90?'var(--danger)':wp>70?'var(--warning)':'var(--success)'}"></div></div>
+          <div class="prog-pct" style="color:${wp>90?'#ef4444':wp>70?'#f59e0b':'#22c55e'}">${wp}%</div>
+        </div>
+
+        <div class="viz-grid">
+          <div class="viz-box" style="grid-column:1/-1">
+            <div class="viz-title">📐 Top View — Length × Width (color = customer · zone brackets)</div>
+            <canvas id="${canTopId}" width="700" height="200"></canvas>
+            <div class="viz-legend">
+              ${legendItems.map(li=>`<div class="legend-item"><div class="legend-dot" style="background:${li.color}"></div>${esc(li.label)}</div>`).join('')}
+            </div>
+          </div>
+          <div class="viz-box">
+            <div class="viz-title">📏 Side View — Length × Height</div>
+            <canvas id="${canSideId}" width="400" height="180"></canvas>
+          </div>
+          <div class="viz-box">
+            <div class="viz-title">🖼 Front View — Width × Height</div>
+            <canvas id="${canFrontId}" width="400" height="180"></canvas>
+          </div>
+        </div>
+
+        ${truckCusts.length > 0 ? `
+        <div class="customer-section">
+          <div class="cust-section-title">🚚 Delivery Order (unload sequence)</div>
+          ${deliveryRows}
+        </div>` : ''}
+
+        <div class="section-hdr">Items by Customer</div>
+        <table class="items-table">
+          <thead><tr><th>Customer</th><th>Item</th><th>Qty</th><th>Vol each</th></tr></thead>
+          <tbody>
+            ${Object.values(iGroups).map(g => {
+              const cust = customers.find(c => c.id === g.customerId);
+              const custLbl = cust ? cust.name : 'Unassigned';
+              const itemDef = items.find(i => i.name === g.name);
+              const eVol = itemDef ? itemDef.length * itemDef.width * itemDef.height : 0;
+              return `<tr><td><span class="color-dot" style="background:${g.color}"></span>${esc(custLbl)}</td>
+                <td>${esc(g.name)}</td><td>${g.count}</td><td>${fmt(eVol)} ${dimUnit()}³</td></tr>`;
+            }).join('')}
+            ${packer.placements.length === 0 ? '<tr><td colspan="4" style="color:var(--text2);text-align:center">No items loaded</td></tr>' : ''}
+          </tbody>
+        </table>
+      </div>
+    </div>`;
+  });
+
+  resultsEl.innerHTML = html;
+
+  requestAnimationFrame(() => {
+    packers.forEach((packer, idx) => {
+      const colorMap = {};
+      packer.placements.forEach(p => {
+        const c = customers.find(cu => cu.id === p.customerId);
+        colorMap[p.customerId] = c ? c.color : '#64748b';
+      });
+      const custZones = Object.entries(packer.customerZones).map(([cid, zone]) => {
+        const c = customers.find(cu => cu.id === parseInt(cid));
+        return { color: c ? c.color : '#64748b', label: c ? `${c.name}${c.zone?' ('+c.zone+')':''}` : 'N/A', ...zone };
+      });
+      drawTopView(document.getElementById(`cv-top-${idx}`),   packer.truck, packer.placements, colorMap, custZones);
+      drawSideView(document.getElementById(`cv-side-${idx}`), packer.truck, packer.placements, colorMap);
+      drawFrontView(document.getElementById(`cv-front-${idx}`), packer.truck, packer.placements, colorMap);
+    });
+  });
+}
+
+// ═══════════════════════════════════════════════════
+//  VISUALIZATION
+// ═══════════════════════════════════════════════════
+const PAD = 14;
+
+function drawTopView(canvas, truck, placements, colorMap, custZones) {
+  if (!canvas) return;
+  const ctx = canvas.getContext('2d');
+  const W = canvas.width, H = canvas.height;
+  const scale = Math.min((W - PAD*2) / truck.length, (H - PAD*2 - 20) / truck.width);
+  const ox = PAD, oy = PAD + 10, tw = truck.length * scale, th = truck.width * scale;
+
+  ctx.clearRect(0, 0, W, H);
+  ctx.fillStyle = '#07101e'; ctx.fillRect(ox, oy, tw, th);
+
+  ctx.strokeStyle = 'rgba(71,85,105,0.25)'; ctx.lineWidth = 0.5;
+  for (let z = 1; z < truck.length; z++) { const px = ox + z * scale; ctx.beginPath(); ctx.moveTo(px, oy); ctx.lineTo(px, oy+th); ctx.stroke(); }
+  for (let x = 1; x < truck.width; x++) { const py = oy + x * scale; ctx.beginPath(); ctx.moveTo(ox, py); ctx.lineTo(ox+tw, py); ctx.stroke(); }
+
+  for (const p of placements) {
+    const color = colorMap[p.customerId] || '#64748b';
+    const px = ox + p.z * scale, py = oy + p.x * scale, pw = p.d * scale, ph = p.w * scale;
+    ctx.fillStyle = color + 'bb'; ctx.fillRect(px, py, pw, ph);
+    ctx.strokeStyle = color; ctx.lineWidth = 1; ctx.strokeRect(px, py, pw, ph);
+    if (pw > 22 && ph > 12) {
+      ctx.fillStyle = '#ffffffcc';
+      ctx.font = `bold ${Math.min(9, Math.floor(Math.min(pw,ph)*0.32))}px sans-serif`;
+      ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+      ctx.fillText(p.name.substring(0, 6), px + pw/2, py + ph/2);
+    }
+  }
+
+  ctx.strokeStyle = '#64748b'; ctx.lineWidth = 2; ctx.strokeRect(ox, oy, tw, th);
+
+  for (const zone of custZones) {
+    if (zone.minZ === Infinity) continue;
+    const zx1 = ox + zone.minZ * scale, zx2 = ox + zone.maxZ * scale;
+    ctx.strokeStyle = zone.color; ctx.lineWidth = 2.5;
+    ctx.beginPath(); ctx.moveTo(zx1, oy - 2); ctx.lineTo(zx2, oy - 2); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(zx1, oy - 6); ctx.lineTo(zx1, oy); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(zx2, oy - 6); ctx.lineTo(zx2, oy); ctx.stroke();
+    ctx.fillStyle = zone.color; ctx.font = 'bold 8px sans-serif'; ctx.textAlign = 'center'; ctx.textBaseline = 'bottom';
+    const labelX = Math.max(zx1 + 20, Math.min(zx2 - 20, (zx1 + zx2) / 2));
+    ctx.fillText(zone.label.substring(0, 20), labelX, oy - 6);
+    if (zone.minZ > 0.1) {
+      ctx.strokeStyle = zone.color + '88'; ctx.lineWidth = 1.5; ctx.setLineDash([4, 3]);
+      ctx.beginPath(); ctx.moveTo(zx1, oy); ctx.lineTo(zx1, oy + th); ctx.stroke();
+      ctx.setLineDash([]);
+    }
+  }
+
+  ctx.fillStyle = '#475569'; ctx.font = '9px sans-serif'; ctx.textAlign = 'left'; ctx.textBaseline = 'top'; ctx.fillText('CAB', ox + 2, oy + th + 2);
+  ctx.textAlign = 'right'; ctx.fillText('DOORS ▶', ox + tw - 2, oy + th + 2);
+}
+
+function drawSideView(canvas, truck, placements, colorMap) {
+  if (!canvas) return;
+  const ctx = canvas.getContext('2d');
+  const W = canvas.width, H = canvas.height;
+  const scale = Math.min((W - PAD*2) / truck.length, (H - PAD*2) / truck.height);
+  const ox = PAD, oy = PAD, tw = truck.length * scale, th = truck.height * scale;
+
+  ctx.clearRect(0, 0, W, H);
+  ctx.fillStyle = '#07101e'; ctx.fillRect(ox, oy, tw, th);
+
+  ctx.strokeStyle = 'rgba(71,85,105,0.25)'; ctx.lineWidth = 0.5;
+  for (let z = 1; z < truck.length; z++) { const px = ox + z * scale; ctx.beginPath(); ctx.moveTo(px, oy); ctx.lineTo(px, oy+th); ctx.stroke(); }
+  for (let y = 1; y < truck.height; y++) { const py = oy + y * scale; ctx.beginPath(); ctx.moveTo(ox, py); ctx.lineTo(ox+tw, py); ctx.stroke(); }
+
+  for (const p of placements) {
+    const color = colorMap[p.customerId] || '#64748b';
+    const px = ox + p.z * scale, py = oy + (truck.height - p.y - p.h) * scale;
+    ctx.fillStyle = color + '88'; ctx.fillRect(px, py, p.d * scale, p.h * scale);
+    ctx.strokeStyle = color; ctx.lineWidth = 0.7; ctx.strokeRect(px, py, p.d * scale, p.h * scale);
+  }
+
+  ctx.strokeStyle = '#4f46e5'; ctx.lineWidth = 2; ctx.setLineDash([5,4]);
+  ctx.beginPath(); ctx.moveTo(ox, oy+th); ctx.lineTo(ox+tw, oy+th); ctx.stroke(); ctx.setLineDash([]);
+  ctx.strokeStyle = '#64748b'; ctx.lineWidth = 2; ctx.strokeRect(ox, oy, tw, th);
+  ctx.fillStyle = '#475569'; ctx.font = '9px sans-serif'; ctx.textAlign = 'left'; ctx.textBaseline = 'top'; ctx.fillText('CAB', ox+2, oy+th+2);
+  ctx.textAlign = 'right'; ctx.fillText('DOORS', ox+tw-2, oy+th+2);
+}
+
+function drawFrontView(canvas, truck, placements, colorMap) {
+  if (!canvas) return;
+  const ctx = canvas.getContext('2d');
+  const W = canvas.width, H = canvas.height;
+  const scale = Math.min((W - PAD*2) / truck.width, (H - PAD*2) / truck.height);
+  const ox = PAD + ((W - PAD*2) - truck.width * scale) / 2, oy = PAD;
+  const tw = truck.width * scale, th = truck.height * scale;
+
+  ctx.clearRect(0, 0, W, H);
+  ctx.fillStyle = '#07101e'; ctx.fillRect(ox, oy, tw, th);
+
+  ctx.strokeStyle = 'rgba(71,85,105,0.25)'; ctx.lineWidth = 0.5;
+  for (let x = 1; x < truck.width; x++) { const px = ox + x * scale; ctx.beginPath(); ctx.moveTo(px, oy); ctx.lineTo(px, oy+th); ctx.stroke(); }
+  for (let y = 1; y < truck.height; y++) { const py = oy + y * scale; ctx.beginPath(); ctx.moveTo(ox, py); ctx.lineTo(ox+tw, py); ctx.stroke(); }
+
+  for (const p of placements) {
+    const color = colorMap[p.customerId] || '#64748b';
+    const px = ox + p.x * scale, py = oy + (truck.height - p.y - p.h) * scale;
+    ctx.fillStyle = color + '88'; ctx.fillRect(px, py, p.w * scale, p.h * scale);
+    ctx.strokeStyle = color; ctx.lineWidth = 0.7; ctx.strokeRect(px, py, p.w * scale, p.h * scale);
+  }
+
+  ctx.strokeStyle = '#64748b'; ctx.lineWidth = 2; ctx.strokeRect(ox, oy, tw, th);
+  ctx.fillStyle = '#475569'; ctx.font = '9px sans-serif'; ctx.textAlign = 'left'; ctx.textBaseline = 'top'; ctx.fillText('LEFT', ox+2, oy+th+2);
+  ctx.textAlign = 'right'; ctx.fillText('RIGHT', ox+tw-2, oy+th+2);
+}
+
+// ═══════════════════════════════════════════════════
+//  HELPERS
+// ═══════════════════════════════════════════════════
+const esc  = s => String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+const fmt  = n => Number(n.toFixed(1)).toLocaleString();
+const val  = id => document.getElementById(id).value.trim();
+const num  = id => parseFloat(document.getElementById(id).value);
+
+// ═══════════════════════════════════════════════════
+//  PRINT / PDF
+// ═══════════════════════════════════════════════════
+function printReport() {
+  if (document.getElementById('results').style.display === 'none') {
+    alert('Please run Optimize & Analyze Routes first, then print.');
+    return;
+  }
+  // Populate print-only metadata block
+  const now = new Date();
+  const dateStr = now.toLocaleDateString(undefined, { year:'numeric', month:'long', day:'numeric' });
+  const timeStr = now.toLocaleTimeString(undefined, { hour:'2-digit', minute:'2-digit' });
+  const totalItems = items.reduce((s, i) => s + i.qty, 0);
+  document.getElementById('print-meta').innerHTML =
+    `Generated: ${dateStr} at ${timeStr} &nbsp;·&nbsp; ` +
+    `${trucks.length} truck${trucks.length!==1?'s':''} &nbsp;·&nbsp; ` +
+    `${carriers.length} carrier${carriers.length!==1?'s':''} &nbsp;·&nbsp; ` +
+    `${customers.length} customer${customers.length!==1?'s':''} &nbsp;·&nbsp; ` +
+    `${totalItems} item unit${totalItems!==1?'s':''}`;
+  window.print();
+}
+
+// ═══════════════════════════════════════════════════
+//  SEED DEMO DATA
+// ═══════════════════════════════════════════════════
+function seedDefaults() {
+  // Own fleet
+  trucks.push({ id: nextTruckId++, name: 'Semi Truck 1', length: 53, width: 8.5, height: 9,   maxWt: 44000, baseRate: 600,  ratePerMi: 3.50 });
+  trucks.push({ id: nextTruckId++, name: 'Box Truck 1',  length: 20, width: 7.5, height: 7.5,  maxWt: 12000, baseRate: 280,  ratePerMi: 2.20 });
+
+  // External carriers
+  const ff = { id: nextCarrierId++, name: 'FastFreight LLC', trucks: [] };
+  ff.trucks.push({ tid: nextCarrierTruckId++, name: '53ft Dry Van',   length: 53, width: 8.5, height: 9,   maxWt: 44000, baseRate: 520, ratePerMi: 3.20 });
+  ff.trucks.push({ tid: nextCarrierTruckId++, name: '48ft Reefer',    length: 48, width: 8.5, height: 9,   maxWt: 42000, baseRate: 450, ratePerMi: 2.90 });
+  carriers.push(ff);
+
+  const qh = { id: nextCarrierId++, name: 'QuickHaul Express', trucks: [] };
+  qh.trucks.push({ tid: nextCarrierTruckId++, name: '40ft Truck',     length: 40, width: 8,   height: 8.5, maxWt: 36000, baseRate: 380, ratePerMi: 2.60 });
+  qh.trucks.push({ tid: nextCarrierTruckId++, name: '28ft Sprinter',  length: 28, width: 8,   height: 8,   maxWt: 24000, baseRate: 260, ratePerMi: 2.10 });
+  carriers.push(qh);
+
+  // Customers — Acme & Beta share "Chicago", Gamma is "Milwaukee"
+  customers.push({ id: nextCustomerId++, name: 'Acme Corp',     stop: 1, color: '#3b82f6', zone: 'Chicago',   distance: 320 });
+  customers.push({ id: nextCustomerId++, name: 'Beta Supplies', stop: 2, color: '#22c55e', zone: 'Chicago',   distance: 320 });
+  customers.push({ id: nextCustomerId++, name: 'Gamma Retail',  stop: 3, color: '#f59e0b', zone: 'Milwaukee', distance: 180 });
+
+  // Items
+  items.push({ id: nextItemId++, name: 'Std Pallet',   length: 4, width: 4, height: 5, weight: 2000, qty: 8,  rotate: true,  customerId: 1 });
+  items.push({ id: nextItemId++, name: 'Half Pallet',  length: 4, width: 2, height: 4, weight: 800,  qty: 6,  rotate: true,  customerId: 1 });
+  items.push({ id: nextItemId++, name: 'Supply Crate', length: 6, width: 4, height: 4, weight: 3000, qty: 3,  rotate: false, customerId: 2 });
+  items.push({ id: nextItemId++, name: 'Retail Box',   length: 3, width: 3, height: 3, weight: 400,  qty: 10, rotate: true,  customerId: 2 });
+  items.push({ id: nextItemId++, name: 'Large Crate',  length: 5, width: 4, height: 4, weight: 3500, qty: 2,  rotate: false, customerId: 3 });
+  items.push({ id: nextItemId++, name: 'Small Box',    length: 2, width: 2, height: 2, weight: 150,  qty: 15, rotate: true,  customerId: 3 });
+
+  renderSidebar();
+}
+
+seedDefaults();
+</script>
+</body>
+</html>
