@@ -11,6 +11,37 @@
   --primary: #3b82f6; --primary-h: #2563eb;
   --success: #22c55e; --warning: #f59e0b; --danger: #ef4444; --r: 8px;
 }
+:root.light {
+  --bg: #f1f5f9; --surface: #ffffff; --surface2: #f8fafc;
+  --border: #e2e8f0; --text: #0f172a; --text2: #64748b;
+  --success: #16a34a; --warning: #d97706; --danger: #dc2626;
+}
+html.light .viz-box canvas { background: #e0eeff !important; }
+html.light .cell-green  { color: #166534; }
+html.light .cell-yellow { color: #92400e; }
+html.light .cell-red    { color: #991b1b; }
+html.light .badge-own { color: #1e40af; }
+html.light .badge-ext { color: #6d28d9; }
+html.light .status-best { background: rgba(34,197,94,0.15); color: #166534; }
+html.light .status-ok   { background: rgba(59,130,246,0.12); color: #1e40af; }
+html.light .status-no   { background: rgba(239,68,68,0.12);  color: #991b1b; }
+html.light .zone-dist { background: rgba(59,130,246,0.12); color: #1e40af; }
+html.light .carrier-table th { background: #f1f5f9; }
+html.light .cust-section-title { color: #6d28d9; }
+html.light .customer-section { background: rgba(139,92,246,0.05); border-color: rgba(139,92,246,0.2); }
+html.light .pill-blue   { color: #1e40af; }
+html.light .pill-green  { color: #166534; }
+html.light .pill-yellow { color: #854d0e; }
+html.light .pill-red    { color: #991b1b; }
+html.light .btn-print { border-color: rgba(0,0,0,0.15); background: rgba(0,0,0,0.05); color: var(--text); }
+html.light .btn-print:hover { background: rgba(0,0,0,0.1); }
+html.light .btn-theme { border-color: rgba(0,0,0,0.15); background: rgba(0,0,0,0.05); color: var(--text); }
+html.light .btn-theme:hover { background: rgba(0,0,0,0.1); }
+html.light .savings-badge { background: rgba(34,197,94,0.2); color: #166534; }
+html.light .zone-chip-cost { color: #166534; }
+html.light .zone-chip-warn { color: #dc2626; }
+html.light .unplaced-title { color: #dc2626; }
+html.light .split-warn { background: rgba(245,158,11,0.08); border-color: rgba(245,158,11,0.3); color: #92400e; }
 * { box-sizing: border-box; margin: 0; padding: 0; }
 body { font-family: 'Segoe UI', system-ui, sans-serif; background: var(--bg); color: var(--text); min-height: 100vh; font-size: 14px; }
 
@@ -225,6 +256,9 @@ input[type="checkbox"] { width: auto; cursor: pointer; accent-color: var(--prima
 /* Print button */
 .btn-print { padding: 7px 14px; border-radius: 6px; border: 1px solid rgba(255,255,255,0.15); background: rgba(255,255,255,0.08); color: var(--text); cursor: pointer; font-size: 12px; font-weight: 600; display: flex; align-items: center; gap: 6px; transition: background 0.15s; white-space: nowrap; }
 .btn-print:hover { background: rgba(255,255,255,0.15); }
+/* Theme toggle */
+.btn-theme { padding: 7px 12px; border-radius: 6px; border: 1px solid rgba(255,255,255,0.15); background: rgba(255,255,255,0.08); color: var(--text); cursor: pointer; font-size: 14px; line-height: 1; transition: background 0.15s; }
+.btn-theme:hover { background: rgba(255,255,255,0.15); }
 
 /* Print-only header block — hidden on screen */
 .print-only { display: none; }
@@ -241,7 +275,7 @@ input[type="checkbox"] { width: auto; cursor: pointer; accent-color: var(--prima
   .print-only { display: block !important; }
 
   /* Hide interactive chrome */
-  .sidebar, .unit-toggle, .btn-print, .btn-optimize, .opt-bar, .tabs,
+  .sidebar, .unit-toggle, .btn-print, .btn-theme, .btn-optimize, .opt-bar, .tabs,
   .empty-state, .add-form, #empty-state { display: none !important; }
 
   /* Full-width layout */
@@ -334,6 +368,12 @@ input[type="checkbox"] { width: auto; cursor: pointer; accent-color: var(--prima
   .items-table td { border-bottom-color: #f1f5f9 !important; }
 }
 </style>
+<script>
+/* Run before body renders to avoid flash */
+(function(){
+  if(localStorage.getItem('theme')==='light') document.documentElement.classList.add('light');
+})();
+</script>
 </head>
 <body>
 
@@ -346,6 +386,7 @@ input[type="checkbox"] { width: auto; cursor: pointer; accent-color: var(--prima
   <label class="unit-toggle">
     <input type="checkbox" id="metricToggle" onchange="toggleUnits()"> Metric (m / kg)
   </label>
+  <button class="btn-theme" id="theme-btn" onclick="toggleTheme()" title="Toggle light / dark mode"></button>
   <button class="btn-print" onclick="printReport()" title="Export to PDF via browser print dialog">🖨 Print / PDF</button>
 </div>
 
@@ -1518,6 +1559,22 @@ function showSaveStatus(msg, cls) {
 }
 
 // ═══════════════════════════════════════════════════
+//  THEME TOGGLE
+// ═══════════════════════════════════════════════════
+function toggleTheme() {
+  const isLight = document.documentElement.classList.toggle('light');
+  localStorage.setItem('theme', isLight ? 'light' : 'dark');
+  updateThemeBtn();
+}
+function updateThemeBtn() {
+  const btn = document.getElementById('theme-btn');
+  if (!btn) return;
+  const isLight = document.documentElement.classList.contains('light');
+  btn.textContent = isLight ? '🌙' : '☀️';
+  btn.title = isLight ? 'Switch to dark mode' : 'Switch to light mode';
+}
+
+// ═══════════════════════════════════════════════════
 //  PRINT / PDF
 // ═══════════════════════════════════════════════════
 function printReport() {
@@ -1581,6 +1638,7 @@ if (!loadFromStorage()) {
   renderSidebar();
   showSaveStatus('💾 Restored your last session', 'ok');
 }
+updateThemeBtn();
 </script>
 </body>
 </html>
