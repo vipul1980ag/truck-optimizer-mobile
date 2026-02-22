@@ -82,6 +82,13 @@ input[type="checkbox"] { width: auto; cursor: pointer; accent-color: var(--prima
 .btn-optimize { width: 100%; padding: 11px; background: linear-gradient(135deg, #3b82f6, #8b5cf6); color: #fff; border: none; border-radius: var(--r); cursor: pointer; font-size: 15px; font-weight: 800; letter-spacing: 0.3px; transition: opacity 0.15s, transform 0.1s; }
 .btn-optimize:hover { opacity: 0.9; }
 .btn-optimize:active { transform: scale(0.98); }
+.data-bar { display: flex; align-items: center; gap: 5px; margin-bottom: 8px; }
+.btn-data { flex: 1; padding: 6px 4px; border-radius: 6px; border: 1px solid var(--border); background: var(--surface2); color: var(--text2); cursor: pointer; font-size: 11px; font-weight: 600; display: flex; align-items: center; justify-content: center; gap: 3px; transition: all 0.15s; white-space: nowrap; }
+.btn-data:hover { background: var(--border); color: var(--text); }
+.btn-data-danger:hover { background: rgba(239,68,68,0.15) !important; color: var(--danger) !important; border-color: rgba(239,68,68,0.4) !important; }
+.save-status { font-size: 10px; color: var(--text2); text-align: center; margin-bottom: 5px; min-height: 13px; transition: color 0.4s; }
+.save-status.ok  { color: var(--success); }
+.save-status.err { color: var(--danger); }
 
 /* Main */
 .main { overflow-y: auto; padding: 16px; background: var(--bg); }
@@ -454,6 +461,14 @@ input[type="checkbox"] { width: auto; cursor: pointer; accent-color: var(--prima
     </div>
 
     <div class="opt-bar">
+      <div class="save-status" id="save-status"></div>
+      <div class="data-bar">
+        <button class="btn-data" onclick="exportJSON()" title="Download all data as a JSON file">📥 Export</button>
+        <label class="btn-data" title="Load data from a previously exported JSON file" style="cursor:pointer">
+          📂 Import<input type="file" accept=".json" onchange="importJSON(this)" style="display:none">
+        </label>
+        <button class="btn-data btn-data-danger" onclick="clearAll()" title="Clear all data and start fresh">🗑 Clear</button>
+      </div>
       <div class="opt-counts" id="opt-counts">0 items · 0 trucks · 0 customers · 0 carriers</div>
       <button class="btn-optimize" onclick="optimize()">⚡ Optimize & Analyze Routes</button>
     </div>
@@ -526,17 +541,17 @@ function addTruck() {
   const ratePerMi = num('t-rpermile') || 0;
   trucks.push({ id: nextTruckId++, name, length, width, height, maxWt, baseRate, ratePerMi });
   document.getElementById('t-name').value = `Semi Truck ${nextTruckId}`;
-  renderSidebar();
+  renderSidebar(); saveToStorage();
 }
-function removeTruck(id) { trucks = trucks.filter(t => t.id !== id); renderSidebar(); }
+function removeTruck(id) { trucks = trucks.filter(t => t.id !== id); renderSidebar(); saveToStorage(); }
 
 function addCarrier() {
   const name = val('ca-name') || `Carrier ${nextCarrierId}`;
   carriers.push({ id: nextCarrierId++, name, trucks: [] });
   document.getElementById('ca-name').value = '';
-  renderSidebar();
+  renderSidebar(); saveToStorage();
 }
-function removeCarrier(id) { carriers = carriers.filter(c => c.id !== id); renderSidebar(); }
+function removeCarrier(id) { carriers = carriers.filter(c => c.id !== id); renderSidebar(); saveToStorage(); }
 
 function toggleCarrierTruckForm(cid) {
   const el = document.getElementById(`ct-form-${cid}`);
@@ -554,16 +569,15 @@ function addCarrierTruck(cid) {
   const baseRate  = num(`ct-baserate-${cid}`) || 0;
   const ratePerMi = num(`ct-rpm-${cid}`)      || 0;
   carrier.trucks.push({ tid: nextCarrierTruckId++, name, length, width, height, maxWt, baseRate, ratePerMi });
-  // Clear inline form
   [`ct-name-${cid}`,`ct-length-${cid}`,`ct-width-${cid}`,`ct-height-${cid}`,`ct-maxwt-${cid}`,`ct-baserate-${cid}`,`ct-rpm-${cid}`].forEach(id => {
     const el = document.getElementById(id); if (el) el.value = '';
   });
-  renderSidebar();
+  renderSidebar(); saveToStorage();
 }
 function removeCarrierTruck(cid, tid) {
   const carrier = carriers.find(c => c.id === cid);
   if (carrier) carrier.trucks = carrier.trucks.filter(t => t.tid !== tid);
-  renderSidebar();
+  renderSidebar(); saveToStorage();
 }
 
 function addCustomer() {
@@ -578,12 +592,12 @@ function addCustomer() {
   document.getElementById('c-name').value = '';
   document.getElementById('c-stop').value = customers.length + 1;
   document.getElementById('c-zone').value = '';
-  renderSidebar();
+  renderSidebar(); saveToStorage();
 }
 function removeCustomer(id) {
   customers = customers.filter(c => c.id !== id);
   items.forEach(i => { if (i.customerId === id) i.customerId = null; });
-  renderSidebar();
+  renderSidebar(); saveToStorage();
 }
 
 function addItem() {
@@ -598,9 +612,9 @@ function addItem() {
   const customerId = custId ? parseInt(custId) : null;
   items.push({ id: nextItemId++, name, length, width, height, weight, qty, rotate, customerId });
   document.getElementById('i-name').value = '';
-  renderSidebar();
+  renderSidebar(); saveToStorage();
 }
-function removeItem(id) { items = items.filter(i => i.id !== id); renderSidebar(); }
+function removeItem(id) { items = items.filter(i => i.id !== id); renderSidebar(); saveToStorage(); }
 
 // ═══════════════════════════════════════════════════
 //  SIDEBAR RENDER
@@ -1396,6 +1410,114 @@ const val  = id => document.getElementById(id).value.trim();
 const num  = id => parseFloat(document.getElementById(id).value);
 
 // ═══════════════════════════════════════════════════
+//  SAVE / LOAD (localStorage + JSON file)
+// ═══════════════════════════════════════════════════
+const STORAGE_KEY = 'truckOptimizerData';
+
+function saveToStorage() {
+  try {
+    const payload = {
+      version: 1,
+      savedAt: new Date().toISOString(),
+      trucks, carriers, customers, items,
+      nextIds: { truck: nextTruckId, carrier: nextCarrierId, carrierTruck: nextCarrierTruckId, customer: nextCustomerId, item: nextItemId, color: colorIdx }
+    };
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(payload));
+    showSaveStatus('💾 Saved', 'ok');
+  } catch(e) {
+    showSaveStatus('⚠ Save failed', 'err');
+  }
+}
+
+function loadFromStorage() {
+  try {
+    const raw = localStorage.getItem(STORAGE_KEY);
+    if (!raw) return false;
+    return applyPayload(JSON.parse(raw));
+  } catch(e) {
+    return false;
+  }
+}
+
+function applyPayload(data) {
+  if (!data || data.version !== 1) return false;
+  trucks    = data.trucks    || [];
+  carriers  = data.carriers  || [];
+  customers = data.customers || [];
+  items     = data.items     || [];
+  if (data.nextIds) {
+    nextTruckId         = data.nextIds.truck        || 1;
+    nextCarrierId       = data.nextIds.carrier      || 1;
+    nextCarrierTruckId  = data.nextIds.carrierTruck || 1;
+    nextCustomerId      = data.nextIds.customer     || 1;
+    nextItemId          = data.nextIds.item         || 1;
+    colorIdx            = data.nextIds.color        || 0;
+  }
+  return true;
+}
+
+function exportJSON() {
+  const payload = {
+    version: 1,
+    savedAt: new Date().toISOString(),
+    trucks, carriers, customers, items,
+    nextIds: { truck: nextTruckId, carrier: nextCarrierId, carrierTruck: nextCarrierTruckId, customer: nextCustomerId, item: nextItemId, color: colorIdx }
+  };
+  const blob = new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json' });
+  const url  = URL.createObjectURL(blob);
+  const a    = document.createElement('a');
+  const date = new Date().toISOString().slice(0, 10);
+  a.href     = url;
+  a.download = `truck-optimizer-${date}.json`;
+  a.click();
+  URL.revokeObjectURL(url);
+  showSaveStatus('📥 Exported', 'ok');
+}
+
+function importJSON(input) {
+  const file = input.files[0];
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = e => {
+    try {
+      const data = JSON.parse(e.target.result);
+      if (!applyPayload(data)) throw new Error('Invalid format');
+      renderSidebar();
+      // Reset results
+      document.getElementById('results').style.display = 'none';
+      document.getElementById('empty-state').style.display = 'block';
+      saveToStorage();
+      showSaveStatus('📂 Imported ' + file.name, 'ok');
+    } catch(err) {
+      showSaveStatus('⚠ Import failed — invalid file', 'err');
+    }
+    input.value = ''; // allow re-import of same file
+  };
+  reader.readAsText(file);
+}
+
+function clearAll() {
+  if (!confirm('Clear all trucks, carriers, customers and items?')) return;
+  trucks = []; carriers = []; customers = []; items = [];
+  nextTruckId = nextCarrierId = nextCarrierTruckId = nextCustomerId = nextItemId = 1;
+  colorIdx = 0;
+  localStorage.removeItem(STORAGE_KEY);
+  renderSidebar();
+  document.getElementById('results').style.display = 'none';
+  document.getElementById('empty-state').style.display = 'block';
+  showSaveStatus('🗑 Cleared', 'ok');
+}
+
+let _saveTimer;
+function showSaveStatus(msg, cls) {
+  const el = document.getElementById('save-status');
+  el.textContent = msg;
+  el.className = 'save-status ' + (cls || '');
+  clearTimeout(_saveTimer);
+  _saveTimer = setTimeout(() => { el.textContent = ''; el.className = 'save-status'; }, 3000);
+}
+
+// ═══════════════════════════════════════════════════
 //  PRINT / PDF
 // ═══════════════════════════════════════════════════
 function printReport() {
@@ -1452,7 +1574,13 @@ function seedDefaults() {
   renderSidebar();
 }
 
-seedDefaults();
+// Load saved data, or seed demo data if nothing is stored
+if (!loadFromStorage()) {
+  seedDefaults();
+} else {
+  renderSidebar();
+  showSaveStatus('💾 Restored your last session', 'ok');
+}
 </script>
 </body>
 </html>
