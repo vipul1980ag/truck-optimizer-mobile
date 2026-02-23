@@ -1,7 +1,7 @@
 services:
   - type: web
     name: truck-capacity-optimizer
-    runtime: node
+    env: node
     rootDir: truck-optimizer
     buildCommand: npm install
     startCommand: npm start
