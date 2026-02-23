@@ -1,10 +1,7 @@
-// ---------------------------------------------------------------------------
-// WARNING: Change BASE_URL to your computer's local IP address.
-//     On Windows: open Command Prompt -> run ipconfig -> find IPv4 Address
-//     Example: 'http://192.168.1.105:3000'
-//     Your iPhone and computer must be on the same Wi-Fi network.
-// ---------------------------------------------------------------------------
-export const BASE_URL = 'http://192.168.178.60:3000';
+// In development: set BASE_URL to your computer's local IP (e.g. http://192.168.1.x:3000)
+// In production:  EXPO_PUBLIC_API_URL is injected automatically via eas.json env vars
+export const BASE_URL =
+  process.env.EXPO_PUBLIC_API_URL || 'http://192.168.178.60:3000';
 
 async function request(method, path, body) {
   const opts = {
