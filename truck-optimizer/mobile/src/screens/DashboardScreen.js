@@ -43,8 +43,7 @@ export default function DashboardScreen() {
         <Text style={s.errTitle}>Cannot reach server</Text>
         <Text style={s.errSub}>{error}</Text>
         <Text style={s.errHint}>
-          Open src/api.js and set BASE_URL to your computer's local IP address (e.g. http://192.168.1.x:3000).
-          Both devices must be on the same Wi-Fi.
+          Cannot connect to the server. Please check your internet connection and try again.
         </Text>
         <TouchableOpacity style={s.retryBtn} onPress={load}>
           <Text style={s.retryBtnTxt}>Retry</Text>

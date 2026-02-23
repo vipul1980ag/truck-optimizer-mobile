@@ -1,6 +1,6 @@
 {
   "expo": {
-    "name": "Load Optimizer",
+    "name": "Truck Capacity Optimizer",
     "slug": "truck-optimizer-mobile",
     "version": "1.0.0",
     "orientation": "portrait",
@@ -19,6 +19,11 @@
       },
       "package": "com.truckoptimizer.mobile"
     },
-    "plugins": []
+    "plugins": [],
+    "extra": {
+      "eas": {
+        "projectId": "REPLACE_WITH_EAS_PROJECT_ID"
+      }
+    }
   }
 }
