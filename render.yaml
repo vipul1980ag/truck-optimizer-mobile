@@ -2,6 +2,7 @@ services:
   - type: web
     name: truck-capacity-optimizer
     runtime: node
+    rootDir: truck-optimizer
     buildCommand: npm install
     startCommand: npm start
     envVars:
@@ -11,9 +12,3 @@ services:
         sync: false
       - key: PAYPAL_ENV
         value: live
-    # Persistent disk keeps store.json alive across redeploys
-    # Remove the disk section below if you are on Render's free plan
-    disk:
-      name: truck-optimizer-data
-      mountPath: /opt/render/project/src/data
-      sizeGB: 1
