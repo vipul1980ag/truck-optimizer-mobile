@@ -22,8 +22,9 @@
     "plugins": [],
     "extra": {
       "eas": {
-        "projectId": "REPLACE_WITH_EAS_PROJECT_ID"
+        "projectId": "cb76151f-4926-4d91-9e32-7997c8682935"
       }
-    }
+    },
+    "owner": "vipul1980"
   }
 }
