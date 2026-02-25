@@ -1,0 +1,30 @@
+{
+  "expo": {
+    "name": "Truck Capacity Optimizer",
+    "slug": "truck-optimizer-mobile",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "userInterfaceStyle": "light",
+    "splash": {
+      "resizeMode": "contain",
+      "backgroundColor": "#1e293b"
+    },
+    "ios": {
+      "supportsTablet": true,
+      "bundleIdentifier": "com.truckoptimizer.mobile"
+    },
+    "android": {
+      "adaptiveIcon": {
+        "backgroundColor": "#1e293b"
+      },
+      "package": "com.truckoptimizer.mobile"
+    },
+    "plugins": [],
+    "extra": {
+      "eas": {
+        "projectId": "cb76151f-4926-4d91-9e32-7997c8682935"
+      }
+    },
+    "owner": "vipul1980"
+  }
+}
