@@ -13,9 +13,6 @@
       "android": {
         "buildType": "apk"
       },
-      "cache": {
-        "clear": true
-      },
       "env": {
         "EXPO_PUBLIC_API_URL": "https://truck-capacity-optimizer.onrender.com"
       }
