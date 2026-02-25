@@ -20,6 +20,7 @@
       "package": "com.truckoptimizer.mobile"
     },
     "plugins": [],
+    "newArchEnabled": false,
     "extra": {
       "eas": {
         "projectId": "cb76151f-4926-4d91-9e32-7997c8682935"
