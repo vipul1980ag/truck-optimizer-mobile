@@ -14,8 +14,8 @@ function ProgressBar({ pct, color }) {
   );
 }
 const pb = StyleSheet.create({
-  track: { flex: 1, height: 8, backgroundColor: C.border, borderRadius: 4, overflow: 'hidden' },
-  fill:  { height: 8, borderRadius: 4 },
+  track: { flex: 1, height: 9, backgroundColor: C.border, borderRadius: 5, overflow: 'hidden' },
+  fill:  { height: 9, borderRadius: 5 },
 });
 
 export default function OptimizeScreen() {
@@ -50,76 +50,100 @@ export default function OptimizeScreen() {
   const totalPlaced = (results?.packers || []).reduce((s, p) => s + p.placements.length, 0);
 
   return (
-    <ScrollView style={s.bg} refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}>
+    <ScrollView
+      style={s.bg}
+      refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={C.primary} />}
+    >
+      {/* Optimize Button Hero */}
       <View style={s.hero}>
-        <TouchableOpacity style={s.optBtn} onPress={runOptimize} disabled={loading}>
-          {loading
-            ? <ActivityIndicator color="#fff" size="large" />
-            : <Text style={s.optBtnTxt}>{'\u26a1'} Optimize Load Now</Text>}
+        <TouchableOpacity style={s.optBtn} onPress={runOptimize} disabled={loading} activeOpacity={0.85}>
+          {loading ? (
+            <View style={s.optBtnInner}>
+              <ActivityIndicator color="#fff" size="large" />
+              <Text style={s.optBtnTxt}>Optimizing…</Text>
+            </View>
+          ) : (
+            <View style={s.optBtnInner}>
+              <Text style={s.optBtnIcon}>⚡</Text>
+              <Text style={s.optBtnTxt}>Optimize Load Now</Text>
+            </View>
+          )}
         </TouchableOpacity>
-        <Text style={s.optHint}>Groups same-zone customers {'\u00b7'} Maximises truck utilisation {'\u00b7'} Shows route costs</Text>
+        <Text style={s.optHint}>
+          Groups same-zone customers  ·  Maximises truck utilisation  ·  Shows route costs
+        </Text>
       </View>
 
+      {/* Empty state */}
       {!results && !loading && (
         <View style={s.emptyState}>
-          <Text style={{ fontSize: 52, marginBottom: 12 }}>{'\uD83D\uDCCA'}</Text>
-          <Text style={s.emptyTxt}>Your load plan will appear here after optimising.</Text>
+          <Text style={s.emptyIcon}>📊</Text>
+          <Text style={s.emptyTitle}>No load plan yet</Text>
+          <Text style={s.emptyTxt}>Tap the button above to generate your optimised load plan.</Text>
         </View>
       )}
 
       {results && (
         <>
+          {/* Summary cards */}
           <View style={s.sumRow}>
             {[
-              { num: results.packers.length, lbl: 'Trucks Used' },
-              { num: totalPlaced,            lbl: 'Items Placed' },
-              { num: totalCost > 0 ? '$' + totalCost.toLocaleString('en-US', { maximumFractionDigits: 0 }) : '\u2014', lbl: 'Fleet Cost', col: C.primary },
-            ].map(({ num, lbl, col }) => (
+              { num: results.packers.length, lbl: 'Trucks Used',   icon: '🚛' },
+              { num: totalPlaced,            lbl: 'Items Placed',  icon: '📦' },
+              { num: totalCost > 0 ? '$' + totalCost.toLocaleString('en-US', { maximumFractionDigits: 0 }) : '—', lbl: 'Fleet Cost', icon: '💰', col: C.primary },
+            ].map(({ num, lbl, icon, col }) => (
               <View key={lbl} style={s.sumCard}>
+                <Text style={s.sumIcon}>{icon}</Text>
                 <Text style={[s.sumNum, col && { color: col }]}>{num}</Text>
                 <Text style={s.sumLbl}>{lbl}</Text>
               </View>
             ))}
           </View>
 
+          {/* Warnings */}
           {results.splitWarn?.length > 0 && (
             <View style={s.warnBox}>
-              <Text style={s.warnTitle}>{'\u26a0'} Customer Split Across Trucks</Text>
+              <Text style={s.warnTitle}>⚠ Customer Split Across Trucks</Text>
               {results.splitWarn.map((w, i) => (
-                <Text key={i} style={s.warnItem}>{'\u2022'} {w.name} {'\u2192'} {(w.trucks || []).join(', ')}</Text>
+                <Text key={i} style={s.warnItem}>• {w.name} → {(w.trucks || []).join(', ')}</Text>
               ))}
             </View>
           )}
 
           {results.unplaced?.length > 0 && (
             <View style={s.errBox}>
-              <Text style={s.errTitle}>{'\u2715'} Items That Didn't Fit</Text>
+              <Text style={s.errBoxTitle}>✕ Items That Didn't Fit</Text>
               {[...new Map(results.unplaced.map(u => [u.name, u])).values()].map((u, i) => (
-                <Text key={i} style={s.errItem}>{'\u2022'} {u.name} ({u.length}x{u.width}x{u.height} ft)</Text>
+                <Text key={i} style={s.errItem}>• {u.name} ({u.length}×{u.width}×{u.height} ft)</Text>
               ))}
             </View>
           )}
 
+          {/* Truck cards */}
           {results.packers.map((p, i) => {
-            const t   = p.truck;
-            const ts  = (results.truckZoneSummary || [])[i];
+            const t      = p.truck;
+            const ts     = (results.truckZoneSummary || [])[i];
             const volCap  = t.length * t.width * t.height;
             const volUsed = p.placements.reduce((s, pl) => s + pl.length * pl.width * pl.height, 0);
             const volPct  = volCap > 0 ? Math.min(100, Math.round(volUsed / volCap * 100)) : 0;
             const wtPct   = t.maxWt  > 0 ? Math.min(100, Math.round((p.usedWeight || 0) / t.maxWt * 100)) : 0;
             const volCol  = volPct >= 90 ? C.danger : volPct >= 70 ? C.warning : C.success;
             const wtCol   = wtPct  >= 90 ? C.danger : wtPct  >= 70 ? C.warning : C.success;
+            const pillStyle = volPct >= 90 ? s.pillRed : volPct >= 70 ? s.pillYellow : s.pillGreen;
             return (
               <View key={i} style={s.truckCard}>
+                {/* Card header */}
                 <View style={s.truckHead}>
                   <View style={{ flex: 1 }}>
-                    <Text style={s.truckName}>{'\uD83D\uDE9B'} {t.name}</Text>
-                    <Text style={s.truckSub}>{t.length}x{t.width}x{t.height} ft {'\u00b7'} max {(t.maxWt || 0).toLocaleString()} lbs</Text>
+                    <Text style={s.truckName}>🚛 {t.name}</Text>
+                    <Text style={s.truckSub}>{t.length}×{t.width}×{t.height} ft  ·  max {(t.maxWt || 0).toLocaleString()} lbs</Text>
                   </View>
-                  <View style={[s.pill, volPct >= 90 ? s.pillRed : volPct >= 70 ? s.pillYellow : s.pillGreen]}>
+                  <View style={[s.pill, pillStyle]}>
                     <Text style={s.pillTxt}>{volPct}% full</Text>
                   </View>
                 </View>
+
+                {/* Progress bars */}
                 <View style={s.truckBody}>
                   {[['Volume', volPct, volCol], ['Weight', wtPct, wtCol]].map(([lbl, pct, col]) => (
                     <View key={lbl} style={s.progRow}>
@@ -129,14 +153,17 @@ export default function OptimizeScreen() {
                     </View>
                   ))}
 
+                  {/* Delivery zones */}
                   {ts?.zones?.length > 0 && (
                     <View style={s.zones}>
                       <Text style={s.zonesLbl}>Delivery Zones</Text>
                       {ts.zones.map((z, zi) => (
                         <View key={zi} style={s.zoneRow}>
-                          <Text style={s.zoneIcon}>{'\uD83D\uDCCD'}</Text>
+                          <Text style={s.zoneIcon}>📍</Text>
                           <View style={{ flex: 1 }}>
-                            <Text style={s.zoneName}>{z.zone}{z.distance ? `  \u00b7  ${z.distance} mi` : ''}</Text>
+                            <Text style={s.zoneName}>
+                              {z.zone}{z.distance ? `  ·  ${z.distance} mi` : ''}
+                            </Text>
                             {(z.customers || []).map(zc => {
                               const fc = custMap[zc.id];
                               const ps = fc?.paymentStatus || 'pending';
@@ -158,6 +185,7 @@ export default function OptimizeScreen() {
                     </View>
                   )}
 
+                  {/* Trip cost */}
                   {ts?.estimatedCost != null && (
                     <View style={s.tripCost}>
                       <View>
@@ -172,16 +200,17 @@ export default function OptimizeScreen() {
             );
           })}
 
+          {/* Fleet total */}
           {totalCost > 0 && (
             <View style={s.fleetTotal}>
               <View>
                 <Text style={s.ftLbl}>Total Fleet Cost</Text>
-                <Text style={s.ftSub}>{results.packers.length} trucks {'\u00b7'} {totalPlaced} items placed</Text>
+                <Text style={s.ftSub}>{results.packers.length} trucks  ·  {totalPlaced} items placed</Text>
               </View>
               <Text style={s.ftVal}>${totalCost.toLocaleString('en-US', { maximumFractionDigits: 0 })}</Text>
             </View>
           )}
-          <View style={{ height: 30 }} />
+          <View style={{ height: 36 }} />
         </>
       )}
     </ScrollView>
@@ -189,52 +218,96 @@ export default function OptimizeScreen() {
 }
 
 const s = StyleSheet.create({
-  bg:         { flex: 1, backgroundColor: C.bg },
-  hero:       { padding: 16 },
-  optBtn:     { backgroundColor: C.primary, borderRadius: 14, padding: 20, alignItems: 'center', justifyContent: 'center', minHeight: 64, elevation: 3 },
-  optBtnTxt:  { color: '#fff', fontSize: 20, fontWeight: '900' },
-  optHint:    { fontSize: 11, color: C.text2, textAlign: 'center', marginTop: 8 },
-  emptyState: { alignItems: 'center', paddingVertical: 60 },
-  emptyTxt:   { fontSize: 14, color: C.text2, textAlign: 'center' },
-  sumRow:     { flexDirection: 'row', gap: 8, paddingHorizontal: 12, marginBottom: 10 },
-  sumCard:    { flex: 1, backgroundColor: C.surface, borderRadius: 10, borderWidth: 1, borderColor: C.border, padding: 12, alignItems: 'center' },
-  sumNum:     { fontSize: 20, fontWeight: '900', color: C.text },
-  sumLbl:     { fontSize: 9, color: C.text2, textTransform: 'uppercase', marginTop: 2, fontWeight: '700', textAlign: 'center' },
-  warnBox:    { marginHorizontal: 12, marginBottom: 8, backgroundColor: '#fff7ed', borderWidth: 1, borderColor: '#fed7aa', borderRadius: 10, padding: 12 },
-  warnTitle:  { fontSize: 12, fontWeight: '700', color: '#c2410c', marginBottom: 5 },
-  warnItem:   { fontSize: 11, color: '#9a3412', marginTop: 2 },
-  errBox:     { marginHorizontal: 12, marginBottom: 8, backgroundColor: '#fef2f2', borderWidth: 1, borderColor: '#fecaca', borderRadius: 10, padding: 12 },
-  errTitle:   { fontSize: 12, fontWeight: '700', color: C.danger, marginBottom: 5 },
-  errItem:    { fontSize: 11, color: '#991b1b', marginTop: 2 },
-  truckCard:  { marginHorizontal: 12, marginBottom: 14, backgroundColor: C.surface, borderRadius: 12, borderWidth: 1, borderColor: C.border, overflow: 'hidden', elevation: 2 },
-  truckHead:  { backgroundColor: C.navy, padding: 14, flexDirection: 'row', alignItems: 'center' },
-  truckName:  { fontSize: 15, fontWeight: '800', color: '#f1f5f9' },
-  truckSub:   { fontSize: 11, color: '#64748b', marginTop: 2 },
-  pill:       { paddingHorizontal: 10, paddingVertical: 4, borderRadius: 20, marginLeft: 8 },
-  pillGreen:  { backgroundColor: 'rgba(34,197,94,0.2)' },
-  pillYellow: { backgroundColor: 'rgba(245,158,11,0.2)' },
-  pillRed:    { backgroundColor: 'rgba(239,68,68,0.2)' },
-  pillTxt:    { fontSize: 11, fontWeight: '700', color: '#f1f5f9' },
-  truckBody:  { padding: 14 },
-  progRow:    { flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 8 },
-  progLbl:    { fontSize: 11, color: C.text2, width: 52 },
-  progPct:    { fontSize: 12, fontWeight: '700', width: 36, textAlign: 'right' },
-  zones:      { marginTop: 8 },
-  zonesLbl:   { fontSize: 10, fontWeight: '700', color: C.text2, textTransform: 'uppercase', letterSpacing: 0.4, marginBottom: 6 },
-  zoneRow:    { flexDirection: 'row', gap: 8, backgroundColor: C.surface2, borderWidth: 1, borderColor: C.border, borderRadius: 8, padding: 8, marginBottom: 5 },
-  zoneIcon:   { fontSize: 14 },
-  zoneName:   { fontSize: 12, fontWeight: '700', color: C.text, marginBottom: 3 },
-  custRow:    { flexDirection: 'row', alignItems: 'center', gap: 5, marginTop: 4 },
-  payBadge:   { paddingHorizontal: 6, paddingVertical: 2, borderRadius: 10 },
+  bg: { flex: 1, backgroundColor: C.bg },
+
+  /* Hero */
+  hero:       { backgroundColor: C.navy, padding: 20, paddingBottom: 24 },
+  optBtn:     {
+    borderRadius: 16, padding: 22, alignItems: 'center', justifyContent: 'center',
+    minHeight: 72,
+    backgroundColor: C.primary,
+    shadowColor: C.primary, shadowOffset: { width: 0, height: 6 }, shadowOpacity: 0.5, shadowRadius: 16, elevation: 6,
+  },
+  optBtnInner:{ flexDirection: 'row', alignItems: 'center', gap: 10 },
+  optBtnIcon: { fontSize: 24 },
+  optBtnTxt:  { color: '#fff', fontSize: 20, fontWeight: '900', letterSpacing: -0.3 },
+  optHint:    { fontSize: 11, color: '#64748b', textAlign: 'center', marginTop: 12, lineHeight: 17 },
+
+  /* Empty */
+  emptyState: { alignItems: 'center', paddingVertical: 64, paddingHorizontal: 24 },
+  emptyIcon:  { fontSize: 56, marginBottom: 16 },
+  emptyTitle: { fontSize: 17, fontWeight: '900', color: C.text, marginBottom: 8 },
+  emptyTxt:   { fontSize: 13, color: C.text2, textAlign: 'center', lineHeight: 20 },
+
+  /* Summary */
+  sumRow:  { flexDirection: 'row', gap: 8, marginHorizontal: 14, marginTop: 14, marginBottom: 12 },
+  sumCard: {
+    flex: 1, backgroundColor: C.surface, borderRadius: 12, borderWidth: 1, borderColor: C.border,
+    padding: 12, alignItems: 'center',
+    shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.06, shadowRadius: 6, elevation: 2,
+  },
+  sumIcon: { fontSize: 18, marginBottom: 5 },
+  sumNum:  { fontSize: 18, fontWeight: '900', color: C.text, letterSpacing: -0.3 },
+  sumLbl:  { fontSize: 9, color: C.text2, textTransform: 'uppercase', marginTop: 3, fontWeight: '700', textAlign: 'center', letterSpacing: 0.4 },
+
+  /* Warnings */
+  warnBox:      { marginHorizontal: 14, marginBottom: 10, backgroundColor: '#fff7ed', borderWidth: 1, borderColor: '#fed7aa', borderRadius: 12, padding: 14 },
+  warnTitle:    { fontSize: 12, fontWeight: '800', color: '#c2410c', marginBottom: 6 },
+  warnItem:     { fontSize: 11, color: '#9a3412', marginTop: 3 },
+  errBox:       { marginHorizontal: 14, marginBottom: 10, backgroundColor: '#fef2f2', borderWidth: 1, borderColor: '#fecaca', borderRadius: 12, padding: 14 },
+  errBoxTitle:  { fontSize: 12, fontWeight: '800', color: C.danger, marginBottom: 6 },
+  errItem:      { fontSize: 11, color: '#991b1b', marginTop: 3 },
+
+  /* Truck card */
+  truckCard: {
+    marginHorizontal: 14, marginBottom: 14, backgroundColor: C.surface,
+    borderRadius: 14, borderWidth: 1, borderColor: C.border, overflow: 'hidden',
+    shadowColor: '#000', shadowOffset: { width: 0, height: 3 }, shadowOpacity: 0.08, shadowRadius: 10, elevation: 3,
+  },
+  truckHead: { backgroundColor: C.navy, padding: 14, flexDirection: 'row', alignItems: 'center' },
+  truckName: { fontSize: 15, fontWeight: '900', color: '#f1f5f9', letterSpacing: -0.2 },
+  truckSub:  { fontSize: 11, color: '#64748b', marginTop: 3 },
+  pill:        { paddingHorizontal: 11, paddingVertical: 5, borderRadius: 20, marginLeft: 10 },
+  pillGreen:   { backgroundColor: 'rgba(34,197,94,0.2)' },
+  pillYellow:  { backgroundColor: 'rgba(245,158,11,0.2)' },
+  pillRed:     { backgroundColor: 'rgba(239,68,68,0.2)' },
+  pillTxt:     { fontSize: 11, fontWeight: '800', color: '#f1f5f9' },
+  truckBody:   { padding: 14 },
+
+  /* Progress */
+  progRow:  { flexDirection: 'row', alignItems: 'center', gap: 10, marginBottom: 10 },
+  progLbl:  { fontSize: 11, color: C.text2, width: 54, fontWeight: '600' },
+  progPct:  { fontSize: 12, fontWeight: '800', width: 38, textAlign: 'right' },
+
+  /* Zones */
+  zones:    { marginTop: 10 },
+  zonesLbl: { fontSize: 10, fontWeight: '800', color: C.text2, textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 8 },
+  zoneRow:  { flexDirection: 'row', gap: 10, backgroundColor: C.surface2, borderWidth: 1, borderColor: C.border, borderRadius: 10, padding: 10, marginBottom: 6 },
+  zoneIcon: { fontSize: 14, marginTop: 1 },
+  zoneName: { fontSize: 12, fontWeight: '800', color: C.text, marginBottom: 4 },
+  custRow:  { flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 5 },
+  payBadge: { paddingHorizontal: 7, paddingVertical: 3, borderRadius: 10 },
   payBadgeTxt:{ fontSize: 9, fontWeight: '700' },
-  zoneCust:   { fontSize: 11, color: C.text },
-  zoneAmt:    { fontSize: 10, fontWeight: '700', color: C.primary, marginLeft: 'auto' },
-  tripCost:   { marginTop: 10, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', backgroundColor: 'rgba(37,99,235,0.05)', borderWidth: 1, borderColor: 'rgba(37,99,235,0.15)', borderRadius: 8, padding: 10 },
-  tripLbl:    { fontSize: 11, color: C.text2 },
-  tripSavings:{ fontSize: 11, fontWeight: '700', color: C.success, marginTop: 2 },
-  tripVal:    { fontSize: 18, fontWeight: '800', color: C.primary },
-  fleetTotal: { marginHorizontal: 12, backgroundColor: C.surface, borderWidth: 1, borderColor: C.border, borderRadius: 12, padding: 16, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
-  ftLbl:      { fontSize: 12, fontWeight: '700', color: C.text2 },
-  ftSub:      { fontSize: 11, color: C.text2, marginTop: 2 },
-  ftVal:      { fontSize: 24, fontWeight: '900', color: C.text },
+  zoneCust: { fontSize: 11, color: C.text, fontWeight: '600' },
+  zoneAmt:  { fontSize: 10, fontWeight: '800', color: C.primary, marginLeft: 'auto' },
+
+  /* Trip cost */
+  tripCost:    {
+    marginTop: 12, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center',
+    backgroundColor: 'rgba(37,99,235,0.05)', borderWidth: 1,
+    borderColor: 'rgba(37,99,235,0.15)', borderRadius: 10, padding: 12,
+  },
+  tripLbl:     { fontSize: 11, color: C.text2, fontWeight: '600' },
+  tripSavings: { fontSize: 11, fontWeight: '700', color: C.success, marginTop: 3 },
+  tripVal:     { fontSize: 20, fontWeight: '900', color: C.primary, letterSpacing: -0.4 },
+
+  /* Fleet total */
+  fleetTotal: {
+    marginHorizontal: 14, backgroundColor: C.surface, borderWidth: 1, borderColor: C.border,
+    borderRadius: 14, padding: 18, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center',
+    shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.06, shadowRadius: 6, elevation: 2,
+  },
+  ftLbl:  { fontSize: 13, fontWeight: '800', color: C.text2 },
+  ftSub:  { fontSize: 11, color: C.text2, marginTop: 3 },
+  ftVal:  { fontSize: 26, fontWeight: '900', color: C.text, letterSpacing: -0.5 },
 });

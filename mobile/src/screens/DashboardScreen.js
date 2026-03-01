@@ -6,9 +6,10 @@ import {
 import { api } from '../api';
 import { C, PAY_LABEL, PAY_COLOR, PAY_BG } from '../theme';
 
-function StatCard({ num, label, color }) {
+function StatCard({ num, label, color, icon }) {
   return (
     <View style={s.statCard}>
+      <Text style={s.statIcon}>{icon}</Text>
       <Text style={[s.statNum, color && { color }]}>{num}</Text>
       <Text style={s.statLbl}>{label}</Text>
     </View>
@@ -16,9 +17,9 @@ function StatCard({ num, label, color }) {
 }
 
 export default function DashboardScreen() {
-  const [data,      setData]      = useState(null);
-  const [error,     setError]     = useState(null);
-  const [refreshing,setRefreshing]= useState(false);
+  const [data,       setData]       = useState(null);
+  const [error,      setError]      = useState(null);
+  const [refreshing, setRefreshing] = useState(false);
 
   const load = useCallback(async () => {
     try {
@@ -39,12 +40,10 @@ export default function DashboardScreen() {
   if (error) {
     return (
       <View style={s.center}>
-        <Text style={{ fontSize: 40, marginBottom: 12 }}>⚠️</Text>
+        <Text style={{ fontSize: 48, marginBottom: 14 }}>⚠️</Text>
         <Text style={s.errTitle}>Cannot reach server</Text>
         <Text style={s.errSub}>{error}</Text>
-        <Text style={s.errHint}>
-          Cannot connect to the server. Please check your internet connection and try again.
-        </Text>
+        <Text style={s.errHint}>Check your internet connection and try again.</Text>
         <TouchableOpacity style={s.retryBtn} onPress={load}>
           <Text style={s.retryBtnTxt}>Retry</Text>
         </TouchableOpacity>
@@ -60,88 +59,162 @@ export default function DashboardScreen() {
   const outstanding   = totalInvoiced - totalPaid;
 
   return (
-    <ScrollView style={s.bg} refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}>
+    <ScrollView
+      style={s.bg}
+      refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={C.primary} />}
+    >
+      {/* Hero */}
       <View style={s.hero}>
+        <View style={s.heroBadge}>
+          <Text style={s.heroBadgeTxt}>LIVE DATA</Text>
+        </View>
         <Text style={s.heroTitle}>🚛 Load Optimizer</Text>
-        <Text style={s.heroSub}>Pull down to refresh · Tap Optimize tab to run load plan</Text>
+        <Text style={s.heroSub}>Pull to refresh  ·  Tap Optimize tab to run load plan</Text>
       </View>
 
+      {/* Stats */}
       <View style={s.statsGrid}>
-        <StatCard num={trucks.length}    label="Own Trucks"  />
-        <StatCard num={carriers.length}  label="Carriers"    />
-        <StatCard num={customers.length} label="Customers"   />
-        <StatCard num={totalUnits}       label="Cargo Units" color={C.primary} />
+        <StatCard num={trucks.length}    label="Own Trucks"   icon="🚛" />
+        <StatCard num={carriers.length}  label="Carriers"     icon="🏢" />
+        <StatCard num={customers.length} label="Customers"    icon="👥" />
+        <StatCard num={totalUnits}       label="Cargo Units"  icon="📦" color={C.primary} />
       </View>
 
-      <Text style={s.sectionTitle}>💰 Payment Summary</Text>
+      {/* Payment Summary */}
+      <View style={s.sectionHeader}>
+        <Text style={s.sectionTitle}>💰 Payment Summary</Text>
+      </View>
       <View style={s.payRow}>
-        <View style={[s.payCard, { borderColor: '#bbf7d0' }]}>
+        <View style={[s.payCard, s.payCardGreen]}>
+          <Text style={s.payIcon}>✅</Text>
           <Text style={[s.payNum, { color: C.success }]}>${totalPaid.toLocaleString()}</Text>
           <Text style={s.payLbl}>Collected</Text>
         </View>
-        <View style={[s.payCard, { borderColor: '#fed7aa' }]}>
+        <View style={[s.payCard, s.payCardOrange]}>
+          <Text style={s.payIcon}>⏳</Text>
           <Text style={[s.payNum, { color: C.warning }]}>${outstanding.toLocaleString()}</Text>
           <Text style={s.payLbl}>Outstanding</Text>
         </View>
-        <View style={[s.payCard, { borderColor: C.border }]}>
-          <Text style={[s.payNum, { color: C.text }]}>${totalInvoiced.toLocaleString()}</Text>
+        <View style={[s.payCard, s.payCardBlue]}>
+          <Text style={s.payIcon}>📄</Text>
+          <Text style={[s.payNum, { color: C.primary }]}>${totalInvoiced.toLocaleString()}</Text>
           <Text style={s.payLbl}>Total Invoiced</Text>
         </View>
       </View>
 
-      <Text style={s.sectionTitle}>👥 Customer Status</Text>
+      {/* Customer Status */}
+      <View style={s.sectionHeader}>
+        <Text style={s.sectionTitle}>👥 Customer Status</Text>
+        <Text style={s.sectionCount}>{customers.length} total</Text>
+      </View>
+
       {customers.length === 0
-        ? <Text style={s.empty}>No customers yet.</Text>
+        ? (
+          <View style={s.emptyBox}>
+            <Text style={s.emptyIcon}>👥</Text>
+            <Text style={s.emptyTxt}>No customers yet.</Text>
+          </View>
+        )
         : customers.map(c => {
             const ps = c.paymentStatus || 'pending';
             return (
               <View key={c.id} style={s.custCard}>
-                <View style={[s.dot, { backgroundColor: c.color || '#888' }]} />
-                <View style={{ flex: 1 }}>
-                  <Text style={s.custName}>{c.name}</Text>
-                  <Text style={s.custMeta}>Stop {c.stop} · {c.zone || '—'}{c.distance ? ` · ${c.distance} mi` : ''}</Text>
+                <View style={[s.colorBar, { backgroundColor: c.color || '#888' }]} />
+                <View style={s.custBody}>
+                  <View style={s.custRow}>
+                    <Text style={s.custName}>{c.name}</Text>
+                    <View style={[s.badge, { backgroundColor: PAY_BG[ps] }]}>
+                      <Text style={[s.badgeTxt, { color: PAY_COLOR[ps] }]}>{PAY_LABEL[ps]}</Text>
+                    </View>
+                  </View>
+                  <Text style={s.custMeta}>
+                    Stop {c.stop}  ·  {c.zone || '—'}{c.distance ? `  ·  ${c.distance} mi` : ''}
+                  </Text>
                   {c.invoiceAmount > 0 && (
-                    <Text style={s.custInv}>${Number(c.invoiceAmount).toLocaleString()} invoice</Text>
+                    <Text style={s.custInv}>${Number(c.invoiceAmount).toLocaleString()}</Text>
                   )}
-                </View>
-                <View style={[s.badge, { backgroundColor: PAY_BG[ps] }]}>
-                  <Text style={[s.badgeTxt, { color: PAY_COLOR[ps] }]}>{PAY_LABEL[ps]}</Text>
                 </View>
               </View>
             );
           })
       }
-      <View style={{ height: 30 }} />
+      <View style={{ height: 32 }} />
     </ScrollView>
   );
 }
 
 const s = StyleSheet.create({
-  bg:         { flex: 1, backgroundColor: C.bg },
-  center:     { flex: 1, justifyContent: 'center', alignItems: 'center', padding: 24 },
-  errTitle:   { fontSize: 18, fontWeight: '800', color: C.danger, marginBottom: 8, textAlign: 'center' },
-  errSub:     { fontSize: 13, color: C.text2, textAlign: 'center', marginBottom: 12 },
-  errHint:    { fontSize: 12, color: C.text2, textAlign: 'center', marginBottom: 24, paddingHorizontal: 16, lineHeight: 18 },
-  retryBtn:   { backgroundColor: C.primary, paddingHorizontal: 28, paddingVertical: 11, borderRadius: 8 },
-  retryBtnTxt:{ color: '#fff', fontWeight: '800', fontSize: 15 },
-  hero:       { backgroundColor: C.navy, padding: 20 },
-  heroTitle:  { fontSize: 24, fontWeight: '900', color: '#f1f5f9' },
-  heroSub:    { fontSize: 12, color: '#94a3b8', marginTop: 4 },
-  statsGrid:  { flexDirection: 'row', flexWrap: 'wrap', padding: 10, gap: 8 },
-  statCard:   { flex: 1, minWidth: '46%', backgroundColor: C.surface, borderRadius: 10, borderWidth: 1, borderColor: C.border, padding: 14, alignItems: 'center', elevation: 1 },
-  statNum:    { fontSize: 30, fontWeight: '900', color: C.text },
-  statLbl:    { fontSize: 10, color: C.text2, marginTop: 4, textTransform: 'uppercase', letterSpacing: 0.5, fontWeight: '700' },
-  sectionTitle:{ fontSize: 12, fontWeight: '800', color: C.text2, textTransform: 'uppercase', letterSpacing: 0.5, marginHorizontal: 12, marginTop: 8, marginBottom: 8 },
-  payRow:     { flexDirection: 'row', gap: 8, marginHorizontal: 12, marginBottom: 4 },
-  payCard:    { flex: 1, backgroundColor: C.surface, borderRadius: 10, borderWidth: 1, padding: 12, alignItems: 'center' },
-  payNum:     { fontSize: 17, fontWeight: '900' },
-  payLbl:     { fontSize: 9, color: C.text2, marginTop: 3, textTransform: 'uppercase', fontWeight: '700', textAlign: 'center' },
-  custCard:   { backgroundColor: C.surface, borderRadius: 10, borderWidth: 1, borderColor: C.border, marginHorizontal: 12, marginBottom: 8, padding: 12, flexDirection: 'row', alignItems: 'center', gap: 10 },
-  dot:        { width: 10, height: 10, borderRadius: 5, flexShrink: 0 },
-  custName:   { fontSize: 13, fontWeight: '700', color: C.text },
-  custMeta:   { fontSize: 11, color: C.text2, marginTop: 2 },
-  custInv:    { fontSize: 11, fontWeight: '700', color: C.primary, marginTop: 2 },
-  badge:      { paddingHorizontal: 8, paddingVertical: 3, borderRadius: 20, flexShrink: 0 },
-  badgeTxt:   { fontSize: 10, fontWeight: '700' },
-  empty:      { fontSize: 13, color: C.text2, textAlign: 'center', padding: 20 },
+  bg:          { flex: 1, backgroundColor: C.bg },
+  center:      { flex: 1, justifyContent: 'center', alignItems: 'center', padding: 24 },
+  errTitle:    { fontSize: 18, fontWeight: '800', color: C.danger, marginBottom: 8, textAlign: 'center' },
+  errSub:      { fontSize: 13, color: C.text2, textAlign: 'center', marginBottom: 8 },
+  errHint:     { fontSize: 12, color: C.text2, textAlign: 'center', marginBottom: 24, paddingHorizontal: 16, lineHeight: 18 },
+  retryBtn:    { backgroundColor: C.primary, paddingHorizontal: 32, paddingVertical: 12, borderRadius: 10, elevation: 3 },
+  retryBtnTxt: { color: '#fff', fontWeight: '900', fontSize: 15 },
+
+  /* Hero */
+  hero:      {
+    backgroundColor: C.navy, padding: 22, paddingTop: 24,
+    shadowColor: '#000', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.25, shadowRadius: 8,
+  },
+  heroBadge:    { flexDirection: 'row', marginBottom: 10 },
+  heroBadgeTxt: {
+    fontSize: 9, fontWeight: '800', color: '#60a5fa', letterSpacing: 1.2,
+    backgroundColor: 'rgba(59,130,246,0.15)',
+    borderWidth: 1, borderColor: 'rgba(59,130,246,0.25)',
+    paddingHorizontal: 8, paddingVertical: 3, borderRadius: 20,
+  },
+  heroTitle: { fontSize: 26, fontWeight: '900', color: '#f1f5f9', letterSpacing: -0.5 },
+  heroSub:   { fontSize: 12, color: '#64748b', marginTop: 5, lineHeight: 18 },
+
+  /* Stats */
+  statsGrid: { flexDirection: 'row', flexWrap: 'wrap', paddingHorizontal: 10, paddingTop: 14, gap: 8 },
+  statCard: {
+    flex: 1, minWidth: '46%', backgroundColor: C.surface,
+    borderRadius: 14, borderWidth: 1, borderColor: C.border,
+    padding: 16, alignItems: 'center',
+    shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.06, shadowRadius: 6, elevation: 2,
+  },
+  statIcon:  { fontSize: 22, marginBottom: 8 },
+  statNum:   { fontSize: 28, fontWeight: '900', color: C.text, letterSpacing: -0.5, lineHeight: 32 },
+  statLbl:   { fontSize: 10, color: C.text2, marginTop: 5, textTransform: 'uppercase', letterSpacing: 0.6, fontWeight: '700' },
+
+  /* Section */
+  sectionHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginHorizontal: 14, marginTop: 20, marginBottom: 10 },
+  sectionTitle:  { fontSize: 13, fontWeight: '800', color: C.text, letterSpacing: -0.1 },
+  sectionCount:  { fontSize: 11, color: C.text2, fontWeight: '600' },
+
+  /* Payment cards */
+  payRow:       { flexDirection: 'row', gap: 8, marginHorizontal: 14, marginBottom: 4 },
+  payCard:      {
+    flex: 1, backgroundColor: C.surface, borderRadius: 14, borderWidth: 1,
+    borderColor: C.border, padding: 14, alignItems: 'center',
+    shadowColor: '#000', shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.05, shadowRadius: 4, elevation: 1,
+  },
+  payCardGreen:  { borderColor: '#bbf7d0' },
+  payCardOrange: { borderColor: '#fed7aa' },
+  payCardBlue:   { borderColor: '#bfdbfe' },
+  payIcon:  { fontSize: 18, marginBottom: 6 },
+  payNum:   { fontSize: 16, fontWeight: '900', letterSpacing: -0.3 },
+  payLbl:   { fontSize: 9, color: C.text2, marginTop: 3, textTransform: 'uppercase', fontWeight: '700', textAlign: 'center', letterSpacing: 0.4 },
+
+  /* Customer cards */
+  custCard: {
+    backgroundColor: C.surface, borderRadius: 14, borderWidth: 1, borderColor: C.border,
+    marginHorizontal: 14, marginBottom: 8, flexDirection: 'row', overflow: 'hidden',
+    shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.06, shadowRadius: 6, elevation: 2,
+  },
+  colorBar:  { width: 6, backgroundColor: '#888' },
+  custBody:  { flex: 1, padding: 12 },
+  custRow:   { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 },
+  custName:  { fontSize: 14, fontWeight: '800', color: C.text, flex: 1 },
+  custMeta:  { fontSize: 11, color: C.text2, lineHeight: 16 },
+  custInv:   { fontSize: 15, fontWeight: '900', color: C.primary, marginTop: 6, letterSpacing: -0.3 },
+  badge:     { paddingHorizontal: 9, paddingVertical: 4, borderRadius: 20, marginLeft: 8 },
+  badgeTxt:  { fontSize: 10, fontWeight: '700' },
+
+  /* Empty */
+  emptyBox:  { alignItems: 'center', padding: 36, backgroundColor: C.surface, marginHorizontal: 14, borderRadius: 14, borderWidth: 1, borderColor: C.border },
+  emptyIcon: { fontSize: 40, marginBottom: 10 },
+  emptyTxt:  { fontSize: 13, color: C.text2, textAlign: 'center' },
 });
