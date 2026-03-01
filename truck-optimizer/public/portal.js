@@ -1,5 +1,234 @@
 'use strict';
 
+// ── Item Catalogs ──────────────────────────────────────────────────────────────
+const PORTAL_HOUSEHOLD = [
+  { cat: 'Living Room', items: [
+    { name: 'Sofa (3-seat)',        l: 7.5, w: 3.0, h: 3.0, wt: 180 },
+    { name: 'Loveseat',             l: 5.0, w: 3.0, h: 3.0, wt: 120 },
+    { name: 'Armchair',             l: 3.0, w: 3.0, h: 3.5, wt:  70 },
+    { name: 'Recliner',             l: 3.5, w: 3.0, h: 3.5, wt: 100 },
+    { name: 'Sectional Sofa',       l:10.0, w: 5.0, h: 3.0, wt: 300 },
+    { name: 'Coffee Table',         l: 4.0, w: 2.0, h: 1.5, wt:  50 },
+    { name: 'Side Table',           l: 1.5, w: 1.5, h: 2.0, wt:  25 },
+    { name: 'TV Stand',             l: 5.0, w: 1.5, h: 2.0, wt:  80 },
+    { name: 'Entertainment Center', l: 6.0, w: 1.5, h: 5.0, wt: 200 },
+    { name: 'Bookshelf (tall)',      l: 3.0, w: 1.0, h: 6.0, wt:  60 },
+    { name: 'Ottoman',              l: 3.0, w: 2.0, h: 1.5, wt:  40 },
+    { name: 'Floor Lamp',           l: 1.0, w: 1.0, h: 5.5, wt:  10 },
+    { name: 'TV 55"',               l: 4.5, w: 0.5, h: 2.5, wt:  40 },
+    { name: 'TV 75"',               l: 5.7, w: 0.5, h: 3.2, wt:  70 },
+  ]},
+  { cat: 'Bedroom', items: [
+    { name: 'King Bed Frame',       l: 7.0, w: 6.5, h: 4.0, wt: 250 },
+    { name: 'Queen Bed Frame',      l: 7.0, w: 5.5, h: 4.0, wt: 180 },
+    { name: 'Full Bed Frame',       l: 6.5, w: 4.5, h: 4.0, wt: 140 },
+    { name: 'Twin Bed Frame',       l: 6.5, w: 3.5, h: 4.0, wt: 100 },
+    { name: 'King Mattress',        l: 6.5, w: 6.5, h: 1.0, wt: 100 },
+    { name: 'Queen Mattress',       l: 6.5, w: 5.0, h: 1.0, wt:  80 },
+    { name: 'Full Mattress',        l: 6.5, w: 4.5, h: 1.0, wt:  60 },
+    { name: 'Twin Mattress',        l: 6.5, w: 3.5, h: 0.5, wt:  45 },
+    { name: 'Dresser (wide)',       l: 4.0, w: 1.5, h: 4.0, wt: 150 },
+    { name: 'Chest of Drawers',     l: 3.0, w: 1.5, h: 4.5, wt: 120 },
+    { name: 'Wardrobe',             l: 4.0, w: 2.0, h: 6.0, wt: 250 },
+    { name: 'Nightstand',           l: 1.5, w: 1.5, h: 2.0, wt:  30 },
+    { name: 'Vanity Table',         l: 3.5, w: 1.5, h: 4.5, wt:  80 },
+    { name: 'Tall Mirror',          l: 1.5, w: 0.5, h: 6.0, wt:  40 },
+    { name: 'Bunk Bed',             l: 7.0, w: 3.5, h: 6.0, wt: 200 },
+  ]},
+  { cat: 'Dining Room', items: [
+    { name: 'Dining Table (6-seat)',l: 6.0, w: 3.0, h: 2.5, wt: 150 },
+    { name: 'Dining Table (4-seat)',l: 4.0, w: 3.0, h: 2.5, wt: 100 },
+    { name: 'Dining Chair',         l: 1.5, w: 1.5, h: 3.5, wt:  20 },
+    { name: 'Bar Stool',            l: 1.5, w: 1.5, h: 3.5, wt:  15 },
+    { name: 'Buffet / Sideboard',   l: 5.0, w: 1.5, h: 3.0, wt: 180 },
+    { name: 'China Cabinet',        l: 3.5, w: 1.5, h: 6.0, wt: 200 },
+    { name: 'Bar Cart',             l: 2.5, w: 1.5, h: 3.5, wt:  30 },
+    { name: 'Bench (dining)',       l: 4.0, w: 1.5, h: 1.5, wt:  40 },
+  ]},
+  { cat: 'Kitchen / Appliances', items: [
+    { name: 'Refrigerator (full)',  l: 3.0, w: 2.5, h: 6.0, wt: 300 },
+    { name: 'Refrigerator (mini)', l: 1.5, w: 1.5, h: 3.5, wt:  60 },
+    { name: 'Oven / Range',         l: 2.5, w: 2.5, h: 3.5, wt: 200 },
+    { name: 'Washing Machine',      l: 2.0, w: 2.5, h: 3.5, wt: 200 },
+    { name: 'Dryer',                l: 2.0, w: 2.5, h: 3.5, wt: 150 },
+    { name: 'Dishwasher',           l: 2.0, w: 2.0, h: 3.5, wt: 100 },
+    { name: 'Microwave',            l: 1.5, w: 1.5, h: 1.0, wt:  40 },
+    { name: 'Chest Freezer',        l: 4.0, w: 2.0, h: 3.0, wt: 150 },
+    { name: 'Kitchen Island',       l: 4.0, w: 2.0, h: 3.0, wt: 200 },
+  ]},
+  { cat: 'Home Office', items: [
+    { name: 'Desk (large)',         l: 5.0, w: 2.0, h: 2.5, wt: 100 },
+    { name: 'Desk (small)',         l: 3.5, w: 1.5, h: 2.5, wt:  60 },
+    { name: 'L-Shaped Desk',        l: 6.0, w: 5.0, h: 2.5, wt: 150 },
+    { name: 'Office Chair',         l: 2.0, w: 2.0, h: 4.0, wt:  40 },
+    { name: 'Filing Cabinet (4dr)', l: 1.5, w: 2.0, h: 4.5, wt: 130 },
+    { name: 'Bookcase',             l: 3.0, w: 1.0, h: 6.0, wt:  80 },
+    { name: 'Printer (desktop)',    l: 1.5, w: 1.5, h: 1.0, wt:  20 },
+    { name: 'Monitor 27"',          l: 2.5, w: 0.5, h: 1.5, wt:  15 },
+    { name: 'Desktop Computer',     l: 1.5, w: 1.0, h: 1.5, wt:  20 },
+  ]},
+  { cat: 'Exercise Equipment', items: [
+    { name: 'Treadmill',            l: 5.5, w: 2.5, h: 4.0, wt: 250 },
+    { name: 'Exercise Bike',        l: 3.5, w: 2.0, h: 4.0, wt: 100 },
+    { name: 'Elliptical Trainer',   l: 5.0, w: 2.5, h: 5.0, wt: 200 },
+    { name: 'Weight Bench',         l: 4.0, w: 2.0, h: 3.5, wt:  80 },
+    { name: 'Weight Rack',          l: 3.0, w: 2.0, h: 5.0, wt: 150 },
+    { name: 'Rowing Machine',       l: 7.0, w: 2.0, h: 3.5, wt: 100 },
+    { name: 'Punching Bag',         l: 1.5, w: 1.5, h: 4.0, wt:  70 },
+    { name: 'Squat Rack',           l: 4.0, w: 4.0, h: 7.0, wt: 300 },
+  ]},
+  { cat: 'Outdoor / Garage', items: [
+    { name: 'Lawn Mower (push)',    l: 3.0, w: 2.0, h: 3.0, wt:  80 },
+    { name: 'Riding Mower',         l: 6.0, w: 4.0, h: 4.0, wt: 450 },
+    { name: 'Patio Table',          l: 4.0, w: 4.0, h: 2.5, wt:  80 },
+    { name: 'Patio Chair',          l: 2.0, w: 2.0, h: 3.0, wt:  25 },
+    { name: 'Patio Sofa',           l: 6.0, w: 3.0, h: 3.0, wt: 120 },
+    { name: 'BBQ Grill',            l: 2.5, w: 2.0, h: 4.0, wt: 150 },
+    { name: 'Bicycle',              l: 5.5, w: 1.5, h: 3.5, wt:  25 },
+    { name: 'Workbench',            l: 6.0, w: 2.0, h: 3.0, wt: 200 },
+    { name: 'Tool Cabinet',         l: 2.5, w: 1.5, h: 5.0, wt: 180 },
+    { name: 'Storage Shelving',     l: 4.0, w: 1.5, h: 6.0, wt:  60 },
+    { name: 'Ladder (6 ft)',        l: 6.0, w: 1.5, h: 0.5, wt:  25 },
+    { name: 'Kayak / Canoe',        l:12.0, w: 2.5, h: 1.5, wt:  55 },
+  ]},
+  { cat: 'Moving Boxes', items: [
+    { name: 'Small Box',            l: 1.5, w: 1.5, h: 1.5, wt:  40 },
+    { name: 'Medium Box',           l: 2.0, w: 1.5, h: 1.5, wt:  60 },
+    { name: 'Large Box',            l: 2.0, w: 2.0, h: 2.0, wt:  80 },
+    { name: 'Extra-Large Box',      l: 2.5, w: 2.0, h: 2.0, wt: 100 },
+    { name: 'Wardrobe Box',         l: 2.0, w: 2.0, h: 4.0, wt:  60 },
+    { name: 'Picture / Mirror Box', l: 3.5, w: 0.5, h: 3.0, wt:  30 },
+    { name: 'Dish Pack Box',        l: 1.5, w: 1.5, h: 2.0, wt:  50 },
+    { name: 'Book Box',             l: 1.5, w: 1.5, h: 1.0, wt:  60 },
+  ]},
+];
+
+const PORTAL_INDUSTRIAL = [
+  { cat: 'Pallets & Crates', items: [
+    { name: 'Standard Pallet (48×40)', l: 4.0, w: 3.5, h: 0.6, wt:   50 },
+    { name: 'Euro Pallet (47×31)',      l: 3.9, w: 2.6, h: 0.6, wt:   55 },
+    { name: 'Double-Wing Pallet',       l: 4.0, w: 4.0, h: 0.6, wt:   60 },
+    { name: 'Wooden Crate (small)',     l: 3.0, w: 2.0, h: 2.0, wt:   80 },
+    { name: 'Wooden Crate (large)',     l: 6.0, w: 4.0, h: 4.0, wt:  200 },
+    { name: 'Pallet + Load (48×40)',    l: 4.0, w: 3.5, h: 4.5, wt: 2000 },
+    { name: 'Steel Skid',               l: 5.0, w: 3.0, h: 0.5, wt:  150 },
+  ]},
+  { cat: 'Industrial Machinery', items: [
+    { name: 'CNC Machine (small)',      l: 6.0, w: 4.0, h: 5.0, wt: 4000 },
+    { name: 'Compressor (industrial)', l: 5.0, w: 3.0, h: 4.0, wt: 1500 },
+    { name: 'Generator (portable)',     l: 4.0, w: 2.0, h: 2.5, wt:  500 },
+    { name: 'Generator (standby)',      l: 8.0, w: 3.0, h: 4.0, wt: 2500 },
+    { name: 'Industrial Press',         l: 5.0, w: 3.0, h: 6.0, wt: 3000 },
+    { name: 'Conveyor Belt (8 ft)',     l: 9.0, w: 2.0, h: 3.0, wt:  600 },
+    { name: 'Lathe Machine',            l: 8.0, w: 3.0, h: 5.0, wt: 3500 },
+    { name: 'Air Compressor (tank)',    l: 3.0, w: 2.0, h: 3.5, wt:  300 },
+  ]},
+  { cat: 'Warehouse Equipment', items: [
+    { name: 'Pallet Rack Section',      l: 8.0, w: 3.5, h: 8.0, wt:  250 },
+    { name: 'Shelving Unit (heavy)',    l: 6.0, w: 2.0, h: 6.0, wt:  120 },
+    { name: 'Wire Shelving (5-tier)',   l: 4.0, w: 1.5, h: 6.0, wt:   60 },
+    { name: 'Mezzanine Panel',          l: 8.0, w: 4.0, h: 0.5, wt:  400 },
+    { name: 'Dock Plate',               l: 4.0, w: 3.0, h: 0.5, wt:  200 },
+    { name: 'Industrial Workbench',     l: 6.0, w: 2.5, h: 3.5, wt:  250 },
+    { name: 'Storage Cabinet (steel)', l: 3.0, w: 1.5, h: 5.5, wt:  150 },
+  ]},
+  { cat: 'Material Handling', items: [
+    { name: 'Forklift (3-ton)',         l: 9.0, w: 4.0, h: 6.0, wt: 9000 },
+    { name: 'Pallet Jack (manual)',     l: 5.5, w: 1.5, h: 4.0, wt:  170 },
+    { name: 'Pallet Jack (electric)',   l: 6.0, w: 2.0, h: 4.5, wt:  600 },
+    { name: 'Hand Truck / Dolly',       l: 1.5, w: 1.0, h: 4.5, wt:   25 },
+    { name: 'Platform Cart (large)',    l: 4.0, w: 2.5, h: 1.5, wt:   80 },
+    { name: 'Drum (55-gal steel)',      l: 2.0, w: 2.0, h: 3.0, wt:  500 },
+    { name: 'IBC Tote (275-gal)',       l: 3.5, w: 3.0, h: 3.5, wt: 2800 },
+  ]},
+  { cat: 'Construction Materials', items: [
+    { name: 'Lumber Bundle (8 ft)',      l:  8.0, w: 2.0, h: 2.0, wt:  800 },
+    { name: 'Plywood Bundle (4×8)',      l:  8.5, w: 4.5, h: 2.0, wt:  700 },
+    { name: 'Drywall Bundle (4×8)',      l:  8.5, w: 4.5, h: 1.5, wt: 1200 },
+    { name: 'Steel Beam (20 ft)',        l: 20.0, w: 1.0, h: 1.0, wt: 1000 },
+    { name: 'Concrete Block (pallet)',   l:  4.0, w: 3.5, h: 2.5, wt: 2800 },
+    { name: 'Roofing Shingles (pallet)', l:  4.0, w: 3.0, h: 4.0, wt: 2500 },
+    { name: 'HVAC Unit (split)',          l:  4.0, w: 2.0, h: 2.5, wt:  300 },
+    { name: 'Pipe Bundle (10 ft)',        l: 10.0, w: 2.0, h: 2.0, wt:  400 },
+  ]},
+  { cat: 'Office & Business', items: [
+    { name: 'Server Rack (42U)',        l: 3.0, w: 3.5, h: 6.5, wt:  250 },
+    { name: 'Commercial Copier',        l: 2.5, w: 2.0, h: 3.5, wt:  200 },
+    { name: 'Cubicle Desk System',      l: 6.0, w: 5.0, h: 4.0, wt:  300 },
+    { name: 'Safe (commercial)',        l: 2.5, w: 2.0, h: 4.0, wt: 1000 },
+    { name: 'Vending Machine',          l: 3.0, w: 2.5, h: 6.0, wt:  500 },
+    { name: 'ATM Machine',              l: 2.0, w: 2.0, h: 5.5, wt:  600 },
+    { name: 'Large Format Printer',     l: 5.0, w: 2.5, h: 3.5, wt:  300 },
+  ]},
+  { cat: 'Retail Equipment', items: [
+    { name: 'Glass Display Case',       l: 4.0, w: 2.0, h: 4.0, wt: 150 },
+    { name: 'Checkout Counter',         l: 5.0, w: 2.5, h: 3.5, wt: 200 },
+    { name: 'Gondola Shelving',         l: 4.0, w: 1.5, h: 5.0, wt: 100 },
+    { name: 'Clothing Rack (floor)',    l: 3.0, w: 1.5, h: 5.0, wt:  40 },
+    { name: 'Point of Sale Kiosk',      l: 2.0, w: 2.0, h: 5.0, wt: 150 },
+    { name: 'Commercial Refrigerator', l: 3.0, w: 2.5, h: 6.0, wt: 400 },
+    { name: 'Walk-in Cooler Panel',     l: 4.0, w: 4.0, h: 8.0, wt: 600 },
+  ]},
+  { cat: 'Food & Beverage', items: [
+    { name: 'Restaurant Range (6-brn)', l: 3.5, w: 2.5, h: 3.5, wt:  350 },
+    { name: 'Commercial Dishwasher',    l: 4.0, w: 2.5, h: 4.0, wt:  300 },
+    { name: 'Walk-in Refrigerator',     l: 8.0, w: 6.0, h: 8.0, wt: 1500 },
+    { name: 'Ice Machine (commercial)', l: 2.5, w: 2.0, h: 3.5, wt:  250 },
+    { name: 'Deep Fryer (commercial)',  l: 2.0, w: 2.0, h: 3.5, wt:  150 },
+    { name: 'Prep Table (stainless)',   l: 5.0, w: 2.0, h: 3.0, wt:  200 },
+    { name: 'Keg (half-barrel)',         l: 1.5, w: 1.5, h: 2.0, wt:  170 },
+    { name: 'Food Truck Equipment Kit', l: 6.0, w: 3.0, h: 4.0, wt:  800 },
+  ]},
+];
+
+let _portalCategory = null; // 'household' | 'industrial'
+
+function portalSetCategory(type) {
+  _portalCategory = type;
+  const sel = document.getElementById('p-item-select');
+  sel.innerHTML = '<option value="">— Choose an item —</option>';
+  const catalog = type === 'household' ? PORTAL_HOUSEHOLD : PORTAL_INDUSTRIAL;
+  catalog.forEach(group => {
+    const og = document.createElement('optgroup');
+    og.label = group.cat;
+    group.items.forEach(item => {
+      const opt = document.createElement('option');
+      opt.value = JSON.stringify(item);
+      opt.textContent = item.name;
+      og.appendChild(opt);
+    });
+    sel.appendChild(og);
+  });
+  document.getElementById('p-step1').style.display = 'none';
+  document.getElementById('p-step2').style.display = 'block';
+}
+
+function portalPickItem(val) {
+  if (!val) return;
+  const item = JSON.parse(val);
+  document.getElementById('p-name').value       = item.name;
+  document.getElementById('p-length').value     = item.l;
+  document.getElementById('p-width').value      = item.w;
+  document.getElementById('p-height').value     = item.h;
+  document.getElementById('p-weight').value     = item.wt;
+  document.getElementById('p-pkg-weight').value = '0';
+  document.getElementById('p-qty').value        = '1';
+}
+
+function portalResetCategory() {
+  _portalCategory = null;
+  document.getElementById('p-step1').style.display = 'block';
+  document.getElementById('p-step2').style.display = 'none';
+  document.getElementById('p-item-select').value = '';
+  document.getElementById('p-name').value        = '';
+  document.getElementById('p-length').value      = '4';
+  document.getElementById('p-width').value       = '4';
+  document.getElementById('p-height').value      = '4';
+  document.getElementById('p-weight').value      = '500';
+  document.getElementById('p-pkg-weight').value  = '0';
+  document.getElementById('p-qty').value         = '1';
+}
+
 // ── State ─────────────────────────────────────────────────────────────────────
 let trucks    = [];
 let carriers  = [];
@@ -81,14 +310,7 @@ function portalAddItem() {
     customerId:     custId || null,
   });
 
-  // Reset form
-  document.getElementById('p-name').value       = '';
-  document.getElementById('p-length').value     = '4';
-  document.getElementById('p-width').value      = '4';
-  document.getElementById('p-height').value     = '4';
-  document.getElementById('p-weight').value     = '500';
-  document.getElementById('p-pkg-weight').value = '0';
-  document.getElementById('p-qty').value        = '1';
+  portalResetCategory();
 
   saveToServer();
   renderAll();
