@@ -1027,20 +1027,124 @@ const CATALOG = [
   ]},
 ];
 
+const INDUSTRIAL_CATALOG = [
+  { cat: 'Pallets & Crates', items: [
+    { name: 'Standard Pallet (48×40)', l: 4.0, w: 3.5, h: 0.6, wt:   50 },
+    { name: 'Euro Pallet (47×31)',      l: 3.9, w: 2.6, h: 0.6, wt:   55 },
+    { name: 'Double-Wing Pallet',       l: 4.0, w: 4.0, h: 0.6, wt:   60 },
+    { name: 'Wooden Crate (small)',     l: 3.0, w: 2.0, h: 2.0, wt:   80 },
+    { name: 'Wooden Crate (large)',     l: 6.0, w: 4.0, h: 4.0, wt:  200 },
+    { name: 'Pallet + Load (48×40)',    l: 4.0, w: 3.5, h: 4.5, wt: 2000 },
+    { name: 'Steel Skid',               l: 5.0, w: 3.0, h: 0.5, wt:  150 },
+  ]},
+  { cat: 'Industrial Machinery', items: [
+    { name: 'CNC Machine (small)',      l: 6.0, w: 4.0, h: 5.0, wt: 4000 },
+    { name: 'Compressor (industrial)', l: 5.0, w: 3.0, h: 4.0, wt: 1500 },
+    { name: 'Generator (portable)',     l: 4.0, w: 2.0, h: 2.5, wt:  500 },
+    { name: 'Generator (standby)',      l: 8.0, w: 3.0, h: 4.0, wt: 2500 },
+    { name: 'Industrial Press',         l: 5.0, w: 3.0, h: 6.0, wt: 3000 },
+    { name: 'Conveyor Belt (8 ft)',     l: 9.0, w: 2.0, h: 3.0, wt:  600 },
+    { name: 'Lathe Machine',            l: 8.0, w: 3.0, h: 5.0, wt: 3500 },
+    { name: 'Air Compressor (tank)',    l: 3.0, w: 2.0, h: 3.5, wt:  300 },
+  ]},
+  { cat: 'Warehouse Equipment', items: [
+    { name: 'Pallet Rack Section',      l: 8.0, w: 3.5, h: 8.0, wt:  250 },
+    { name: 'Shelving Unit (heavy)',    l: 6.0, w: 2.0, h: 6.0, wt:  120 },
+    { name: 'Wire Shelving (5-tier)',   l: 4.0, w: 1.5, h: 6.0, wt:   60 },
+    { name: 'Mezzanine Panel',          l: 8.0, w: 4.0, h: 0.5, wt:  400 },
+    { name: 'Dock Plate',               l: 4.0, w: 3.0, h: 0.5, wt:  200 },
+    { name: 'Industrial Workbench',     l: 6.0, w: 2.5, h: 3.5, wt:  250 },
+    { name: 'Storage Cabinet (steel)', l: 3.0, w: 1.5, h: 5.5, wt:  150 },
+  ]},
+  { cat: 'Material Handling', items: [
+    { name: 'Forklift (3-ton)',         l: 9.0, w: 4.0, h: 6.0, wt: 9000 },
+    { name: 'Pallet Jack (manual)',     l: 5.5, w: 1.5, h: 4.0, wt:  170 },
+    { name: 'Pallet Jack (electric)',   l: 6.0, w: 2.0, h: 4.5, wt:  600 },
+    { name: 'Hand Truck / Dolly',       l: 1.5, w: 1.0, h: 4.5, wt:   25 },
+    { name: 'Platform Cart (large)',    l: 4.0, w: 2.5, h: 1.5, wt:   80 },
+    { name: 'Drum (55-gal steel)',      l: 2.0, w: 2.0, h: 3.0, wt:  500 },
+    { name: 'IBC Tote (275-gal)',       l: 3.5, w: 3.0, h: 3.5, wt: 2800 },
+  ]},
+  { cat: 'Construction Materials', items: [
+    { name: 'Lumber Bundle (8 ft)',      l:  8.0, w: 2.0, h: 2.0, wt:  800 },
+    { name: 'Plywood Bundle (4×8)',      l:  8.5, w: 4.5, h: 2.0, wt:  700 },
+    { name: 'Drywall Bundle (4×8)',      l:  8.5, w: 4.5, h: 1.5, wt: 1200 },
+    { name: 'Steel Beam (20 ft)',        l: 20.0, w: 1.0, h: 1.0, wt: 1000 },
+    { name: 'Concrete Block (pallet)',   l:  4.0, w: 3.5, h: 2.5, wt: 2800 },
+    { name: 'Roofing Shingles (pallet)', l:  4.0, w: 3.0, h: 4.0, wt: 2500 },
+    { name: 'HVAC Unit (split)',          l:  4.0, w: 2.0, h: 2.5, wt:  300 },
+    { name: 'Pipe Bundle (10 ft)',        l: 10.0, w: 2.0, h: 2.0, wt:  400 },
+  ]},
+  { cat: 'Office & Business', items: [
+    { name: 'Server Rack (42U)',        l: 3.0, w: 3.5, h: 6.5, wt:  250 },
+    { name: 'Commercial Copier',        l: 2.5, w: 2.0, h: 3.5, wt:  200 },
+    { name: 'Cubicle Desk System',      l: 6.0, w: 5.0, h: 4.0, wt:  300 },
+    { name: 'Safe (commercial)',        l: 2.5, w: 2.0, h: 4.0, wt: 1000 },
+    { name: 'Vending Machine',          l: 3.0, w: 2.5, h: 6.0, wt:  500 },
+    { name: 'ATM Machine',              l: 2.0, w: 2.0, h: 5.5, wt:  600 },
+    { name: 'Large Format Printer',     l: 5.0, w: 2.5, h: 3.5, wt:  300 },
+  ]},
+  { cat: 'Retail Equipment', items: [
+    { name: 'Glass Display Case',       l: 4.0, w: 2.0, h: 4.0, wt: 150 },
+    { name: 'Checkout Counter',         l: 5.0, w: 2.5, h: 3.5, wt: 200 },
+    { name: 'Gondola Shelving',         l: 4.0, w: 1.5, h: 5.0, wt: 100 },
+    { name: 'Clothing Rack (floor)',    l: 3.0, w: 1.5, h: 5.0, wt:  40 },
+    { name: 'Point of Sale Kiosk',      l: 2.0, w: 2.0, h: 5.0, wt: 150 },
+    { name: 'Commercial Refrigerator', l: 3.0, w: 2.5, h: 6.0, wt: 400 },
+    { name: 'Walk-in Cooler Panel',     l: 4.0, w: 4.0, h: 8.0, wt: 600 },
+  ]},
+  { cat: 'Food & Beverage', items: [
+    { name: 'Restaurant Range (6-brn)', l: 3.5, w: 2.5, h: 3.5, wt:  350 },
+    { name: 'Commercial Dishwasher',    l: 4.0, w: 2.5, h: 4.0, wt:  300 },
+    { name: 'Walk-in Refrigerator',     l: 8.0, w: 6.0, h: 8.0, wt: 1500 },
+    { name: 'Ice Machine (commercial)', l: 2.5, w: 2.0, h: 3.5, wt:  250 },
+    { name: 'Deep Fryer (commercial)',  l: 2.0, w: 2.0, h: 3.5, wt:  150 },
+    { name: 'Prep Table (stainless)',   l: 5.0, w: 2.0, h: 3.0, wt:  200 },
+    { name: 'Keg (half-barrel)',         l: 1.5, w: 1.5, h: 2.0, wt:  170 },
+    { name: 'Food Truck Equipment Kit', l: 6.0, w: 3.0, h: 4.0, wt:  800 },
+  ]},
+];
+
+let _catalogTab = 'household'; // 'household' | 'industrial'
+
 function initCatalog() {
   const el = document.getElementById('item-catalog');
   if (!el) return;
-  const bodyId = 'catalog-body';
-  let html = `
+  const totalHousehold   = CATALOG.reduce((s,c) => s + c.items.length, 0);
+  const totalIndustrial  = INDUSTRIAL_CATALOG.reduce((s,c) => s + c.items.length, 0);
+  const html = `
     <div class="catalog-wrap">
       <button class="catalog-toggle" onclick="toggleCatalog()" id="catalog-toggle-btn">
-        📋 Item Catalog <small style="font-weight:400;color:var(--text2)">(${CATALOG.reduce((s,c)=>s+c.items.length,0)} items)</small>
+        📋 Item Catalog <small style="font-weight:400;color:var(--text2)">(${totalHousehold + totalIndustrial} items)</small>
         <span class="ct-arrow">▶</span>
       </button>
-      <div class="catalog-body" id="${bodyId}">
+      <div class="catalog-body" id="catalog-body">
+        <div class="catalog-tabs">
+          <button class="ctab active" id="ctab-household" onclick="switchCatalogTab('household')">🏠 Household</button>
+          <button class="ctab" id="ctab-industrial" onclick="switchCatalogTab('industrial')">🏭 Industrial</button>
+        </div>
         <input type="text" class="catalog-search" placeholder="Search items…" oninput="filterCatalog(this.value)" id="catalog-search">
-        <div id="catalog-groups">`;
-  CATALOG.forEach(cat => {
+        <div id="catalog-groups"></div>
+      </div>
+    </div>`;
+  el.innerHTML = html;
+  _catalogTab = 'household';
+  renderCatalogGroups(CATALOG);
+}
+
+function switchCatalogTab(tab) {
+  _catalogTab = tab;
+  document.getElementById('ctab-household').classList.toggle('active', tab === 'household');
+  document.getElementById('ctab-industrial').classList.toggle('active', tab === 'industrial');
+  document.getElementById('catalog-search').value = '';
+  renderCatalogGroups(tab === 'household' ? CATALOG : INDUSTRIAL_CATALOG);
+}
+
+function renderCatalogGroups(catalog) {
+  const container = document.getElementById('catalog-groups');
+  if (!container) return;
+  let html = '';
+  catalog.forEach(cat => {
     html += `<div class="cat-group" data-cat="${cat.cat}">
       <div class="cat-label">${cat.cat}</div>
       <div class="cat-items-grid">`;
@@ -1052,8 +1156,7 @@ function initCatalog() {
     });
     html += `</div></div>`;
   });
-  html += `</div></div></div>`;
-  el.innerHTML = html;
+  container.innerHTML = html;
 }
 
 function toggleCatalog() {

@@ -52,28 +52,60 @@
   <!-- LEFT: Cargo Management -->
   <aside class="left-panel">
 
-    <!-- Quick-add form -->
+    <!-- Quick-add form (two-step wizard) -->
     <div class="card">
       <div class="card-head">📦 Add Cargo Item</div>
-      <div class="field-row">
-        <div class="field">
-          <label>Customer</label>
-          <select id="p-customer"><option value="">— Unassigned —</option></select>
-        </div>
-        <div class="field">
-          <label>Item Name</label>
-          <input type="text" id="p-name" placeholder="e.g. Pallet A">
+
+      <!-- Step 1: Category picker -->
+      <div id="p-step1">
+        <div class="cat-pick-row">
+          <button class="cat-pick-btn" onclick="portalSetCategory('household')">
+            <span class="cat-pick-icon">🏠</span>
+            <span>Household</span>
+            <small>Furniture, appliances, boxes</small>
+          </button>
+          <button class="cat-pick-btn" onclick="portalSetCategory('industrial')">
+            <span class="cat-pick-icon">🏭</span>
+            <span>Industrial / Business</span>
+            <small>Pallets, machinery, equipment</small>
+          </button>
         </div>
       </div>
-      <div class="dims-row">
-        <div class="field"><label>Length (ft)</label><input type="number" id="p-length" value="4" min="0.1" step="0.5"></div>
-        <div class="field"><label>Width (ft)</label><input type="number" id="p-width"  value="4" min="0.1" step="0.5"></div>
-        <div class="field"><label>Height (ft)</label><input type="number" id="p-height" value="4" min="0.1" step="0.5"></div>
-        <div class="field"><label>Item Wt (lbs)</label><input type="number" id="p-weight" value="500" min="0"></div>
-        <div class="field"><label>Pkg Wt (lbs)</label><input type="number" id="p-pkg-weight" value="0" min="0"></div>
-        <div class="field"><label>Quantity</label><input type="number" id="p-qty" value="1" min="1"></div>
-        <div class="field field-btn"><label>&nbsp;</label>
-          <button class="btn-add" onclick="portalAddItem()">＋ Add</button>
+
+      <!-- Step 2: Item + dims (hidden until category chosen) -->
+      <div id="p-step2" style="display:none">
+        <div class="field-row" style="margin-bottom:10px">
+          <div class="field">
+            <label>Customer</label>
+            <select id="p-customer"><option value="">— Unassigned —</option></select>
+          </div>
+          <div class="field">
+            <label>Select Item</label>
+            <select id="p-item-select" onchange="portalPickItem(this.value)">
+              <option value="">— Choose an item —</option>
+            </select>
+          </div>
+        </div>
+        <div class="field-row" style="margin-bottom:10px">
+          <div class="field">
+            <label>Item Name <small style="font-weight:400;color:var(--text2);text-transform:none">(editable)</small></label>
+            <input type="text" id="p-name" placeholder="e.g. Pallet A">
+          </div>
+          <div class="field">
+            <label>&nbsp;</label>
+            <button class="cat-back-btn" onclick="portalResetCategory()">← Change Category</button>
+          </div>
+        </div>
+        <div class="dims-row">
+          <div class="field"><label>Length (ft)</label><input type="number" id="p-length" value="4" min="0.1" step="0.5"></div>
+          <div class="field"><label>Width (ft)</label><input type="number" id="p-width"  value="4" min="0.1" step="0.5"></div>
+          <div class="field"><label>Height (ft)</label><input type="number" id="p-height" value="4" min="0.1" step="0.5"></div>
+          <div class="field"><label>Item Wt (lbs)</label><input type="number" id="p-weight" value="500" min="0"></div>
+          <div class="field"><label>Pkg Wt (lbs)</label><input type="number" id="p-pkg-weight" value="0" min="0"></div>
+          <div class="field"><label>Quantity</label><input type="number" id="p-qty" value="1" min="1"></div>
+          <div class="field field-btn"><label>&nbsp;</label>
+            <button class="btn-add" onclick="portalAddItem()">＋ Add</button>
+          </div>
         </div>
       </div>
     </div>
