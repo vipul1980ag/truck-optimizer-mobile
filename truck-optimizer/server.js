@@ -3,6 +3,7 @@
 const express = require('express');
 const fs      = require('fs');
 const path    = require('path');
+const crypto  = require('crypto');
 
 const { optimize }      = require('./engine/optimizer');
 const { analyzeRoutes } = require('./engine/routes');
@@ -72,7 +73,8 @@ const SEED = {
     { id: 5, name: 'Large Crate',  length: 5, width: 4, height: 4, weight: 3500, qty: 2,  rotate: false, customerId: 3 },
     { id: 6, name: 'Small Box',    length: 2, width: 2, height: 2, weight: 150,  qty: 15, rotate: true,  customerId: 3 },
   ],
-  nextIds: { truck: 3, carrier: 3, carrierTruck: 5, customer: 4, item: 7, color: 3 },
+  users:   [],
+  nextIds: { truck: 3, carrier: 3, carrierTruck: 5, customer: 4, item: 7, color: 3, user: 1 },
 };
 
 // ── Persistence helpers ────────────────────────────────────────────────────
@@ -89,6 +91,94 @@ function writeStore(data) {
   if (!fs.existsSync(DATA_DIR)) fs.mkdirSync(DATA_DIR, { recursive: true });
   fs.writeFileSync(STORE_PATH, JSON.stringify(data, null, 2), 'utf8');
 }
+
+// ── Auth helpers ───────────────────────────────────────────────────────────
+function hashPassword(plain, salt) {
+  return crypto.pbkdf2Sync(plain, salt, 100_000, 64, 'sha512').toString('hex');
+}
+function genSalt()  { return crypto.randomBytes(16).toString('hex'); }
+function genToken() { return crypto.randomBytes(32).toString('hex'); }
+
+function getTokenFromHeader(req) {
+  const auth = req.headers.authorization || '';
+  return auth.startsWith('Bearer ') ? auth.slice(7) : null;
+}
+
+// ── Auth Routes ────────────────────────────────────────────────────────────
+
+app.post('/api/auth/register', (req, res) => {
+  const { email, password, phone, address } = req.body || {};
+  if (!email || !password || !phone || !address)
+    return res.status(400).json({ error: 'All fields are required (email, password, phone, address).' });
+  if (password.length < 6)
+    return res.status(400).json({ error: 'Password must be at least 6 characters.' });
+
+  const store = readStore();
+  if (!store.users) store.users = [];
+  if (!store.nextIds.user) store.nextIds.user = 1;
+
+  const existing = store.users.find(u => u.email.toLowerCase() === email.toLowerCase());
+  if (existing) return res.status(409).json({ error: 'An account with that email already exists.' });
+
+  const salt         = genSalt();
+  const passwordHash = hashPassword(password, salt);
+  const token        = genToken();
+  const newUser      = {
+    id: store.nextIds.user++,
+    email: email.toLowerCase().trim(),
+    passwordHash,
+    salt,
+    phone:     phone.trim(),
+    address:   address.trim(),
+    token,
+    createdAt: new Date().toISOString(),
+  };
+  store.users.push(newUser);
+  writeStore(store);
+
+  res.json({ token, user: { id: newUser.id, email: newUser.email, phone: newUser.phone, address: newUser.address } });
+});
+
+app.post('/api/auth/login', (req, res) => {
+  const { email, password } = req.body || {};
+  if (!email || !password)
+    return res.status(400).json({ error: 'Email and password are required.' });
+
+  const store = readStore();
+  if (!store.users) store.users = [];
+
+  const user = store.users.find(u => u.email.toLowerCase() === email.toLowerCase());
+  if (!user) return res.status(401).json({ error: 'Invalid email or password.' });
+
+  const hash = hashPassword(password, user.salt);
+  if (hash !== user.passwordHash) return res.status(401).json({ error: 'Invalid email or password.' });
+
+  user.token = genToken();
+  writeStore(store);
+
+  res.json({ token: user.token, user: { id: user.id, email: user.email, phone: user.phone, address: user.address } });
+});
+
+app.post('/api/auth/logout', (req, res) => {
+  const token = getTokenFromHeader(req);
+  if (token) {
+    const store = readStore();
+    const user  = (store.users || []).find(u => u.token === token);
+    if (user) { user.token = null; writeStore(store); }
+  }
+  res.json({ ok: true });
+});
+
+app.get('/api/auth/me', (req, res) => {
+  const token = getTokenFromHeader(req);
+  if (!token) return res.status(401).json({ error: 'No token provided.' });
+
+  const store = readStore();
+  const user  = (store.users || []).find(u => u.token === token);
+  if (!user) return res.status(401).json({ error: 'Invalid or expired token.' });
+
+  res.json({ user: { id: user.id, email: user.email, phone: user.phone, address: user.address } });
+});
 
 // ── API Routes ─────────────────────────────────────────────────────────────
 app.get('/api/data', (req, res) => {

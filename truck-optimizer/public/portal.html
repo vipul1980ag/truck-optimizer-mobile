@@ -13,144 +13,163 @@
   <div class="nav-left">
     <span class="nav-icon">🚛</span>
     <span class="nav-title">Load Optimizer</span>
-    <span class="nav-badge">Dashboard</span>
   </div>
-  <a href="/advanced" class="nav-link" target="_blank">⚙ Advanced Settings</a>
+  <div class="nav-right">
+    <a href="/advanced" class="nav-link" target="_blank">⚙ Advanced</a>
+    <button id="nav-login-btn" class="nav-auth-btn" onclick="openAuthModal()">Login</button>
+    <div id="nav-user" style="display:none" class="nav-user-row">
+      <span id="nav-user-email" class="nav-user-email"></span>
+      <button class="nav-logout-btn" onclick="doLogout()">Sign Out</button>
+    </div>
+  </div>
 </nav>
 
-<!-- ── Hero Stats ── -->
-<div class="hero">
-  <div class="hero-inner">
-    <div class="hero-text">
-      <h1>Plan Your Shipment</h1>
-      <p>Add cargo below, then click <strong>Optimize Load</strong> to get your load plan instantly.</p>
+<!-- ── Add Cargo (single centered card) ── -->
+<div class="portal-single">
+
+  <!-- Lock overlay (visible when not logged in) -->
+  <div id="cargo-lock" class="cargo-lock">
+    <div class="cargo-lock-icon">🔒</div>
+    <div class="cargo-lock-title">Sign in to add cargo items</div>
+    <div class="cargo-lock-sub">Create a free account or log in to get started</div>
+    <button class="cargo-lock-btn" onclick="openAuthModal()">Login / Register</button>
+  </div>
+
+  <!-- Add Cargo Item card (two-step wizard) -->
+  <div class="card" id="cargo-card">
+    <div class="card-head">📦 Add Cargo Item</div>
+
+    <!-- Step 1: Category picker -->
+    <div id="p-step1">
+      <div class="cat-pick-row">
+        <button class="cat-pick-btn" onclick="portalSetCategory('household')">
+          <span class="cat-pick-icon">🏠</span>
+          <span>Household</span>
+          <small>Furniture, appliances, boxes</small>
+        </button>
+        <button class="cat-pick-btn" onclick="portalSetCategory('industrial')">
+          <span class="cat-pick-icon">🏭</span>
+          <span>Industrial / Business</span>
+          <small>Pallets, machinery, equipment</small>
+        </button>
+      </div>
     </div>
-    <div class="stats-row">
-      <div class="stat-card">
-        <div class="stat-num" id="s-trucks">—</div>
-        <div class="stat-lbl">Fleet Trucks</div>
+
+    <!-- Step 2: Item + dims (hidden until category chosen) -->
+    <div id="p-step2" style="display:none">
+      <div class="field-row" style="margin-bottom:10px">
+        <div class="field">
+          <label>Customer</label>
+          <select id="p-customer"><option value="">— Unassigned —</option></select>
+        </div>
+        <div class="field">
+          <label>Select Item</label>
+          <select id="p-item-select" onchange="portalPickItem(this.value)">
+            <option value="">— Choose an item —</option>
+          </select>
+        </div>
       </div>
-      <div class="stat-card">
-        <div class="stat-num" id="s-carriers">—</div>
-        <div class="stat-lbl">Carriers</div>
+      <div class="field-row" style="margin-bottom:10px">
+        <div class="field">
+          <label>Item Name <small style="font-weight:400;color:var(--text2);text-transform:none">(editable)</small></label>
+          <input type="text" id="p-name" placeholder="e.g. Pallet A">
+        </div>
+        <div class="field">
+          <label>&nbsp;</label>
+          <button class="cat-back-btn" onclick="portalResetCategory()">← Change Category</button>
+        </div>
       </div>
-      <div class="stat-card">
-        <div class="stat-num" id="s-customers">—</div>
-        <div class="stat-lbl">Customers</div>
-      </div>
-      <div class="stat-card">
-        <div class="stat-num" id="s-units">—</div>
-        <div class="stat-lbl">Cargo Units</div>
+      <div class="dims-row">
+        <div class="field"><label>Length (ft)</label><input type="number" id="p-length" value="4" min="0.1" step="0.5"></div>
+        <div class="field"><label>Width (ft)</label><input type="number" id="p-width"  value="4" min="0.1" step="0.5"></div>
+        <div class="field"><label>Height (ft)</label><input type="number" id="p-height" value="4" min="0.1" step="0.5"></div>
+        <div class="field"><label>Item Wt (lbs)</label><input type="number" id="p-weight" value="500" min="0"></div>
+        <div class="field"><label>Pkg Wt (lbs)</label><input type="number" id="p-pkg-weight" value="0" min="0"></div>
+        <div class="field"><label>Quantity</label><input type="number" id="p-qty" value="1" min="1"></div>
+        <div class="field field-btn"><label>&nbsp;</label>
+          <button class="btn-add" onclick="portalAddItem()">＋ Add</button>
+        </div>
       </div>
     </div>
   </div>
+
+  <!-- save status -->
+  <div class="save-status" id="p-save-status" style="text-align:center;margin-top:8px;"></div>
+
 </div>
 
-<!-- ── Main Layout ── -->
-<div class="portal-layout">
+<!-- ── Auth Modal ── -->
+<div id="auth-modal" class="auth-modal-overlay" onclick="authOverlayClick(event)">
+  <div class="auth-modal-card">
 
-  <!-- LEFT: Cargo Management -->
-  <aside class="left-panel">
-
-    <!-- Quick-add form (two-step wizard) -->
-    <div class="card">
-      <div class="card-head">📦 Add Cargo Item</div>
-
-      <!-- Step 1: Category picker -->
-      <div id="p-step1">
-        <div class="cat-pick-row">
-          <button class="cat-pick-btn" onclick="portalSetCategory('household')">
-            <span class="cat-pick-icon">🏠</span>
-            <span>Household</span>
-            <small>Furniture, appliances, boxes</small>
-          </button>
-          <button class="cat-pick-btn" onclick="portalSetCategory('industrial')">
-            <span class="cat-pick-icon">🏭</span>
-            <span>Industrial / Business</span>
-            <small>Pallets, machinery, equipment</small>
-          </button>
+    <!-- View A: Choose login or register -->
+    <div id="auth-view-choose">
+      <div class="auth-modal-head">
+        <div>
+          <div class="auth-modal-title">👋 Welcome</div>
+          <div class="auth-modal-sub">Sign in or create a new account</div>
         </div>
+        <button class="auth-modal-close" onclick="closeAuthModal()">✕</button>
       </div>
-
-      <!-- Step 2: Item + dims (hidden until category chosen) -->
-      <div id="p-step2" style="display:none">
-        <div class="field-row" style="margin-bottom:10px">
-          <div class="field">
-            <label>Customer</label>
-            <select id="p-customer"><option value="">— Unassigned —</option></select>
-          </div>
-          <div class="field">
-            <label>Select Item</label>
-            <select id="p-item-select" onchange="portalPickItem(this.value)">
-              <option value="">— Choose an item —</option>
-            </select>
-          </div>
-        </div>
-        <div class="field-row" style="margin-bottom:10px">
-          <div class="field">
-            <label>Item Name <small style="font-weight:400;color:var(--text2);text-transform:none">(editable)</small></label>
-            <input type="text" id="p-name" placeholder="e.g. Pallet A">
-          </div>
-          <div class="field">
-            <label>&nbsp;</label>
-            <button class="cat-back-btn" onclick="portalResetCategory()">← Change Category</button>
-          </div>
-        </div>
-        <div class="dims-row">
-          <div class="field"><label>Length (ft)</label><input type="number" id="p-length" value="4" min="0.1" step="0.5"></div>
-          <div class="field"><label>Width (ft)</label><input type="number" id="p-width"  value="4" min="0.1" step="0.5"></div>
-          <div class="field"><label>Height (ft)</label><input type="number" id="p-height" value="4" min="0.1" step="0.5"></div>
-          <div class="field"><label>Item Wt (lbs)</label><input type="number" id="p-weight" value="500" min="0"></div>
-          <div class="field"><label>Pkg Wt (lbs)</label><input type="number" id="p-pkg-weight" value="0" min="0"></div>
-          <div class="field"><label>Quantity</label><input type="number" id="p-qty" value="1" min="1"></div>
-          <div class="field field-btn"><label>&nbsp;</label>
-            <button class="btn-add" onclick="portalAddItem()">＋ Add</button>
-          </div>
-        </div>
+      <div class="auth-choose-row">
+        <button class="auth-choose-btn" onclick="showAuthView('login')">
+          <span class="auth-choose-icon">🔑</span>
+          <span class="auth-choose-label">Login</span>
+          <small class="auth-choose-sub">Existing account</small>
+        </button>
+        <button class="auth-choose-btn" onclick="showAuthView('register')">
+          <span class="auth-choose-icon">✨</span>
+          <span class="auth-choose-label">Create Account</span>
+          <small class="auth-choose-sub">New user</small>
+        </button>
       </div>
     </div>
 
-    <!-- Cargo item list -->
-    <div class="card">
-      <div class="card-head">🗂 Current Cargo</div>
-      <div id="p-item-list"></div>
-    </div>
-
-    <!-- Customer context (read-only) -->
-    <div class="card">
-      <div class="card-head">👥 Customers</div>
-      <div id="p-customer-list"></div>
-      <a href="/advanced" target="_blank" class="adv-link">+ Add / edit customers in Advanced Settings</a>
-    </div>
-
-    <!-- Fleet context (read-only) -->
-    <div class="card">
-      <div class="card-head">🚛 Fleet & Carriers</div>
-      <div id="p-fleet-list"></div>
-      <a href="/advanced" target="_blank" class="adv-link">+ Configure fleet in Advanced Settings</a>
-    </div>
-
-  </aside>
-
-  <!-- RIGHT: Optimize & Results -->
-  <section class="right-panel">
-
-    <div class="optimize-zone">
-      <div class="save-status" id="p-save-status"></div>
-      <button class="btn-optimize" id="p-opt-btn" onclick="portalOptimize()">
-        ⚡ Optimize Load Now
-      </button>
-      <div class="opt-hint">Groups same-zone customers · Maximizes truck utilization · Shows route costs &amp; savings</div>
-    </div>
-
-    <div id="p-results">
-      <div class="empty-state">
-        <div class="empty-icon">📊</div>
-        <div class="empty-text">Your load plan will appear here after optimizing.</div>
+    <!-- View B: Login form -->
+    <div id="auth-view-login" style="display:none">
+      <div class="auth-modal-head">
+        <div>
+          <div class="auth-modal-title">🔑 Login</div>
+          <div class="auth-modal-sub">Enter your credentials</div>
+        </div>
+        <button class="auth-modal-close" onclick="showAuthView('choose')">←</button>
+      </div>
+      <div class="auth-form">
+        <label class="auth-lbl">Email</label>
+        <input type="email" id="login-email" class="auth-input" placeholder="you@example.com" autocomplete="email">
+        <label class="auth-lbl">Password</label>
+        <input type="password" id="login-password" class="auth-input" placeholder="••••••••" autocomplete="current-password">
+        <div id="login-err" class="auth-err"></div>
+        <button class="auth-submit-btn" onclick="doLogin()">Sign In</button>
+        <div class="auth-switch">No account? <a href="#" onclick="showAuthView('register');return false;">Create one →</a></div>
       </div>
     </div>
 
-  </section>
+    <!-- View C: Register form -->
+    <div id="auth-view-register" style="display:none">
+      <div class="auth-modal-head">
+        <div>
+          <div class="auth-modal-title">✨ Create Account</div>
+          <div class="auth-modal-sub">Fill in your details to get started</div>
+        </div>
+        <button class="auth-modal-close" onclick="showAuthView('choose')">←</button>
+      </div>
+      <div class="auth-form">
+        <label class="auth-lbl">Email</label>
+        <input type="email" id="reg-email" class="auth-input" placeholder="you@example.com" autocomplete="email">
+        <label class="auth-lbl">Password</label>
+        <input type="password" id="reg-password" class="auth-input" placeholder="Min 6 characters" autocomplete="new-password">
+        <label class="auth-lbl">Phone Number</label>
+        <input type="tel" id="reg-phone" class="auth-input" placeholder="+1 555 000 0000" autocomplete="tel">
+        <label class="auth-lbl">Address</label>
+        <textarea id="reg-address" class="auth-input auth-textarea" placeholder="123 Main St, City, State, ZIP" autocomplete="street-address"></textarea>
+        <div id="reg-err" class="auth-err"></div>
+        <button class="auth-submit-btn" onclick="doRegister()">Create Account</button>
+        <div class="auth-switch">Have an account? <a href="#" onclick="showAuthView('login');return false;">Sign in →</a></div>
+      </div>
+    </div>
+
+  </div>
 </div>
 
 <!-- ── Payment Modal ── -->
