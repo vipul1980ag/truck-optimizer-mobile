@@ -229,6 +229,101 @@ function portalResetCategory() {
   document.getElementById('p-qty').value         = '1';
 }
 
+// ── Auth State ────────────────────────────────────────────────────────────────
+let _authToken = localStorage.getItem('auth_token') || null;
+let _authUser  = null;
+
+async function checkAuth() {
+  if (!_authToken) { applyAuthState(false); return; }
+  try {
+    const res = await fetch('/api/auth/me', { headers: { Authorization: 'Bearer ' + _authToken } });
+    if (!res.ok) { _authToken = null; localStorage.removeItem('auth_token'); applyAuthState(false); return; }
+    _authUser = (await res.json()).user;
+    applyAuthState(true);
+  } catch { applyAuthState(false); }
+}
+
+function applyAuthState(loggedIn) {
+  document.getElementById('nav-login-btn').style.display  = loggedIn ? 'none' : '';
+  document.getElementById('nav-user').style.display       = loggedIn ? '' : 'none';
+  document.getElementById('cargo-lock').style.display     = loggedIn ? 'none' : '';
+  document.getElementById('cargo-card').style.opacity     = loggedIn ? '1' : '0.35';
+  document.getElementById('cargo-card').style.pointerEvents = loggedIn ? '' : 'none';
+  if (loggedIn && _authUser) {
+    document.getElementById('nav-user-email').textContent = _authUser.email;
+  }
+}
+
+function openAuthModal()  {
+  showAuthView('choose');
+  document.getElementById('auth-modal').classList.add('open');
+}
+function closeAuthModal() { document.getElementById('auth-modal').classList.remove('open'); }
+function authOverlayClick(e) { if (e.target === document.getElementById('auth-modal')) closeAuthModal(); }
+
+function showAuthView(v) {
+  ['choose', 'login', 'register'].forEach(id => {
+    document.getElementById('auth-view-' + id).style.display = id === v ? '' : 'none';
+  });
+}
+
+async function doLogin() {
+  const email    = document.getElementById('login-email').value.trim();
+  const password = document.getElementById('login-password').value;
+  const errEl    = document.getElementById('login-err');
+  errEl.textContent = '';
+  if (!email || !password) { errEl.textContent = 'Email and password are required.'; return; }
+  try {
+    const res  = await fetch('/api/auth/login', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email, password })
+    });
+    const data = await res.json();
+    if (!res.ok) { errEl.textContent = data.error || 'Login failed.'; return; }
+    _authToken = data.token;
+    _authUser  = data.user;
+    localStorage.setItem('auth_token', _authToken);
+    closeAuthModal();
+    applyAuthState(true);
+  } catch (e) { errEl.textContent = 'Network error: ' + e.message; }
+}
+
+async function doRegister() {
+  const email    = document.getElementById('reg-email').value.trim();
+  const password = document.getElementById('reg-password').value;
+  const phone    = document.getElementById('reg-phone').value.trim();
+  const address  = document.getElementById('reg-address').value.trim();
+  const errEl    = document.getElementById('reg-err');
+  errEl.textContent = '';
+  if (!email || !password || !phone || !address) { errEl.textContent = 'All fields are required.'; return; }
+  if (password.length < 6) { errEl.textContent = 'Password must be at least 6 characters.'; return; }
+  try {
+    const res  = await fetch('/api/auth/register', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email, password, phone, address })
+    });
+    const data = await res.json();
+    if (!res.ok) { errEl.textContent = data.error || 'Registration failed.'; return; }
+    _authToken = data.token;
+    _authUser  = data.user;
+    localStorage.setItem('auth_token', _authToken);
+    closeAuthModal();
+    applyAuthState(true);
+  } catch (e) { errEl.textContent = 'Network error: ' + e.message; }
+}
+
+async function doLogout() {
+  if (_authToken) {
+    await fetch('/api/auth/logout', {
+      method: 'POST', headers: { Authorization: 'Bearer ' + _authToken }
+    }).catch(() => {});
+    _authToken = null;
+    _authUser  = null;
+    localStorage.removeItem('auth_token');
+  }
+  applyAuthState(false);
+}
+
 // ── State ─────────────────────────────────────────────────────────────────────
 let trucks    = [];
 let carriers  = [];
@@ -238,6 +333,7 @@ let nextIds   = { truck: 1, carrier: 1, carrierTruck: 1, customer: 1, item: 1 };
 
 // ── Boot ──────────────────────────────────────────────────────────────────────
 async function init() {
+  await checkAuth();
   try {
     const data = await fetch('/api/data').then(r => r.json());
     applyPayload(data);
