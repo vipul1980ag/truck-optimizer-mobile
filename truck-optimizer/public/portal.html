@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Truck Load Optimizer — Dashboard</title>
+<title>Truck Load Optimizer — Customer Portal</title>
 <link rel="stylesheet" href="portal.css">
 </head>
 <body>
@@ -24,10 +24,10 @@
   </div>
 </nav>
 
-<!-- ── Add Cargo (single centered card) ── -->
-<div class="portal-single">
+<!-- ── Two-column portal ── -->
+<div class="portal-two-col">
 
-  <!-- Lock overlay (visible when not logged in) -->
+  <!-- Lock overlay — spans both columns -->
   <div id="cargo-lock" class="cargo-lock">
     <div class="cargo-lock-icon">🔒</div>
     <div class="cargo-lock-title">Sign in to add cargo items</div>
@@ -35,74 +35,165 @@
     <button class="cargo-lock-btn" onclick="openAuthModal()">Login / Register</button>
   </div>
 
-  <!-- Add Cargo Item card (two-step wizard) -->
-  <div class="card" id="cargo-card">
-    <div class="card-head">📦 Add Cargo Item</div>
+  <!-- LEFT: Add Cargo form -->
+  <div class="portal-col-left">
+    <div class="card" id="cargo-card">
+      <div class="card-head">📦 Add Cargo Item</div>
 
-    <!-- Step 1: Category picker -->
-    <div id="p-step1">
-      <div class="cat-pick-row">
-        <button class="cat-pick-btn" onclick="portalSetCategory('household')">
-          <span class="cat-pick-icon">🏠</span>
-          <span>Household</span>
-          <small>Furniture, appliances, boxes</small>
-        </button>
-        <button class="cat-pick-btn" onclick="portalSetCategory('industrial')">
-          <span class="cat-pick-icon">🏭</span>
-          <span>Industrial / Business</span>
-          <small>Pallets, machinery, equipment</small>
-        </button>
+      <!-- Step 1: Category picker -->
+      <div id="p-step1">
+        <div class="cat-pick-row">
+          <button class="cat-pick-btn" onclick="portalSetCategory('household')">
+            <span class="cat-pick-icon">🏠</span>
+            <span>Household</span>
+            <small>Furniture, appliances, boxes</small>
+          </button>
+          <button class="cat-pick-btn" onclick="portalSetCategory('industrial')">
+            <span class="cat-pick-icon">🏭</span>
+            <span>Industrial / Business</span>
+            <small>Pallets, machinery, equipment</small>
+          </button>
+        </div>
+      </div>
+
+      <!-- Step 2: Item select + dims -->
+      <div id="p-step2" style="display:none">
+        <div class="field-row" style="margin-bottom:10px">
+          <div class="field">
+            <label>Select Item</label>
+            <select id="p-item-select" onchange="portalPickItem(this.value)">
+              <option value="">— Choose an item —</option>
+            </select>
+          </div>
+          <div class="field">
+            <label>&nbsp;</label>
+            <button class="cat-back-btn" onclick="portalResetCategory()">← Change Category</button>
+          </div>
+        </div>
+        <div class="field" style="margin-bottom:10px">
+          <label>Item Name <small style="font-weight:400;color:var(--text2);text-transform:none">(editable)</small></label>
+          <input type="text" id="p-name" placeholder="e.g. Sofa (3-seat)">
+        </div>
+        <div class="dims-row">
+          <div class="field"><label>Length (ft)</label><input type="number" id="p-length" value="4" min="0.1" step="0.5"></div>
+          <div class="field"><label>Width (ft)</label><input type="number" id="p-width"  value="4" min="0.1" step="0.5"></div>
+          <div class="field"><label>Height (ft)</label><input type="number" id="p-height" value="4" min="0.1" step="0.5"></div>
+          <div class="field"><label>Item Wt (lbs)</label><input type="number" id="p-weight" value="500" min="0"></div>
+          <div class="field"><label>Pkg Wt (lbs)</label><input type="number" id="p-pkg-weight" value="0" min="0"></div>
+          <div class="field"><label>Quantity</label><input type="number" id="p-qty" value="1" min="1"></div>
+          <div class="field field-btn"><label>&nbsp;</label>
+            <button class="btn-add" onclick="portalAddItem()">＋ Add</button>
+          </div>
+        </div>
       </div>
     </div>
+    <div class="save-status" id="p-save-status" style="text-align:center;margin-top:8px;"></div>
+  </div>
 
-    <!-- Step 2: Item + dims (hidden until category chosen) -->
-    <div id="p-step2" style="display:none">
-      <div class="field-row" style="margin-bottom:10px">
-        <div class="field">
-          <label>Customer</label>
-          <select id="p-customer"><option value="">— Unassigned —</option></select>
-        </div>
-        <div class="field">
-          <label>Select Item</label>
-          <select id="p-item-select" onchange="portalPickItem(this.value)">
-            <option value="">— Choose an item —</option>
-          </select>
-        </div>
+  <!-- RIGHT: Cargo list -->
+  <div class="portal-col-right">
+    <div class="card cargo-list-card">
+      <div class="card-head">📋 Cargo List</div>
+
+      <!-- Summary strip (hidden when list is empty) -->
+      <div id="p-list-summary" class="list-summary-strip" style="display:none">
+        <div class="lss-cell"><span id="lss-types">0</span><small>Types</small></div>
+        <div class="lss-sep"></div>
+        <div class="lss-cell"><span id="lss-units">0</span><small>Units</small></div>
+        <div class="lss-sep"></div>
+        <div class="lss-cell"><span id="lss-weight">0</span><small>lbs</small></div>
       </div>
-      <div class="field-row" style="margin-bottom:10px">
-        <div class="field">
-          <label>Item Name <small style="font-weight:400;color:var(--text2);text-transform:none">(editable)</small></label>
-          <input type="text" id="p-name" placeholder="e.g. Pallet A">
-        </div>
-        <div class="field">
-          <label>&nbsp;</label>
-          <button class="cat-back-btn" onclick="portalResetCategory()">← Change Category</button>
-        </div>
-      </div>
-      <div class="dims-row">
-        <div class="field"><label>Length (ft)</label><input type="number" id="p-length" value="4" min="0.1" step="0.5"></div>
-        <div class="field"><label>Width (ft)</label><input type="number" id="p-width"  value="4" min="0.1" step="0.5"></div>
-        <div class="field"><label>Height (ft)</label><input type="number" id="p-height" value="4" min="0.1" step="0.5"></div>
-        <div class="field"><label>Item Wt (lbs)</label><input type="number" id="p-weight" value="500" min="0"></div>
-        <div class="field"><label>Pkg Wt (lbs)</label><input type="number" id="p-pkg-weight" value="0" min="0"></div>
-        <div class="field"><label>Quantity</label><input type="number" id="p-qty" value="1" min="1"></div>
-        <div class="field field-btn"><label>&nbsp;</label>
-          <button class="btn-add" onclick="portalAddItem()">＋ Add</button>
-        </div>
+
+      <!-- Item rows rendered by JS -->
+      <div id="p-item-list"></div>
+
+      <!-- Proceed button (hidden when list is empty) -->
+      <div id="p-proceed-bar" class="proceed-bar" style="display:none">
+        <button class="btn-proceed" onclick="openBookingModal()">Next: Choose Shipping →</button>
       </div>
     </div>
   </div>
 
-  <!-- save status -->
-  <div class="save-status" id="p-save-status" style="text-align:center;margin-top:8px;"></div>
+</div>
 
+<!-- ── Booking Wizard Modal ── -->
+<div id="booking-modal" class="booking-modal-overlay" onclick="bookingOverlayClick(event)">
+  <div class="booking-modal-card">
+
+    <!-- Step 1: Shipping option -->
+    <div id="bm-step-shipping">
+      <div class="bm-head">
+        <div>
+          <div class="bm-title">🚛 Choose Shipping</div>
+          <div class="bm-sub">How would you like to ship your cargo?</div>
+        </div>
+        <button class="bm-close" onclick="closeBookingModal()">✕</button>
+      </div>
+      <div class="bm-body">
+        <div class="ship-options">
+          <button class="ship-opt" id="ship-opt-shared" onclick="selectShipping('shared')">
+            <div class="ship-opt-top">
+              <span class="ship-opt-icon">🤝</span>
+              <div>
+                <div class="ship-opt-title">Share Truck</div>
+                <div class="ship-opt-sub">LTL — Less Than Truckload</div>
+              </div>
+              <span class="ship-opt-tag tag-green">Best Value</span>
+            </div>
+            <div class="ship-opt-desc">Split the truck with other customers going the same way. Lower cost, flexible pickup windows.</div>
+          </button>
+          <button class="ship-opt" id="ship-opt-private" onclick="selectShipping('private')">
+            <div class="ship-opt-top">
+              <span class="ship-opt-icon">🚚</span>
+              <div>
+                <div class="ship-opt-title">Private Truck</div>
+                <div class="ship-opt-sub">FTL — Full Truckload</div>
+              </div>
+              <span class="ship-opt-tag tag-blue">Fastest</span>
+            </div>
+            <div class="ship-opt-desc">A dedicated truck exclusively for your cargo. Faster delivery and full scheduling control.</div>
+          </button>
+        </div>
+        <button class="btn-bm-next" id="btn-see-charges" onclick="showChargesStep()" disabled>See Estimated Charges →</button>
+      </div>
+    </div>
+
+    <!-- Step 2: Charges -->
+    <div id="bm-step-charges" style="display:none">
+      <div class="bm-head">
+        <div>
+          <div class="bm-title">💰 Estimated Charges</div>
+          <div class="bm-sub">Based on 100-mile service estimate</div>
+        </div>
+        <button class="bm-close" onclick="showBookingStep('shipping')">←</button>
+      </div>
+      <div class="bm-body">
+        <div id="bm-charges-content"></div>
+        <button class="btn-bm-confirm" onclick="confirmWebBooking()">✓ Confirm Booking</button>
+      </div>
+    </div>
+
+    <!-- Step 3: Confirmed -->
+    <div id="bm-step-confirm" style="display:none">
+      <div class="bm-body bm-success-body">
+        <div class="bm-success-icon">✅</div>
+        <div class="bm-title" style="font-size:22px;">Booking Confirmed!</div>
+        <div class="bm-sub" style="margin-top:6px;">Your cargo has been submitted successfully.</div>
+        <div id="bm-confirm-summary" class="bm-confirm-summary"></div>
+        <p style="font-size:12px;color:var(--text2);margin-bottom:24px;line-height:1.7;">
+          Our team will contact you to confirm pickup details and final pricing.
+        </p>
+        <button class="btn-bm-new" onclick="startNewBooking()">＋ Start New Booking</button>
+      </div>
+    </div>
+
+  </div>
 </div>
 
 <!-- ── Auth Modal ── -->
 <div id="auth-modal" class="auth-modal-overlay" onclick="authOverlayClick(event)">
   <div class="auth-modal-card">
 
-    <!-- View A: Choose login or register -->
     <div id="auth-view-choose">
       <div class="auth-modal-head">
         <div>
@@ -125,7 +216,6 @@
       </div>
     </div>
 
-    <!-- View B: Login form -->
     <div id="auth-view-login" style="display:none">
       <div class="auth-modal-head">
         <div>
@@ -145,7 +235,6 @@
       </div>
     </div>
 
-    <!-- View C: Register form -->
     <div id="auth-view-register" style="display:none">
       <div class="auth-modal-head">
         <div>
@@ -175,7 +264,6 @@
 <!-- ── Payment Modal ── -->
 <div id="pay-modal" class="pay-modal-overlay" onclick="payModalOverlayClick(event)">
   <div class="pay-modal-card">
-
     <div class="pay-modal-head">
       <div>
         <div class="pay-modal-title">💳 Pay Invoice</div>
@@ -183,7 +271,6 @@
       </div>
       <button class="pay-modal-close" onclick="closePaymentModal()">✕</button>
     </div>
-
     <div class="pay-modal-body">
       <div class="pay-modal-amount-row">
         <div>
@@ -192,13 +279,10 @@
         </div>
         <div class="pay-modal-amount-value" id="pay-modal-amount"></div>
       </div>
-
       <div id="paypal-button-container"></div>
       <div id="pay-modal-msg"></div>
-
       <div class="pay-modal-secure">🔒 Secured by PayPal · 256-bit SSL encryption</div>
     </div>
-
   </div>
 </div>
 
