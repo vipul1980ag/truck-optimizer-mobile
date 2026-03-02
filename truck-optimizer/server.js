@@ -186,7 +186,14 @@ app.get('/api/data', (req, res) => {
 });
 
 app.put('/api/data', (req, res) => {
-  writeStore(req.body);
+  const existing = readStore();
+  const update   = { ...req.body };
+  // Preserve auth data — clients don't send users so never let PUT wipe them
+  if (existing.users && existing.users.length) update.users = existing.users;
+  if (existing.nextIds && update.nextIds) {
+    update.nextIds.user = existing.nextIds.user || update.nextIds.user;
+  }
+  writeStore(update);
   res.json({ ok: true });
 });
 
