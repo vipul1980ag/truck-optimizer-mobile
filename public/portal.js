@@ -385,10 +385,9 @@ function portalAddItem() {
   const length = parseFloat(document.getElementById('p-length').value) || 4;
   const width  = parseFloat(document.getElementById('p-width').value)  || 4;
   const height = parseFloat(document.getElementById('p-height').value) || 4;
-  const weight        = parseFloat(document.getElementById('p-weight').value)     || 0;
+  const weight          = parseFloat(document.getElementById('p-weight').value)     || 0;
   const packagingWeight = parseFloat(document.getElementById('p-pkg-weight').value) || 0;
   const qty    = parseInt(document.getElementById('p-qty').value, 10)  || 1;
-  const custId = parseInt(document.getElementById('p-customer').value, 10) || null;
 
   if (!name) { alert('Please enter an item name.'); return; }
   if (length <= 0 || width <= 0 || height <= 0) { alert('Dimensions must be positive.'); return; }
@@ -403,11 +402,11 @@ function portalAddItem() {
     packagingWeight,
     qty,
     rotate:         true,
-    customerId:     custId || null,
+    customerId:     null,
   });
 
+  // Reset form and stay on same screen — right panel updates
   portalResetCategory();
-
   saveToServer();
   renderAll();
 }
@@ -442,7 +441,7 @@ function setText(id, val) {
 
 function renderCustomerSelect() {
   const sel = document.getElementById('p-customer');
-  if (!sel) return;
+  if (!sel) return; // not present in portal view
   const prev = sel.value;
   sel.innerHTML = '<option value="">— Unassigned —</option>';
   for (const c of customers) {
@@ -457,28 +456,172 @@ function renderCustomerSelect() {
 function renderItemList() {
   const el = document.getElementById('p-item-list');
   if (!el) return;
+
+  // Update summary strip + proceed bar
+  const sumEl     = document.getElementById('p-list-summary');
+  const proceedEl = document.getElementById('p-proceed-bar');
+
   if (!items.length) {
-    el.innerHTML = '<p style="font-size:12px;color:var(--text2);padding:8px 2px;">No items yet — add some above.</p>';
+    el.innerHTML = '<p class="list-empty-msg">No items yet — add some on the left.</p>';
+    if (sumEl)     sumEl.style.display     = 'none';
+    if (proceedEl) proceedEl.style.display = 'none';
     return;
   }
-  const custMap = Object.fromEntries(customers.map(c => [c.id, c]));
+
+  const totalUnits  = items.reduce((s, it) => s + (it.qty || 1), 0);
+  const totalWeight = items.reduce((s, it) => s + (it.weight + (it.packagingWeight || 0)) * it.qty, 0);
+
+  if (sumEl) {
+    sumEl.style.display = '';
+    document.getElementById('lss-types').textContent  = items.length;
+    document.getElementById('lss-units').textContent  = totalUnits;
+    document.getElementById('lss-weight').textContent = totalWeight.toLocaleString();
+  }
+  if (proceedEl) proceedEl.style.display = '';
+
   el.innerHTML = '<div class="item-list">' +
-    items.map(it => {
-      const cust = it.customerId ? custMap[it.customerId] : null;
-      const custDot = cust
-        ? `<span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:${cust.color || '#888'};margin-right:4px;"></span>`
-        : '';
-      return `
-        <div class="item-row">
-          <div class="item-row-info">
-            <div class="item-row-name">${esc(it.name)} <span style="font-weight:400;color:var(--text2);">×${it.qty}</span></div>
-            <div class="item-row-meta">${it.length}×${it.width}×${it.height} ft &nbsp;·&nbsp; ${it.weight.toLocaleString()} lbs item${it.packagingWeight ? ` + ${it.packagingWeight.toLocaleString()} lbs pkg = ${(it.weight + it.packagingWeight).toLocaleString()} lbs total` : ''}</div>
-            ${cust ? `<div class="item-row-cust">${custDot}${esc(cust.name)}</div>` : ''}
-          </div>
-          <button class="btn-remove" onclick="portalRemoveItem(${it.id})">✕</button>
-        </div>`;
-    }).join('') +
+    items.map(it => `
+      <div class="item-row">
+        <div class="item-row-info">
+          <div class="item-row-name">${esc(it.name)} <span style="font-weight:400;color:var(--text2);">×${it.qty}</span></div>
+          <div class="item-row-meta">${it.length}×${it.width}×${it.height} ft &nbsp;·&nbsp; ${it.weight.toLocaleString()} lbs${it.packagingWeight ? ` + ${it.packagingWeight.toLocaleString()} pkg` : ''}</div>
+        </div>
+        <button class="btn-remove" onclick="portalRemoveItem(${it.id})">✕</button>
+      </div>`).join('') +
   '</div>';
+}
+
+// ── Booking wizard ─────────────────────────────────────────────────────────────
+let _wizardShipping = null;
+let _bookingEstimate = null;
+
+function openBookingModal() {
+  _wizardShipping = null;
+  _bookingEstimate = null;
+  document.querySelectorAll('.ship-opt').forEach(el => el.classList.remove('selected'));
+  document.getElementById('btn-see-charges').disabled = true;
+  showBookingStep('shipping');
+  document.getElementById('booking-modal').classList.add('open');
+}
+
+function closeBookingModal() {
+  document.getElementById('booking-modal').classList.remove('open');
+}
+
+function bookingOverlayClick(e) {
+  if (e.target === document.getElementById('booking-modal')) closeBookingModal();
+}
+
+function showBookingStep(step) {
+  ['shipping', 'charges', 'confirm'].forEach(s => {
+    document.getElementById('bm-step-' + s).style.display = s === step ? '' : 'none';
+  });
+}
+
+function selectShipping(type) {
+  _wizardShipping = type;
+  document.querySelectorAll('.ship-opt').forEach(el => el.classList.remove('selected'));
+  document.getElementById('ship-opt-' + type).classList.add('selected');
+  document.getElementById('btn-see-charges').disabled = false;
+}
+
+async function showChargesStep() {
+  showBookingStep('charges');
+  const el = document.getElementById('bm-charges-content');
+  el.innerHTML = '<p style="text-align:center;color:var(--text2);font-size:13px;padding:20px;">Loading rates…</p>';
+
+  try {
+    const data  = await fetch('/api/data').then(r => r.json());
+    const truck = (data.trucks || [])[0];
+
+    const totalUnits  = items.reduce((s, i) => s + i.qty, 0);
+    const totalWeight = items.reduce((s, i) => s + (i.weight + (i.packagingWeight || 0)) * i.qty, 0);
+    const totalVol    = items.reduce((s, i) => s + i.length * i.width * i.height * i.qty, 0);
+
+    if (!truck) {
+      _bookingEstimate = { estimate: null, totalUnits, totalWeight };
+      el.innerHTML = '<p style="color:var(--text2);font-size:13px;padding:12px 0;">No truck rates available. You can still confirm your booking.</p>';
+      return;
+    }
+
+    const truckVol = truck.length * truck.width * truck.height;
+    const fullCost = truck.baseRate + truck.ratePerMi * 100;
+    const pct      = Math.min(totalVol / truckVol, 1);
+    const estimate = _wizardShipping === 'shared'
+      ? Math.max(fullCost * pct, fullCost * 0.25)
+      : fullCost;
+
+    _bookingEstimate = { estimate, totalUnits, totalWeight };
+
+    const sharedRow = _wizardShipping === 'shared'
+      ? `<div class="charges-row"><span>Your share (${(pct * 100).toFixed(0)}%)</span><span>×${pct.toFixed(2)}</span></div>`
+      : '';
+
+    el.innerHTML = `
+      <div class="charges-card">
+        <div class="charges-section-lbl">📦 Cargo Summary</div>
+        <div class="charges-row"><span>Total items</span><span>${items.length} type${items.length !== 1 ? 's' : ''} · ${totalUnits} unit${totalUnits !== 1 ? 's' : ''}</span></div>
+        <div class="charges-row"><span>Total weight</span><span>${totalWeight.toLocaleString()} lbs</span></div>
+        <div class="charges-row"><span>Total volume</span><span>${totalVol.toFixed(1)} cu ft</span></div>
+        <div class="charges-row"><span>Truck utilization</span><span>${(pct * 100).toFixed(0)}% of ${esc(truck.name)}</span></div>
+      </div>
+      <div class="charges-card">
+        <div class="charges-section-lbl">💰 Estimated Charges <span style="font-size:10px;font-weight:400;color:var(--text2);">100-mi base estimate</span></div>
+        <div class="charges-row"><span>Base rate</span><span>$${truck.baseRate.toLocaleString()}</span></div>
+        <div class="charges-row"><span>Per-mile (100 mi)</span><span>$${(truck.ratePerMi * 100).toLocaleString()}</span></div>
+        ${sharedRow}
+        <div class="charges-row charges-total">
+          <span>Estimated Total</span>
+          <span style="color:var(--primary);font-size:22px;letter-spacing:-0.4px;">$${Math.round(estimate).toLocaleString()}</span>
+        </div>
+        <p style="font-size:10px;color:var(--text2);margin-top:10px;line-height:1.6;">
+          * Final price confirmed at pickup based on actual distance and weight.
+        </p>
+      </div>`;
+  } catch (e) {
+    el.innerHTML = `<p style="color:var(--danger);font-size:12px;">Could not load rates: ${esc(e.message)}</p>`;
+  }
+}
+
+async function confirmWebBooking() {
+  const btn = document.querySelector('.btn-bm-confirm');
+  btn.textContent = 'Saving…';
+  btn.disabled = true;
+  try {
+    // Items already persisted on add; just record shippingOption on them
+    const fresh = await fetch('/api/data').then(r => r.json());
+    const myIds = new Set(items.map(i => i.id));
+    const updatedItems = (fresh.items || []).map(i =>
+      myIds.has(i.id) ? { ...i, shippingOption: _wizardShipping } : i
+    );
+    await fetch('/api/data', {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ ...fresh, items: updatedItems }),
+    });
+
+    const { estimate, totalUnits, totalWeight } = _bookingEstimate || {};
+    const sumEl = document.getElementById('bm-confirm-summary');
+    sumEl.innerHTML = `
+      <div class="bm-confirm-grid">
+        <div class="bcg-row"><span>Items submitted</span><span>${items.length} type${items.length !== 1 ? 's' : ''} · ${totalUnits || 0} units</span></div>
+        <div class="bcg-row"><span>Total weight</span><span>${(totalWeight || 0).toLocaleString()} lbs</span></div>
+        <div class="bcg-row"><span>Shipping type</span><span>${_wizardShipping === 'shared' ? '🤝 Share Truck (LTL)' : '🚚 Private Truck (FTL)'}</span></div>
+        ${estimate != null ? `<div class="bcg-row"><span>Estimated cost</span><span style="color:var(--primary);font-weight:900;font-size:16px;">$${Math.round(estimate).toLocaleString()}</span></div>` : ''}
+      </div>`;
+
+    showBookingStep('confirm');
+  } catch (e) {
+    alert('Error saving booking: ' + e.message);
+  } finally {
+    btn.textContent = '✓ Confirm Booking';
+    btn.disabled = false;
+  }
+}
+
+function startNewBooking() {
+  closeBookingModal();
+  portalResetCategory();
 }
 
 function renderCustomerList() {
