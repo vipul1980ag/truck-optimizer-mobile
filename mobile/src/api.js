@@ -3,11 +3,12 @@
 export const BASE_URL =
   process.env.EXPO_PUBLIC_API_URL || 'http://192.168.178.60:3000';
 
-async function request(method, path, body) {
+async function request(method, path, body, token) {
   const opts = {
     method,
     headers: { 'Content-Type': 'application/json' },
   };
+  if (token) opts.headers['Authorization'] = 'Bearer ' + token;
   if (body !== undefined) opts.body = JSON.stringify(body);
   const res  = await fetch(BASE_URL + path, opts);
   const data = await res.json();
@@ -22,4 +23,15 @@ export const api = {
   paymentConfig:()     => request('GET',  '/api/payment/config'),
   createOrder:  (body) => request('POST', '/api/payment/create-order', body),
   captureOrder: (body) => request('POST', '/api/payment/capture-order', body),
+};
+
+export const authApi = {
+  register: (email, password, phone, address) =>
+    request('POST', '/api/auth/register', { email, password, phone, address }),
+  login: (email, password) =>
+    request('POST', '/api/auth/login', { email, password }),
+  logout: (token) =>
+    request('POST', '/api/auth/logout', undefined, token),
+  me: (token) =>
+    request('GET', '/api/auth/me', undefined, token),
 };
