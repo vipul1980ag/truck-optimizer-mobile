@@ -142,19 +142,22 @@ const MOBILE_INDUSTRIAL = [
 const BLANK = { name: '', length: '4', width: '4', height: '4', weight: '500', packagingWeight: '0', qty: '1' };
 
 export default function AddCargoScreen({ navigation }) {
-  const { items, addItem } = useWizard();
+  const { items, addItem, updateItem, removeItem } = useWizard();
 
   const [step,        setStep]        = useState(1);
   const [category,    setCategory]    = useState(null);
   const [selectedCat, setSelectedCat] = useState(null);
   const [form,        setForm]        = useState(BLANK);
+  const [expandedId,  setExpandedId]  = useState(null);
+  const [editForm,    setEditForm]    = useState({});
 
-  const catalog = category === 'household' ? MOBILE_HOUSEHOLD : MOBILE_INDUSTRIAL;
+  const catalog  = category === 'household' ? MOBILE_HOUSEHOLD : MOBILE_INDUSTRIAL;
   const catItems = selectedCat
     ? (catalog.find(c => c.cat === selectedCat)?.items || [])
     : [];
 
-  const f = k => v => setForm(p => ({ ...p, [k]: v }));
+  const f  = k => v => setForm(p => ({ ...p, [k]: v }));
+  const ef = k => v => setEditForm(p => ({ ...p, [k]: v }));
 
   function pickItem(item) {
     setForm(p => ({
@@ -175,140 +178,255 @@ export default function AddCargoScreen({ navigation }) {
       return;
     }
     addItem({
-      name:           form.name.trim(),
-      length:         parseFloat(form.length)         || 4,
-      width:          parseFloat(form.width)          || 4,
-      height:         parseFloat(form.height)         || 4,
-      weight:         parseFloat(form.weight)         || 0,
-      packagingWeight:parseFloat(form.packagingWeight)|| 0,
-      qty:            parseInt(form.qty)              || 1,
+      name:            form.name.trim(),
+      length:          parseFloat(form.length)          || 4,
+      width:           parseFloat(form.width)           || 4,
+      height:          parseFloat(form.height)          || 4,
+      weight:          parseFloat(form.weight)          || 0,
+      packagingWeight: parseFloat(form.packagingWeight) || 0,
+      qty:             parseInt(form.qty)               || 1,
     });
-    // reset to step 1 for next item
+    // reset form for next addition — stay on same screen
     setStep(1);
     setCategory(null);
     setSelectedCat(null);
     setForm(BLANK);
+    setExpandedId(null);
   }
+
+  function startEdit(item) {
+    setExpandedId(item._id);
+    setEditForm({
+      name:   item.name,
+      length: String(item.length),
+      width:  String(item.width),
+      height: String(item.height),
+      weight: String(item.weight),
+      qty:    String(item.qty),
+    });
+  }
+
+  function saveEdit(item) {
+    if (!editForm.name.trim()) { Alert.alert('Required', 'Item name cannot be empty.'); return; }
+    updateItem(item._id, {
+      name:   editForm.name.trim(),
+      length: parseFloat(editForm.length) || item.length,
+      width:  parseFloat(editForm.width)  || item.width,
+      height: parseFloat(editForm.height) || item.height,
+      weight: parseFloat(editForm.weight) || item.weight,
+      qty:    parseInt(editForm.qty)      || item.qty,
+    });
+    setExpandedId(null);
+  }
+
+  function confirmDelete(item) {
+    Alert.alert('Remove Item', `Remove "${item.name}"?`, [
+      { text: 'Cancel', style: 'cancel' },
+      { text: 'Remove', style: 'destructive', onPress: () => {
+        removeItem(item._id);
+        if (expandedId === item._id) setExpandedId(null);
+      }},
+    ]);
+  }
+
+  const totalWeight = items.reduce((s, i) => s + (i.weight + (i.packagingWeight || 0)) * i.qty, 0);
 
   return (
     <SafeAreaView style={s.safe} edges={['bottom']}>
       <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
         <ScrollView contentContainerStyle={s.scroll} keyboardShouldPersistTaps="handled">
 
-          {/* ── Step 1: category picker ── */}
-          {step === 1 && (
-            <>
-              <Text style={s.sectionTitle}>What type of cargo?</Text>
-              <View style={s.catRow}>
-                <TouchableOpacity style={s.catBtn} onPress={() => { setCategory('household'); setStep(2); }}>
-                  <Text style={s.catIcon}>🏠</Text>
-                  <Text style={s.catLabel}>Household</Text>
-                  <Text style={s.catSub}>Furniture, appliances, boxes</Text>
-                </TouchableOpacity>
-                <TouchableOpacity style={s.catBtn} onPress={() => { setCategory('industrial'); setStep(2); }}>
-                  <Text style={s.catIcon}>🏭</Text>
-                  <Text style={s.catLabel}>Industrial</Text>
-                  <Text style={s.catSub}>Pallets, machinery, equipment</Text>
-                </TouchableOpacity>
-              </View>
-            </>
-          )}
+          {/* ── Add form section ── */}
+          <View style={s.formCard}>
+            <Text style={s.formCardHead}>＋ Add Cargo Item</Text>
 
-          {/* ── Step 2: sub-cat + item + form ── */}
-          {step === 2 && (
-            <>
-              {/* Back + heading */}
-              <View style={s.stepHead}>
-                <TouchableOpacity onPress={() => { setStep(1); setCategory(null); setSelectedCat(null); setForm(BLANK); }}>
-                  <Text style={s.backBtn}>← Category</Text>
-                </TouchableOpacity>
-                <Text style={s.stepHeadTitle}>
-                  {category === 'household' ? '🏠 Household' : '🏭 Industrial'}
-                </Text>
-              </View>
-
-              {/* Sub-category chips */}
-              <Text style={s.lbl}>Sub-Category</Text>
-              <ScrollView horizontal showsHorizontalScrollIndicator={false} style={s.chipScroll}>
-                {catalog.map(c => (
-                  <TouchableOpacity
-                    key={c.cat}
-                    style={[s.chip, selectedCat === c.cat && s.chipActive]}
-                    onPress={() => { setSelectedCat(c.cat); setForm(BLANK); }}
-                  >
-                    <Text style={[s.chipTxt, selectedCat === c.cat && s.chipTxtActive]}>{c.cat}</Text>
+            {/* Step 1: category picker */}
+            {step === 1 && (
+              <>
+                <Text style={s.lbl}>Select Category</Text>
+                <View style={s.catRow}>
+                  <TouchableOpacity style={s.catBtn} onPress={() => { setCategory('household'); setStep(2); }}>
+                    <Text style={s.catIcon}>🏠</Text>
+                    <Text style={s.catLabel}>Household</Text>
+                    <Text style={s.catSub}>Furniture, appliances, boxes</Text>
                   </TouchableOpacity>
-                ))}
-              </ScrollView>
+                  <TouchableOpacity style={s.catBtn} onPress={() => { setCategory('industrial'); setStep(2); }}>
+                    <Text style={s.catIcon}>🏭</Text>
+                    <Text style={s.catLabel}>Industrial</Text>
+                    <Text style={s.catSub}>Pallets, machinery, equipment</Text>
+                  </TouchableOpacity>
+                </View>
+              </>
+            )}
 
-              {/* Item chips */}
-              {catItems.length > 0 && (
-                <>
-                  <Text style={s.lbl}>Select Item</Text>
-                  <ScrollView horizontal showsHorizontalScrollIndicator={false} style={s.chipScroll}>
-                    {catItems.map(item => (
-                      <TouchableOpacity
-                        key={item.name}
-                        style={[s.chip, form.name === item.name && s.chipActive]}
-                        onPress={() => pickItem(item)}
-                      >
-                        <Text style={[s.chipTxt, form.name === item.name && s.chipTxtActive]}>{item.name}</Text>
+            {/* Step 2: sub-cat + item + form */}
+            {step === 2 && (
+              <>
+                <View style={s.stepHead}>
+                  <TouchableOpacity onPress={() => { setStep(1); setCategory(null); setSelectedCat(null); setForm(BLANK); }}>
+                    <Text style={s.backBtn}>← Category</Text>
+                  </TouchableOpacity>
+                  <Text style={s.stepHeadTitle}>
+                    {category === 'household' ? '🏠 Household' : '🏭 Industrial'}
+                  </Text>
+                </View>
+
+                <Text style={s.lbl}>Sub-Category</Text>
+                <ScrollView horizontal showsHorizontalScrollIndicator={false} style={s.chipScroll}>
+                  {catalog.map(c => (
+                    <TouchableOpacity
+                      key={c.cat}
+                      style={[s.chip, selectedCat === c.cat && s.chipActive]}
+                      onPress={() => { setSelectedCat(c.cat); setForm(BLANK); }}
+                    >
+                      <Text style={[s.chipTxt, selectedCat === c.cat && s.chipTxtActive]}>{c.cat}</Text>
+                    </TouchableOpacity>
+                  ))}
+                </ScrollView>
+
+                {catItems.length > 0 && (
+                  <>
+                    <Text style={s.lbl}>Select Item</Text>
+                    <ScrollView horizontal showsHorizontalScrollIndicator={false} style={s.chipScroll}>
+                      {catItems.map(item => (
+                        <TouchableOpacity
+                          key={item.name}
+                          style={[s.chip, form.name === item.name && s.chipActive]}
+                          onPress={() => pickItem(item)}
+                        >
+                          <Text style={[s.chipTxt, form.name === item.name && s.chipTxtActive]}>{item.name}</Text>
+                        </TouchableOpacity>
+                      ))}
+                    </ScrollView>
+                  </>
+                )}
+
+                <Text style={s.lbl}>Item Name</Text>
+                <TextInput style={s.input} value={form.name} onChangeText={f('name')} placeholder="e.g. Sofa (3-seat)" placeholderTextColor={C.text3} />
+
+                <View style={s.dimRow}>
+                  <View style={s.dimField}>
+                    <Text style={s.lbl}>Length (ft)</Text>
+                    <TextInput style={s.input} value={form.length} onChangeText={f('length')} keyboardType="decimal-pad" />
+                  </View>
+                  <View style={s.dimField}>
+                    <Text style={s.lbl}>Width (ft)</Text>
+                    <TextInput style={s.input} value={form.width} onChangeText={f('width')} keyboardType="decimal-pad" />
+                  </View>
+                  <View style={s.dimField}>
+                    <Text style={s.lbl}>Height (ft)</Text>
+                    <TextInput style={s.input} value={form.height} onChangeText={f('height')} keyboardType="decimal-pad" />
+                  </View>
+                </View>
+
+                <View style={s.dimRow}>
+                  <View style={s.dimField}>
+                    <Text style={s.lbl}>Weight (lbs)</Text>
+                    <TextInput style={s.input} value={form.weight} onChangeText={f('weight')} keyboardType="decimal-pad" />
+                  </View>
+                  <View style={s.dimField}>
+                    <Text style={s.lbl}>Pkg Wt (lbs)</Text>
+                    <TextInput style={s.input} value={form.packagingWeight} onChangeText={f('packagingWeight')} keyboardType="decimal-pad" />
+                  </View>
+                  <View style={s.dimField}>
+                    <Text style={s.lbl}>Qty</Text>
+                    <TextInput style={s.input} value={form.qty} onChangeText={f('qty')} keyboardType="number-pad" />
+                  </View>
+                </View>
+
+                <TouchableOpacity style={s.addBtn} onPress={handleAdd}>
+                  <Text style={s.addBtnTxt}>＋ Add to List</Text>
+                </TouchableOpacity>
+              </>
+            )}
+          </View>
+
+          {/* ── Added items list ── */}
+          {items.length > 0 && (
+            <>
+              {/* Summary bar */}
+              <View style={s.summaryBar}>
+                <View style={s.summaryItem}>
+                  <Text style={s.summaryVal}>{items.length}</Text>
+                  <Text style={s.summaryLbl}>Items</Text>
+                </View>
+                <View style={s.summaryItem}>
+                  <Text style={s.summaryVal}>{items.reduce((s,i)=>s+i.qty,0)}</Text>
+                  <Text style={s.summaryLbl}>Total Units</Text>
+                </View>
+                <View style={s.summaryItem}>
+                  <Text style={s.summaryVal}>{totalWeight.toLocaleString()}</Text>
+                  <Text style={s.summaryLbl}>Total lbs</Text>
+                </View>
+              </View>
+
+              <Text style={s.listHead}>My Cargo List</Text>
+
+              {items.map(item => {
+                const isExp = expandedId === item._id;
+                return (
+                  <View key={String(item._id)} style={s.itemCard}>
+                    <View style={s.itemRow}>
+                      <View style={{ flex: 1 }}>
+                        <Text style={s.itemName}>{item.name}</Text>
+                        <Text style={s.itemDims}>
+                          {item.length}×{item.width}×{item.height} ft · {item.weight} lbs · qty {item.qty}
+                        </Text>
+                      </View>
+                      <TouchableOpacity style={s.iconBtn} onPress={() => isExp ? setExpandedId(null) : startEdit(item)}>
+                        <Text style={s.iconBtnTxt}>{isExp ? '✕' : '✏️'}</Text>
                       </TouchableOpacity>
-                    ))}
-                  </ScrollView>
-                </>
-              )}
+                      <TouchableOpacity style={[s.iconBtn, { marginLeft: 6 }]} onPress={() => confirmDelete(item)}>
+                        <Text style={s.iconBtnTxt}>🗑</Text>
+                      </TouchableOpacity>
+                    </View>
 
-              {/* Form */}
-              <Text style={s.lbl}>Item Name</Text>
-              <TextInput style={s.input} value={form.name} onChangeText={f('name')} placeholder="e.g. Sofa (3-seat)" placeholderTextColor={C.text3} />
-
-              <View style={s.dimRow}>
-                <View style={s.dimField}>
-                  <Text style={s.lbl}>Length (ft)</Text>
-                  <TextInput style={s.input} value={form.length} onChangeText={f('length')} keyboardType="decimal-pad" placeholderTextColor={C.text3} />
-                </View>
-                <View style={s.dimField}>
-                  <Text style={s.lbl}>Width (ft)</Text>
-                  <TextInput style={s.input} value={form.width} onChangeText={f('width')} keyboardType="decimal-pad" placeholderTextColor={C.text3} />
-                </View>
-                <View style={s.dimField}>
-                  <Text style={s.lbl}>Height (ft)</Text>
-                  <TextInput style={s.input} value={form.height} onChangeText={f('height')} keyboardType="decimal-pad" placeholderTextColor={C.text3} />
-                </View>
-              </View>
-
-              <View style={s.dimRow}>
-                <View style={s.dimField}>
-                  <Text style={s.lbl}>Weight (lbs)</Text>
-                  <TextInput style={s.input} value={form.weight} onChangeText={f('weight')} keyboardType="decimal-pad" placeholderTextColor={C.text3} />
-                </View>
-                <View style={s.dimField}>
-                  <Text style={s.lbl}>Pkg Wt (lbs)</Text>
-                  <TextInput style={s.input} value={form.packagingWeight} onChangeText={f('packagingWeight')} keyboardType="decimal-pad" placeholderTextColor={C.text3} />
-                </View>
-                <View style={s.dimField}>
-                  <Text style={s.lbl}>Qty</Text>
-                  <TextInput style={s.input} value={form.qty} onChangeText={f('qty')} keyboardType="number-pad" placeholderTextColor={C.text3} />
-                </View>
-              </View>
-
-              <TouchableOpacity style={s.addBtn} onPress={handleAdd}>
-                <Text style={s.addBtnTxt}>＋ Add Item</Text>
-              </TouchableOpacity>
+                    {isExp && (
+                      <View style={s.editBox}>
+                        <Text style={s.lbl}>Item Name</Text>
+                        <TextInput style={s.input} value={editForm.name} onChangeText={ef('name')} placeholderTextColor={C.text3} />
+                        <View style={s.dimRow}>
+                          <View style={s.dimField}>
+                            <Text style={s.lbl}>Length</Text>
+                            <TextInput style={s.input} value={editForm.length} onChangeText={ef('length')} keyboardType="decimal-pad" />
+                          </View>
+                          <View style={s.dimField}>
+                            <Text style={s.lbl}>Width</Text>
+                            <TextInput style={s.input} value={editForm.width} onChangeText={ef('width')} keyboardType="decimal-pad" />
+                          </View>
+                          <View style={s.dimField}>
+                            <Text style={s.lbl}>Height</Text>
+                            <TextInput style={s.input} value={editForm.height} onChangeText={ef('height')} keyboardType="decimal-pad" />
+                          </View>
+                        </View>
+                        <View style={s.dimRow}>
+                          <View style={{ flex: 1 }}>
+                            <Text style={s.lbl}>Weight (lbs)</Text>
+                            <TextInput style={s.input} value={editForm.weight} onChangeText={ef('weight')} keyboardType="decimal-pad" />
+                          </View>
+                          <View style={{ flex: 1, marginLeft: 8 }}>
+                            <Text style={s.lbl}>Quantity</Text>
+                            <TextInput style={s.input} value={editForm.qty} onChangeText={ef('qty')} keyboardType="number-pad" />
+                          </View>
+                        </View>
+                        <TouchableOpacity style={s.saveBtn} onPress={() => saveEdit(item)}>
+                          <Text style={s.saveBtnTxt}>Save Changes</Text>
+                        </TouchableOpacity>
+                      </View>
+                    )}
+                  </View>
+                );
+              })}
             </>
           )}
 
         </ScrollView>
 
-        {/* ── Bottom bar ── */}
+        {/* ── Bottom bar: proceed when items exist ── */}
         {items.length > 0 && (
           <View style={s.bottomBar}>
-            <View style={s.badge}>
-              <Text style={s.badgeTxt}>{items.length} item{items.length !== 1 ? 's' : ''} added</Text>
-            </View>
-            <TouchableOpacity style={s.viewBtn} onPress={() => navigation.navigate('ReviewCargo')}>
-              <Text style={s.viewBtnTxt}>View List ({items.length}) →</Text>
+            <TouchableOpacity style={s.proceedBtn} onPress={() => navigation.navigate('ShipOption')}>
+              <Text style={s.proceedTxt}>Next: Choose Shipping ({items.length} item{items.length !== 1 ? 's' : ''}) →</Text>
             </TouchableOpacity>
           </View>
         )}
@@ -319,53 +437,60 @@ export default function AddCargoScreen({ navigation }) {
 
 const s = StyleSheet.create({
   safe:   { flex: 1, backgroundColor: C.bg },
-  scroll: { padding: 16, paddingBottom: 8 },
+  scroll: { padding: 14, paddingBottom: 12 },
 
-  sectionTitle: { fontSize: 16, fontWeight: '800', color: C.text, marginBottom: 14 },
-  catRow:  { flexDirection: 'row', gap: 12, marginBottom: 8 },
-  catBtn:  {
-    flex: 1, alignItems: 'center', gap: 6, paddingVertical: 20,
-    borderRadius: 14, borderWidth: 1.5, borderColor: C.border,
-    backgroundColor: C.surface,
-  },
-  catIcon:  { fontSize: 28 },
-  catLabel: { fontSize: 14, fontWeight: '800', color: C.text },
-  catSub:   { fontSize: 10, color: C.text2, textAlign: 'center', paddingHorizontal: 4 },
+  // Form card
+  formCard:     { backgroundColor: C.surface, borderRadius: 14, padding: 16, marginBottom: 14, borderWidth: 1, borderColor: C.border },
+  formCardHead: { fontSize: 15, fontWeight: '900', color: C.text, marginBottom: 12 },
 
-  stepHead:      { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 14 },
-  stepHeadTitle: { fontSize: 14, fontWeight: '800', color: C.text },
+  catRow:  { flexDirection: 'row', gap: 10 },
+  catBtn:  { flex: 1, alignItems: 'center', gap: 5, paddingVertical: 18, borderRadius: 12, borderWidth: 1.5, borderColor: C.border, backgroundColor: C.surface2 },
+  catIcon:  { fontSize: 26 },
+  catLabel: { fontSize: 13, fontWeight: '800', color: C.text },
+  catSub:   { fontSize: 10, color: C.text2, textAlign: 'center', paddingHorizontal: 2 },
+
+  stepHead:      { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10 },
+  stepHeadTitle: { fontSize: 13, fontWeight: '800', color: C.text },
   backBtn:       { fontSize: 13, color: C.primary, fontWeight: '700' },
 
   lbl: { fontSize: 10, fontWeight: '700', color: C.text2, textTransform: 'uppercase', letterSpacing: 0.4, marginBottom: 4, marginTop: 10 },
 
-  chipScroll: { marginBottom: 4 },
-  chip: {
-    paddingHorizontal: 14, paddingVertical: 7, marginRight: 8,
-    borderRadius: 20, borderWidth: 1.5, borderColor: C.border,
-    backgroundColor: C.surface,
-  },
-  chipActive:   { borderColor: C.primary, backgroundColor: '#eff6ff' },
-  chipTxt:      { fontSize: 12, color: C.text2, fontWeight: '600' },
-  chipTxtActive:{ color: C.primary, fontWeight: '800' },
+  chipScroll: { marginBottom: 2 },
+  chip:       { paddingHorizontal: 12, paddingVertical: 6, marginRight: 7, borderRadius: 20, borderWidth: 1.5, borderColor: C.border, backgroundColor: C.surface },
+  chipActive: { borderColor: C.primary, backgroundColor: '#eff6ff' },
+  chipTxt:    { fontSize: 12, color: C.text2, fontWeight: '600' },
+  chipTxtActive: { color: C.primary, fontWeight: '800' },
 
-  input: {
-    borderWidth: 1.5, borderColor: C.border, borderRadius: 9,
-    paddingHorizontal: 10, paddingVertical: 8,
-    fontSize: 13, color: C.text, backgroundColor: C.surface,
-  },
+  input:    { borderWidth: 1.5, borderColor: C.border, borderRadius: 9, paddingHorizontal: 10, paddingVertical: 8, fontSize: 13, color: C.text, backgroundColor: C.surface },
   dimRow:   { flexDirection: 'row', gap: 8, marginTop: 2 },
   dimField: { flex: 1 },
 
-  addBtn:    { marginTop: 16, backgroundColor: C.primary, borderRadius: 10, paddingVertical: 13, alignItems: 'center' },
-  addBtnTxt: { color: '#fff', fontSize: 15, fontWeight: '800' },
+  addBtn:    { marginTop: 14, backgroundColor: C.primary, borderRadius: 10, paddingVertical: 12, alignItems: 'center' },
+  addBtnTxt: { color: '#fff', fontSize: 14, fontWeight: '800' },
 
-  bottomBar: {
-    flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
-    padding: 12, paddingHorizontal: 16,
-    backgroundColor: C.surface, borderTopWidth: 1, borderTopColor: C.border,
-  },
-  badge:    { backgroundColor: '#dbeafe', paddingHorizontal: 12, paddingVertical: 5, borderRadius: 20 },
-  badgeTxt: { fontSize: 12, fontWeight: '700', color: C.primary },
-  viewBtn:    { backgroundColor: C.primary, paddingHorizontal: 18, paddingVertical: 9, borderRadius: 20 },
-  viewBtnTxt: { color: '#fff', fontSize: 13, fontWeight: '800' },
+  // Summary bar
+  summaryBar:  { flexDirection: 'row', backgroundColor: C.navy, borderRadius: 12, padding: 12, marginBottom: 12 },
+  summaryItem: { flex: 1, alignItems: 'center' },
+  summaryVal:  { fontSize: 17, fontWeight: '900', color: '#f1f5f9' },
+  summaryLbl:  { fontSize: 9, color: '#64748b', marginTop: 1 },
+
+  listHead: { fontSize: 13, fontWeight: '800', color: C.text2, marginBottom: 8, textTransform: 'uppercase', letterSpacing: 0.5 },
+
+  // Item cards
+  itemCard: { backgroundColor: C.surface, borderRadius: 12, padding: 12, marginBottom: 8, borderWidth: 1, borderColor: C.border },
+  itemRow:  { flexDirection: 'row', alignItems: 'center' },
+  itemName: { fontSize: 13, fontWeight: '800', color: C.text },
+  itemDims: { fontSize: 11, color: C.text2, marginTop: 2 },
+
+  iconBtn:    { padding: 6, borderRadius: 8, backgroundColor: C.surface2, borderWidth: 1, borderColor: C.border },
+  iconBtnTxt: { fontSize: 13 },
+
+  editBox:    { marginTop: 10, paddingTop: 10, borderTopWidth: 1, borderTopColor: C.border },
+  saveBtn:    { marginTop: 10, backgroundColor: C.primary, borderRadius: 8, paddingVertical: 9, alignItems: 'center' },
+  saveBtnTxt: { color: '#fff', fontSize: 13, fontWeight: '800' },
+
+  // Bottom proceed bar
+  bottomBar:  { padding: 12, paddingHorizontal: 14, backgroundColor: C.surface, borderTopWidth: 1, borderTopColor: C.border },
+  proceedBtn: { backgroundColor: C.primary, borderRadius: 10, paddingVertical: 13, alignItems: 'center' },
+  proceedTxt: { color: '#fff', fontSize: 14, fontWeight: '800' },
 });
