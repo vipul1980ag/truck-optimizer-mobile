@@ -186,7 +186,7 @@ export default function AddCargoScreen({ navigation }) {
       packagingWeight: parseFloat(form.packagingWeight) || 0,
       qty:             parseInt(form.qty)               || 1,
     });
-    // reset form for next addition — stay on same screen
+    // Reset form, stay on same screen
     setStep(1);
     setCategory(null);
     setSelectedCat(null);
@@ -229,44 +229,46 @@ export default function AddCargoScreen({ navigation }) {
     ]);
   }
 
+  const totalUnits  = items.reduce((s, i) => s + i.qty, 0);
   const totalWeight = items.reduce((s, i) => s + (i.weight + (i.packagingWeight || 0)) * i.qty, 0);
 
   return (
     <SafeAreaView style={s.safe} edges={['bottom']}>
       <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
-        <ScrollView contentContainerStyle={s.scroll} keyboardShouldPersistTaps="handled">
 
-          {/* ── Add form section ── */}
-          <View style={s.formCard}>
-            <Text style={s.formCardHead}>＋ Add Cargo Item</Text>
+        {/* ── Two-column body ── */}
+        <View style={s.columns}>
 
-            {/* Step 1: category picker */}
+          {/* LEFT column — add form */}
+          <ScrollView style={s.leftCol} contentContainerStyle={s.leftContent} keyboardShouldPersistTaps="handled">
+
+            <Text style={s.colHead}>＋ Add Item</Text>
+
+            {/* Step 1: category */}
             {step === 1 && (
               <>
                 <Text style={s.lbl}>Select Category</Text>
-                <View style={s.catRow}>
-                  <TouchableOpacity style={s.catBtn} onPress={() => { setCategory('household'); setStep(2); }}>
-                    <Text style={s.catIcon}>🏠</Text>
-                    <Text style={s.catLabel}>Household</Text>
-                    <Text style={s.catSub}>Furniture, appliances, boxes</Text>
-                  </TouchableOpacity>
-                  <TouchableOpacity style={s.catBtn} onPress={() => { setCategory('industrial'); setStep(2); }}>
-                    <Text style={s.catIcon}>🏭</Text>
-                    <Text style={s.catLabel}>Industrial</Text>
-                    <Text style={s.catSub}>Pallets, machinery, equipment</Text>
-                  </TouchableOpacity>
-                </View>
+                <TouchableOpacity style={s.catBtn} onPress={() => { setCategory('household'); setStep(2); }}>
+                  <Text style={s.catIcon}>🏠</Text>
+                  <Text style={s.catLabel}>Household</Text>
+                  <Text style={s.catSub}>Furniture · appliances · boxes</Text>
+                </TouchableOpacity>
+                <TouchableOpacity style={[s.catBtn, { marginTop: 8 }]} onPress={() => { setCategory('industrial'); setStep(2); }}>
+                  <Text style={s.catIcon}>🏭</Text>
+                  <Text style={s.catLabel}>Industrial</Text>
+                  <Text style={s.catSub}>Pallets · machinery · equipment</Text>
+                </TouchableOpacity>
               </>
             )}
 
-            {/* Step 2: sub-cat + item + form */}
+            {/* Step 2: sub-cat + item chips + form */}
             {step === 2 && (
               <>
                 <View style={s.stepHead}>
                   <TouchableOpacity onPress={() => { setStep(1); setCategory(null); setSelectedCat(null); setForm(BLANK); }}>
-                    <Text style={s.backBtn}>← Category</Text>
+                    <Text style={s.backBtn}>← Back</Text>
                   </TouchableOpacity>
-                  <Text style={s.stepHeadTitle}>
+                  <Text style={s.stepTitle}>
                     {category === 'household' ? '🏠 Household' : '🏭 Industrial'}
                   </Text>
                 </View>
@@ -286,7 +288,7 @@ export default function AddCargoScreen({ navigation }) {
 
                 {catItems.length > 0 && (
                   <>
-                    <Text style={s.lbl}>Select Item</Text>
+                    <Text style={s.lbl}>Item</Text>
                     <ScrollView horizontal showsHorizontalScrollIndicator={false} style={s.chipScroll}>
                       {catItems.map(item => (
                         <TouchableOpacity
@@ -301,36 +303,43 @@ export default function AddCargoScreen({ navigation }) {
                   </>
                 )}
 
-                <Text style={s.lbl}>Item Name</Text>
-                <TextInput style={s.input} value={form.name} onChangeText={f('name')} placeholder="e.g. Sofa (3-seat)" placeholderTextColor={C.text3} />
+                <Text style={s.lbl}>Name</Text>
+                <TextInput
+                  style={s.input}
+                  value={form.name}
+                  onChangeText={f('name')}
+                  placeholder="Item name"
+                  placeholderTextColor={C.text3}
+                />
 
                 <View style={s.dimRow}>
                   <View style={s.dimField}>
-                    <Text style={s.lbl}>Length (ft)</Text>
+                    <Text style={s.lbl}>L (ft)</Text>
                     <TextInput style={s.input} value={form.length} onChangeText={f('length')} keyboardType="decimal-pad" />
                   </View>
                   <View style={s.dimField}>
-                    <Text style={s.lbl}>Width (ft)</Text>
+                    <Text style={s.lbl}>W (ft)</Text>
                     <TextInput style={s.input} value={form.width} onChangeText={f('width')} keyboardType="decimal-pad" />
                   </View>
+                </View>
+                <View style={s.dimRow}>
                   <View style={s.dimField}>
-                    <Text style={s.lbl}>Height (ft)</Text>
+                    <Text style={s.lbl}>H (ft)</Text>
                     <TextInput style={s.input} value={form.height} onChangeText={f('height')} keyboardType="decimal-pad" />
                   </View>
+                  <View style={s.dimField}>
+                    <Text style={s.lbl}>Qty</Text>
+                    <TextInput style={s.input} value={form.qty} onChangeText={f('qty')} keyboardType="number-pad" />
+                  </View>
                 </View>
-
                 <View style={s.dimRow}>
                   <View style={s.dimField}>
                     <Text style={s.lbl}>Weight (lbs)</Text>
                     <TextInput style={s.input} value={form.weight} onChangeText={f('weight')} keyboardType="decimal-pad" />
                   </View>
                   <View style={s.dimField}>
-                    <Text style={s.lbl}>Pkg Wt (lbs)</Text>
+                    <Text style={s.lbl}>Pkg Wt</Text>
                     <TextInput style={s.input} value={form.packagingWeight} onChangeText={f('packagingWeight')} keyboardType="decimal-pad" />
-                  </View>
-                  <View style={s.dimField}>
-                    <Text style={s.lbl}>Qty</Text>
-                    <TextInput style={s.input} value={form.qty} onChangeText={f('qty')} keyboardType="number-pad" />
                   </View>
                 </View>
 
@@ -339,158 +348,182 @@ export default function AddCargoScreen({ navigation }) {
                 </TouchableOpacity>
               </>
             )}
-          </View>
+          </ScrollView>
 
-          {/* ── Added items list ── */}
-          {items.length > 0 && (
-            <>
-              {/* Summary bar */}
-              <View style={s.summaryBar}>
-                <View style={s.summaryItem}>
-                  <Text style={s.summaryVal}>{items.length}</Text>
-                  <Text style={s.summaryLbl}>Items</Text>
-                </View>
-                <View style={s.summaryItem}>
-                  <Text style={s.summaryVal}>{items.reduce((s,i)=>s+i.qty,0)}</Text>
-                  <Text style={s.summaryLbl}>Total Units</Text>
-                </View>
-                <View style={s.summaryItem}>
-                  <Text style={s.summaryVal}>{totalWeight.toLocaleString()}</Text>
-                  <Text style={s.summaryLbl}>Total lbs</Text>
-                </View>
+          {/* Vertical divider */}
+          <View style={s.divider} />
+
+          {/* RIGHT column — cargo list */}
+          <ScrollView style={s.rightCol} contentContainerStyle={s.rightContent} keyboardShouldPersistTaps="handled">
+
+            <Text style={s.colHead}>📋 Cargo List</Text>
+
+            {items.length === 0 ? (
+              <View style={s.emptyState}>
+                <Text style={s.emptyIcon}>📦</Text>
+                <Text style={s.emptyTxt}>Added items{'\n'}appear here</Text>
               </View>
-
-              <Text style={s.listHead}>My Cargo List</Text>
-
-              {items.map(item => {
-                const isExp = expandedId === item._id;
-                return (
-                  <View key={String(item._id)} style={s.itemCard}>
-                    <View style={s.itemRow}>
-                      <View style={{ flex: 1 }}>
-                        <Text style={s.itemName}>{item.name}</Text>
-                        <Text style={s.itemDims}>
-                          {item.length}×{item.width}×{item.height} ft · {item.weight} lbs · qty {item.qty}
-                        </Text>
-                      </View>
-                      <TouchableOpacity style={s.iconBtn} onPress={() => isExp ? setExpandedId(null) : startEdit(item)}>
-                        <Text style={s.iconBtnTxt}>{isExp ? '✕' : '✏️'}</Text>
-                      </TouchableOpacity>
-                      <TouchableOpacity style={[s.iconBtn, { marginLeft: 6 }]} onPress={() => confirmDelete(item)}>
-                        <Text style={s.iconBtnTxt}>🗑</Text>
-                      </TouchableOpacity>
-                    </View>
-
-                    {isExp && (
-                      <View style={s.editBox}>
-                        <Text style={s.lbl}>Item Name</Text>
-                        <TextInput style={s.input} value={editForm.name} onChangeText={ef('name')} placeholderTextColor={C.text3} />
-                        <View style={s.dimRow}>
-                          <View style={s.dimField}>
-                            <Text style={s.lbl}>Length</Text>
-                            <TextInput style={s.input} value={editForm.length} onChangeText={ef('length')} keyboardType="decimal-pad" />
-                          </View>
-                          <View style={s.dimField}>
-                            <Text style={s.lbl}>Width</Text>
-                            <TextInput style={s.input} value={editForm.width} onChangeText={ef('width')} keyboardType="decimal-pad" />
-                          </View>
-                          <View style={s.dimField}>
-                            <Text style={s.lbl}>Height</Text>
-                            <TextInput style={s.input} value={editForm.height} onChangeText={ef('height')} keyboardType="decimal-pad" />
-                          </View>
-                        </View>
-                        <View style={s.dimRow}>
-                          <View style={{ flex: 1 }}>
-                            <Text style={s.lbl}>Weight (lbs)</Text>
-                            <TextInput style={s.input} value={editForm.weight} onChangeText={ef('weight')} keyboardType="decimal-pad" />
-                          </View>
-                          <View style={{ flex: 1, marginLeft: 8 }}>
-                            <Text style={s.lbl}>Quantity</Text>
-                            <TextInput style={s.input} value={editForm.qty} onChangeText={ef('qty')} keyboardType="number-pad" />
-                          </View>
-                        </View>
-                        <TouchableOpacity style={s.saveBtn} onPress={() => saveEdit(item)}>
-                          <Text style={s.saveBtnTxt}>Save Changes</Text>
-                        </TouchableOpacity>
-                      </View>
-                    )}
+            ) : (
+              <>
+                {/* Summary strip */}
+                <View style={s.summaryStrip}>
+                  <View style={s.summaryCell}>
+                    <Text style={s.summaryVal}>{items.length}</Text>
+                    <Text style={s.summaryLbl}>Types</Text>
                   </View>
-                );
-              })}
-            </>
-          )}
+                  <View style={s.summarySep} />
+                  <View style={s.summaryCell}>
+                    <Text style={s.summaryVal}>{totalUnits}</Text>
+                    <Text style={s.summaryLbl}>Units</Text>
+                  </View>
+                  <View style={s.summarySep} />
+                  <View style={s.summaryCell}>
+                    <Text style={s.summaryVal}>{totalWeight.toLocaleString()}</Text>
+                    <Text style={s.summaryLbl}>lbs</Text>
+                  </View>
+                </View>
 
-        </ScrollView>
+                {items.map(item => {
+                  const isExp = expandedId === item._id;
+                  return (
+                    <View key={String(item._id)} style={s.itemCard}>
+                      <View style={s.itemRow}>
+                        <View style={{ flex: 1 }}>
+                          <Text style={s.itemName} numberOfLines={1}>{item.name}</Text>
+                          <Text style={s.itemDims}>
+                            {item.length}×{item.width}×{item.height} ft{'\n'}{item.weight} lbs · qty {item.qty}
+                          </Text>
+                        </View>
+                        <View style={s.itemBtns}>
+                          <TouchableOpacity style={s.iconBtn} onPress={() => isExp ? setExpandedId(null) : startEdit(item)}>
+                            <Text style={s.iconBtnTxt}>{isExp ? '✕' : '✏️'}</Text>
+                          </TouchableOpacity>
+                          <TouchableOpacity style={s.iconBtn} onPress={() => confirmDelete(item)}>
+                            <Text style={s.iconBtnTxt}>🗑</Text>
+                          </TouchableOpacity>
+                        </View>
+                      </View>
 
-        {/* ── Bottom bar: proceed when items exist ── */}
+                      {isExp && (
+                        <View style={s.editBox}>
+                          <TextInput style={s.input} value={editForm.name} onChangeText={ef('name')} placeholderTextColor={C.text3} />
+                          <View style={s.dimRow}>
+                            <View style={s.dimField}>
+                              <Text style={s.lbl}>L</Text>
+                              <TextInput style={s.input} value={editForm.length} onChangeText={ef('length')} keyboardType="decimal-pad" />
+                            </View>
+                            <View style={s.dimField}>
+                              <Text style={s.lbl}>W</Text>
+                              <TextInput style={s.input} value={editForm.width} onChangeText={ef('width')} keyboardType="decimal-pad" />
+                            </View>
+                          </View>
+                          <View style={s.dimRow}>
+                            <View style={s.dimField}>
+                              <Text style={s.lbl}>H</Text>
+                              <TextInput style={s.input} value={editForm.height} onChangeText={ef('height')} keyboardType="decimal-pad" />
+                            </View>
+                            <View style={s.dimField}>
+                              <Text style={s.lbl}>Qty</Text>
+                              <TextInput style={s.input} value={editForm.qty} onChangeText={ef('qty')} keyboardType="number-pad" />
+                            </View>
+                          </View>
+                          <Text style={s.lbl}>Weight (lbs)</Text>
+                          <TextInput style={s.input} value={editForm.weight} onChangeText={ef('weight')} keyboardType="decimal-pad" />
+                          <TouchableOpacity style={s.saveBtn} onPress={() => saveEdit(item)}>
+                            <Text style={s.saveBtnTxt}>Save</Text>
+                          </TouchableOpacity>
+                        </View>
+                      )}
+                    </View>
+                  );
+                })}
+              </>
+            )}
+          </ScrollView>
+        </View>
+
+        {/* ── Bottom bar ── */}
         {items.length > 0 && (
           <View style={s.bottomBar}>
             <TouchableOpacity style={s.proceedBtn} onPress={() => navigation.navigate('ShipOption')}>
-              <Text style={s.proceedTxt}>Next: Choose Shipping ({items.length} item{items.length !== 1 ? 's' : ''}) →</Text>
+              <Text style={s.proceedTxt}>
+                Next: Choose Shipping ({items.length} item{items.length !== 1 ? 's' : ''}) →
+              </Text>
             </TouchableOpacity>
           </View>
         )}
+
       </KeyboardAvoidingView>
     </SafeAreaView>
   );
 }
 
 const s = StyleSheet.create({
-  safe:   { flex: 1, backgroundColor: C.bg },
-  scroll: { padding: 14, paddingBottom: 12 },
+  safe:    { flex: 1, backgroundColor: C.bg },
 
-  // Form card
-  formCard:     { backgroundColor: C.surface, borderRadius: 14, padding: 16, marginBottom: 14, borderWidth: 1, borderColor: C.border },
-  formCardHead: { fontSize: 15, fontWeight: '900', color: C.text, marginBottom: 12 },
+  // Two-column layout
+  columns:     { flex: 1, flexDirection: 'row' },
+  leftCol:     { flex: 1 },
+  leftContent: { padding: 12, paddingBottom: 20 },
+  divider:     { width: 1, backgroundColor: C.border },
+  rightCol:    { flex: 1 },
+  rightContent:{ padding: 10, paddingBottom: 20 },
 
-  catRow:  { flexDirection: 'row', gap: 10 },
-  catBtn:  { flex: 1, alignItems: 'center', gap: 5, paddingVertical: 18, borderRadius: 12, borderWidth: 1.5, borderColor: C.border, backgroundColor: C.surface2 },
-  catIcon:  { fontSize: 26 },
-  catLabel: { fontSize: 13, fontWeight: '800', color: C.text },
-  catSub:   { fontSize: 10, color: C.text2, textAlign: 'center', paddingHorizontal: 2 },
+  colHead: { fontSize: 13, fontWeight: '900', color: C.text, marginBottom: 10, letterSpacing: -0.2 },
 
-  stepHead:      { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10 },
-  stepHeadTitle: { fontSize: 13, fontWeight: '800', color: C.text },
-  backBtn:       { fontSize: 13, color: C.primary, fontWeight: '700' },
+  // Category buttons (stacked vertically in left col)
+  catBtn:   { alignItems: 'center', paddingVertical: 14, borderRadius: 12, borderWidth: 1.5, borderColor: C.border, backgroundColor: C.surface },
+  catIcon:  { fontSize: 24 },
+  catLabel: { fontSize: 12, fontWeight: '800', color: C.text, marginTop: 3 },
+  catSub:   { fontSize: 9, color: C.text2, textAlign: 'center', marginTop: 2 },
 
-  lbl: { fontSize: 10, fontWeight: '700', color: C.text2, textTransform: 'uppercase', letterSpacing: 0.4, marginBottom: 4, marginTop: 10 },
+  stepHead:  { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 6 },
+  stepTitle: { fontSize: 11, fontWeight: '800', color: C.text },
+  backBtn:   { fontSize: 12, color: C.primary, fontWeight: '700' },
+
+  lbl: { fontSize: 9, fontWeight: '700', color: C.text2, textTransform: 'uppercase', letterSpacing: 0.4, marginBottom: 3, marginTop: 8 },
 
   chipScroll: { marginBottom: 2 },
-  chip:       { paddingHorizontal: 12, paddingVertical: 6, marginRight: 7, borderRadius: 20, borderWidth: 1.5, borderColor: C.border, backgroundColor: C.surface },
+  chip:       { paddingHorizontal: 10, paddingVertical: 5, marginRight: 6, borderRadius: 20, borderWidth: 1.5, borderColor: C.border, backgroundColor: C.surface },
   chipActive: { borderColor: C.primary, backgroundColor: '#eff6ff' },
-  chipTxt:    { fontSize: 12, color: C.text2, fontWeight: '600' },
+  chipTxt:    { fontSize: 11, color: C.text2, fontWeight: '600' },
   chipTxtActive: { color: C.primary, fontWeight: '800' },
 
-  input:    { borderWidth: 1.5, borderColor: C.border, borderRadius: 9, paddingHorizontal: 10, paddingVertical: 8, fontSize: 13, color: C.text, backgroundColor: C.surface },
-  dimRow:   { flexDirection: 'row', gap: 8, marginTop: 2 },
+  input:    { borderWidth: 1.5, borderColor: C.border, borderRadius: 8, paddingHorizontal: 8, paddingVertical: 6, fontSize: 12, color: C.text, backgroundColor: C.surface },
+  dimRow:   { flexDirection: 'row', gap: 6, marginTop: 2 },
   dimField: { flex: 1 },
 
-  addBtn:    { marginTop: 14, backgroundColor: C.primary, borderRadius: 10, paddingVertical: 12, alignItems: 'center' },
-  addBtnTxt: { color: '#fff', fontSize: 14, fontWeight: '800' },
+  addBtn:    { marginTop: 12, backgroundColor: C.primary, borderRadius: 10, paddingVertical: 11, alignItems: 'center' },
+  addBtnTxt: { color: '#fff', fontSize: 13, fontWeight: '800' },
 
-  // Summary bar
-  summaryBar:  { flexDirection: 'row', backgroundColor: C.navy, borderRadius: 12, padding: 12, marginBottom: 12 },
-  summaryItem: { flex: 1, alignItems: 'center' },
-  summaryVal:  { fontSize: 17, fontWeight: '900', color: '#f1f5f9' },
-  summaryLbl:  { fontSize: 9, color: '#64748b', marginTop: 1 },
+  // Right panel — summary
+  summaryStrip: { flexDirection: 'row', backgroundColor: C.navy, borderRadius: 10, padding: 10, marginBottom: 10, alignItems: 'center' },
+  summaryCell:  { flex: 1, alignItems: 'center' },
+  summarySep:   { width: 1, height: 24, backgroundColor: '#334155' },
+  summaryVal:   { fontSize: 15, fontWeight: '900', color: '#f1f5f9' },
+  summaryLbl:   { fontSize: 8, color: '#64748b', marginTop: 1 },
 
-  listHead: { fontSize: 13, fontWeight: '800', color: C.text2, marginBottom: 8, textTransform: 'uppercase', letterSpacing: 0.5 },
+  // Right panel — empty state
+  emptyState: { alignItems: 'center', paddingTop: 50 },
+  emptyIcon:  { fontSize: 34, marginBottom: 8 },
+  emptyTxt:   { fontSize: 11, color: C.text3, textAlign: 'center', lineHeight: 17 },
 
-  // Item cards
-  itemCard: { backgroundColor: C.surface, borderRadius: 12, padding: 12, marginBottom: 8, borderWidth: 1, borderColor: C.border },
-  itemRow:  { flexDirection: 'row', alignItems: 'center' },
-  itemName: { fontSize: 13, fontWeight: '800', color: C.text },
-  itemDims: { fontSize: 11, color: C.text2, marginTop: 2 },
+  // Right panel — item cards
+  itemCard: { backgroundColor: C.surface, borderRadius: 10, padding: 9, marginBottom: 7, borderWidth: 1, borderColor: C.border },
+  itemRow:  { flexDirection: 'row', alignItems: 'flex-start' },
+  itemName: { fontSize: 12, fontWeight: '800', color: C.text },
+  itemDims: { fontSize: 10, color: C.text2, marginTop: 2, lineHeight: 15 },
 
-  iconBtn:    { padding: 6, borderRadius: 8, backgroundColor: C.surface2, borderWidth: 1, borderColor: C.border },
-  iconBtnTxt: { fontSize: 13 },
+  itemBtns: { gap: 5, alignItems: 'center' },
+  iconBtn:    { padding: 5, borderRadius: 6, backgroundColor: C.surface2, borderWidth: 1, borderColor: C.border, marginBottom: 2 },
+  iconBtnTxt: { fontSize: 12 },
 
-  editBox:    { marginTop: 10, paddingTop: 10, borderTopWidth: 1, borderTopColor: C.border },
-  saveBtn:    { marginTop: 10, backgroundColor: C.primary, borderRadius: 8, paddingVertical: 9, alignItems: 'center' },
-  saveBtnTxt: { color: '#fff', fontSize: 13, fontWeight: '800' },
+  editBox:    { marginTop: 8, paddingTop: 8, borderTopWidth: 1, borderTopColor: C.border },
+  saveBtn:    { marginTop: 8, backgroundColor: C.primary, borderRadius: 7, paddingVertical: 7, alignItems: 'center' },
+  saveBtnTxt: { color: '#fff', fontSize: 12, fontWeight: '800' },
 
-  // Bottom proceed bar
-  bottomBar:  { padding: 12, paddingHorizontal: 14, backgroundColor: C.surface, borderTopWidth: 1, borderTopColor: C.border },
-  proceedBtn: { backgroundColor: C.primary, borderRadius: 10, paddingVertical: 13, alignItems: 'center' },
-  proceedTxt: { color: '#fff', fontSize: 14, fontWeight: '800' },
+  // Bottom bar
+  bottomBar:  { padding: 10, paddingHorizontal: 12, backgroundColor: C.surface, borderTopWidth: 1, borderTopColor: C.border },
+  proceedBtn: { backgroundColor: C.primary, borderRadius: 10, paddingVertical: 12, alignItems: 'center' },
+  proceedTxt: { color: '#fff', fontSize: 13, fontWeight: '800' },
 });
