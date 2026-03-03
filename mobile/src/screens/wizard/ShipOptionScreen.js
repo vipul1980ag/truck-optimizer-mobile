@@ -1,5 +1,5 @@
 import React from 'react';
-import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, ScrollView } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useWizard } from '../../WizardContext';
 import { C } from '../../theme';
@@ -28,13 +28,24 @@ const OPTIONS = [
 ];
 
 export default function ShipOptionScreen({ navigation }) {
-  const { shippingOption, setShippingOption } = useWizard();
+  const { shippingOption, setShippingOption, items } = useWizard();
+  const hasDG   = items.some(i => i.isDG);
+  const dgItems = items.filter(i => i.isDG);
 
   return (
     <SafeAreaView style={s.safe} edges={['bottom']}>
-      <View style={s.container}>
+      <ScrollView contentContainerStyle={s.container}>
         <Text style={s.heading}>How would you like to ship?</Text>
         <Text style={s.sub}>Choose the option that best fits your needs</Text>
+
+        {hasDG && (
+          <View style={s.dgNotice}>
+            <Text style={s.dgNoticeTitle}>⚠ Dangerous Goods in your shipment</Text>
+            <Text style={s.dgNoticeTxt}>
+              {dgItems.length} item{dgItems.length !== 1 ? 's are' : ' is'} declared as DG. A DG-certified truck will be assigned. A 15% DG surcharge applies to the estimated charges.
+            </Text>
+          </View>
+        )}
 
         {OPTIONS.map(opt => {
           const selected = shippingOption === opt.key;
@@ -72,17 +83,21 @@ export default function ShipOptionScreen({ navigation }) {
         >
           <Text style={s.nextBtnTxt}>See Estimated Charges →</Text>
         </TouchableOpacity>
-      </View>
+      </ScrollView>
     </SafeAreaView>
   );
 }
 
 const s = StyleSheet.create({
   safe:      { flex: 1, backgroundColor: C.bg },
-  container: { flex: 1, padding: 20 },
+  container: { flexGrow: 1, padding: 20 },
 
   heading: { fontSize: 20, fontWeight: '900', color: C.text, marginBottom: 4 },
-  sub:     { fontSize: 13, color: C.text2, marginBottom: 24 },
+  sub:     { fontSize: 13, color: C.text2, marginBottom: 16 },
+
+  dgNotice:      { backgroundColor: '#fff7ed', borderRadius: 12, padding: 14, marginBottom: 16, borderWidth: 1.5, borderColor: '#fed7aa' },
+  dgNoticeTitle: { fontSize: 14, fontWeight: '900', color: '#c2410c', marginBottom: 4 },
+  dgNoticeTxt:   { fontSize: 12, color: '#9a3412', lineHeight: 18 },
 
   card: {
     backgroundColor: C.surface, borderRadius: 16,
