@@ -248,6 +248,11 @@ function portalEnterCustomItem() {
   document.getElementById('p-name').focus();
 }
 
+function portalToggleDG() {
+  const checked = document.getElementById('p-is-dg').checked;
+  document.getElementById('p-dg-fields').style.display = checked ? '' : 'none';
+}
+
 function portalResetCategory() {
   _portalCategory = null;
   document.getElementById('p-step1').style.display = 'block';
@@ -260,6 +265,10 @@ function portalResetCategory() {
   document.getElementById('p-weight').value      = '500';
   document.getElementById('p-pkg-weight').value  = '0';
   document.getElementById('p-qty').value         = '1';
+  document.getElementById('p-is-dg').checked     = false;
+  document.getElementById('p-dg-fields').style.display = 'none';
+  document.getElementById('p-dg-class').value    = '';
+  document.getElementById('p-dg-combine').value  = 'true';
 }
 
 // ── Auth State ────────────────────────────────────────────────────────────────
@@ -422,8 +431,13 @@ function portalAddItem() {
   const packagingWeight = parseFloat(document.getElementById('p-pkg-weight').value) || 0;
   const qty    = parseInt(document.getElementById('p-qty').value, 10)  || 1;
 
+  const isDG         = document.getElementById('p-is-dg').checked;
+  const dgClass      = isDG ? (document.getElementById('p-dg-class').value || '') : '';
+  const dgCanCombine = isDG ? (document.getElementById('p-dg-combine').value !== 'false') : true;
+
   if (!name) { alert('Please enter an item name.'); return; }
   if (length <= 0 || width <= 0 || height <= 0) { alert('Dimensions must be positive.'); return; }
+  if (isDG && !dgClass) { alert('Please select a DG Class for dangerous goods.'); return; }
 
   items.push({
     id:             nextIds.item++,
@@ -436,6 +450,9 @@ function portalAddItem() {
     qty,
     rotate:         true,
     customerId:     null,
+    isDG,
+    dgClass,
+    dgCanCombine,
   });
 
   // If item name not in built-in catalog, save it to server catalog for future users
@@ -527,8 +544,11 @@ function renderItemList() {
     items.map(it => `
       <div class="item-row">
         <div class="item-row-info">
-          <div class="item-row-name">${esc(it.name)} <span style="font-weight:400;color:var(--text2);">×${it.qty}</span></div>
-          <div class="item-row-meta">${it.length}×${it.width}×${it.height} ft &nbsp;·&nbsp; ${it.weight.toLocaleString()} lbs${it.packagingWeight ? ` + ${it.packagingWeight.toLocaleString()} pkg` : ''}</div>
+          <div class="item-row-name">
+            ${esc(it.name)} <span style="font-weight:400;color:var(--text2);">×${it.qty}</span>
+            ${it.isDG ? `<span class="dg-badge">⚠ DG</span>` : ''}
+          </div>
+          <div class="item-row-meta">${it.length}×${it.width}×${it.height} ft &nbsp;·&nbsp; ${it.weight.toLocaleString()} lbs${it.packagingWeight ? ` + ${it.packagingWeight.toLocaleString()} pkg` : ''}${it.isDG && it.dgClass ? ` &nbsp;·&nbsp; ${esc(it.dgClass)}` : ''}</div>
         </div>
         <button class="btn-remove" onclick="portalRemoveItem(${it.id})">✕</button>
       </div>`).join('') +
@@ -588,20 +608,39 @@ async function showChargesStep() {
       return;
     }
 
-    const truckVol = truck.length * truck.width * truck.height;
-    const fullCost = truck.baseRate + truck.ratePerMi * 100;
-    const pct      = Math.min(totalVol / truckVol, 1);
-    const estimate = _wizardShipping === 'shared'
+    const hasDG    = items.some(i => i.isDG);
+    const dgItems  = items.filter(i => i.isDG);
+
+    const truckVol   = truck.length * truck.width * truck.height;
+    const fullCost   = truck.baseRate + truck.ratePerMi * 100;
+    const pct        = Math.min(totalVol / truckVol, 1);
+    const baseCost   = _wizardShipping === 'shared'
       ? Math.max(fullCost * pct, fullCost * 0.25)
       : fullCost;
+    const dgSurcharge = hasDG ? baseCost * 0.15 : 0;
+    const estimate    = baseCost + dgSurcharge;
 
-    _bookingEstimate = { estimate, totalUnits, totalWeight };
+    _bookingEstimate = { estimate, totalUnits, totalWeight, hasDG };
 
     const sharedRow = _wizardShipping === 'shared'
       ? `<div class="charges-row"><span>Your share (${(pct * 100).toFixed(0)}%)</span><span>×${pct.toFixed(2)}</span></div>`
       : '';
+    const dgRow = hasDG
+      ? `<div class="charges-row-dg"><span>⚠ DG surcharge (15%)</span><span>+$${Math.round(dgSurcharge).toLocaleString()}</span></div>`
+      : '';
+    const dgWarning = hasDG
+      ? `<div class="dg-warning-banner">
+           <div class="dg-warning-banner-icon">⚠</div>
+           <div class="dg-warning-banner-text">
+             <div class="dg-warning-banner-title">Dangerous Goods Detected</div>
+             Your shipment contains ${dgItems.length} DG item${dgItems.length !== 1 ? 's' : ''}: ${dgItems.map(i => esc(i.dgClass || 'DG')).join(', ')}.
+             A DG-certified truck will be required. A 15% surcharge has been applied.
+           </div>
+         </div>`
+      : '';
 
     el.innerHTML = `
+      ${dgWarning}
       <div class="charges-card">
         <div class="charges-section-lbl">📦 Cargo Summary</div>
         <div class="charges-row"><span>Total items</span><span>${items.length} type${items.length !== 1 ? 's' : ''} · ${totalUnits} unit${totalUnits !== 1 ? 's' : ''}</span></div>
@@ -614,6 +653,7 @@ async function showChargesStep() {
         <div class="charges-row"><span>Base rate</span><span>$${truck.baseRate.toLocaleString()}</span></div>
         <div class="charges-row"><span>Per-mile (100 mi)</span><span>$${(truck.ratePerMi * 100).toLocaleString()}</span></div>
         ${sharedRow}
+        ${dgRow}
         <div class="charges-row charges-total">
           <span>Estimated Total</span>
           <span style="color:var(--primary);font-size:22px;letter-spacing:-0.4px;">$${Math.round(estimate).toLocaleString()}</span>
@@ -644,7 +684,7 @@ async function confirmWebBooking() {
       body: JSON.stringify({ ...fresh, items: updatedItems }),
     });
 
-    const { estimate, totalUnits, totalWeight } = _bookingEstimate || {};
+    const { estimate, totalUnits, totalWeight, hasDG } = _bookingEstimate || {};
     const sumEl = document.getElementById('bm-confirm-summary');
     sumEl.innerHTML = `
       <div class="bm-confirm-grid">
@@ -652,6 +692,7 @@ async function confirmWebBooking() {
         <div class="bcg-row"><span>Total weight</span><span>${(totalWeight || 0).toLocaleString()} lbs</span></div>
         <div class="bcg-row"><span>Shipping type</span><span>${_wizardShipping === 'shared' ? '🤝 Share Truck (LTL)' : '🚚 Private Truck (FTL)'}</span></div>
         ${estimate != null ? `<div class="bcg-row"><span>Estimated cost</span><span style="color:var(--primary);font-weight:900;font-size:16px;">$${Math.round(estimate).toLocaleString()}</span></div>` : ''}
+        ${hasDG ? `<div class="bcg-row"><span>DG note</span><span style="color:#c2410c;">⚠ DG-certified truck required</span></div>` : ''}
       </div>`;
 
     showBookingStep('confirm');

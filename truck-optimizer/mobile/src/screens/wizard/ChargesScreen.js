@@ -24,18 +24,20 @@ export default function ChargesScreen({ navigation }) {
   const totalItems  = items.reduce((s, i) => s + i.qty, 0);
   const totalWeight = items.reduce((s, i) => s + (i.weight + (i.packagingWeight || 0)) * i.qty, 0);
   const totalVol    = items.reduce((s, i) => s + i.length * i.width * i.height * i.qty, 0);
+  const hasDG       = items.some(i => i.isDG);
+  const dgItems     = items.filter(i => i.isDG);
 
   // Cost estimate
-  let truckVol = 0, fullCost = 0, estimate = 0, pct = 0;
+  let truckVol = 0, fullCost = 0, baseCost = 0, dgSurcharge = 0, estimate = 0, pct = 0;
   if (truck) {
     truckVol  = truck.length * truck.width * truck.height;
     fullCost  = truck.baseRate + truck.ratePerMi * 100;
     pct       = Math.min(totalVol / truckVol, 1);
-    if (shippingOption === 'shared') {
-      estimate = Math.max(fullCost * pct, fullCost * 0.25);
-    } else {
-      estimate = fullCost;
-    }
+    baseCost  = shippingOption === 'shared'
+      ? Math.max(fullCost * pct, fullCost * 0.25)
+      : fullCost;
+    dgSurcharge = hasDG ? baseCost * 0.15 : 0;
+    estimate    = baseCost + dgSurcharge;
   }
 
   async function confirmBooking() {
@@ -55,6 +57,9 @@ export default function ChargesScreen({ navigation }) {
         rotate:         true,
         customerId:     null,
         shippingOption,
+        isDG:           i.isDG || false,
+        dgClass:        i.dgClass || '',
+        dgCanCombine:   i.dgCanCombine !== false,
       }));
       await api.saveData({
         ...fresh,
@@ -107,6 +112,17 @@ export default function ChargesScreen({ navigation }) {
           )}
         </View>
 
+        {/* DG warning */}
+        {hasDG && (
+          <View style={s.dgWarning}>
+            <Text style={s.dgWarningTitle}>⚠ Dangerous Goods Detected</Text>
+            <Text style={s.dgWarningTxt}>
+              Your shipment contains {dgItems.length} DG item{dgItems.length !== 1 ? 's' : ''}.
+              A DG-certified truck will be required. A 15% surcharge has been applied.
+            </Text>
+          </View>
+        )}
+
         {/* Charges breakdown */}
         {truck ? (
           <View style={s.card}>
@@ -124,6 +140,12 @@ export default function ChargesScreen({ navigation }) {
               <View style={s.row}>
                 <Text style={s.rowLbl}>Your share ({(pct * 100).toFixed(0)}%)</Text>
                 <Text style={s.rowVal}>×{pct.toFixed(2)}</Text>
+              </View>
+            )}
+            {hasDG && (
+              <View style={s.row}>
+                <Text style={[s.rowLbl, { color: '#c2410c', fontWeight: '700' }]}>⚠ DG surcharge (15%)</Text>
+                <Text style={[s.rowVal, { color: '#c2410c' }]}>+${Math.round(dgSurcharge).toLocaleString()}</Text>
               </View>
             )}
             <View style={[s.row, s.totalRow]}>
@@ -174,4 +196,8 @@ const s = StyleSheet.create({
   footer:     { padding: 12, paddingHorizontal: 16, backgroundColor: C.surface, borderTopWidth: 1, borderTopColor: C.border },
   confirmBtn: { backgroundColor: C.success, borderRadius: 12, paddingVertical: 15, alignItems: 'center' },
   confirmTxt: { color: '#fff', fontSize: 16, fontWeight: '900' },
+
+  dgWarning:     { backgroundColor: '#fff7ed', borderRadius: 12, padding: 14, marginBottom: 14, borderWidth: 1.5, borderColor: '#fed7aa' },
+  dgWarningTitle:{ fontSize: 14, fontWeight: '900', color: '#c2410c', marginBottom: 4 },
+  dgWarningTxt:  { fontSize: 12, color: '#9a3412', lineHeight: 18 },
 });

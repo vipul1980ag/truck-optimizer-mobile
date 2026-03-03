@@ -834,3 +834,70 @@ body {
 .auth-switch { font-size: 12px; color: var(--text2); text-align: center; margin-top: 10px; }
 .auth-switch a { color: var(--primary); text-decoration: none; font-weight: 600; }
 .auth-switch a:hover { text-decoration: underline; }
+
+/* ── Dangerous Goods (DG) section ───────────────────────────────────────── */
+.dg-section {
+  margin-top: 12px;
+  border-top: 1px solid var(--border);
+  padding-top: 10px;
+}
+
+.dg-toggle-label {
+  display: flex; align-items: center; gap: 8px;
+  cursor: pointer; user-select: none;
+  padding: 8px 10px; border-radius: 8px;
+  border: 1.5px solid var(--border);
+  background: var(--surface2);
+  transition: border-color 0.15s, background 0.15s;
+}
+.dg-toggle-label:hover { border-color: #f97316; background: #fff7ed; }
+.dg-toggle-label input[type="checkbox"] { accent-color: #ea580c; width: 15px; height: 15px; cursor: pointer; }
+
+.dg-toggle-icon { font-size: 16px; }
+.dg-toggle-text { font-size: 13px; font-weight: 700; color: var(--text); }
+
+.dg-fields {
+  margin-top: 10px;
+  padding: 12px 14px;
+  background: #fff7ed;
+  border: 1.5px solid #fed7aa;
+  border-radius: 10px;
+}
+
+.dg-truck-note {
+  margin-top: 10px;
+  font-size: 11px; font-weight: 700; color: #c2410c;
+  background: #ffedd5; border: 1px solid #fdba74;
+  border-radius: 7px; padding: 7px 10px; line-height: 1.5;
+}
+
+/* DG badge shown on cargo list items */
+.dg-badge {
+  display: inline-block;
+  font-size: 9px; font-weight: 800;
+  color: #9a3412; background: #ffedd5;
+  border: 1px solid #fed7aa;
+  border-radius: 4px; padding: 1px 6px;
+  margin-left: 6px; vertical-align: middle;
+  text-transform: uppercase; letter-spacing: 0.4px;
+}
+
+/* DG surcharge row highlight */
+.charges-row-dg {
+  display: flex; justify-content: space-between; align-items: center;
+  padding: 5px 0; font-size: 13px;
+  color: #c2410c;
+  border-bottom: 1px solid var(--border);
+  font-weight: 700;
+}
+
+/* DG warning banner in booking modal */
+.dg-warning-banner {
+  display: flex; align-items: flex-start; gap: 10px;
+  padding: 10px 14px; margin-bottom: 14px;
+  background: #fff7ed; border: 1.5px solid #fed7aa;
+  border-radius: 10px;
+}
+.dg-warning-banner-icon { font-size: 18px; line-height: 1; flex-shrink: 0; margin-top: 1px; }
+.dg-warning-banner-text { font-size: 12px; color: #9a3412; line-height: 1.6; }
+.dg-warning-banner-title { font-weight: 800; }

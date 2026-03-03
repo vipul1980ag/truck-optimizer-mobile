@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import {
   View, Text, StyleSheet, ScrollView, TextInput,
-  TouchableOpacity, Alert, KeyboardAvoidingView, Platform,
+  TouchableOpacity, Alert, KeyboardAvoidingView, Platform, Switch,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useWizard } from '../../WizardContext';
@@ -140,7 +140,25 @@ const MOBILE_INDUSTRIAL = [
   ]},
 ];
 
-const BLANK = { name: '', length: '4', width: '4', height: '4', weight: '500', packagingWeight: '0', qty: '1' };
+const DG_CLASSES = [
+  'Class 1 — Explosives',
+  'Class 2.1 — Flammable Gas',
+  'Class 2.2 — Non-Flammable Gas',
+  'Class 2.3 — Toxic Gas',
+  'Class 3 — Flammable Liquid',
+  'Class 4.1 — Flammable Solid',
+  'Class 4.2 — Spontaneously Combustible',
+  'Class 4.3 — Dangerous When Wet',
+  'Class 5.1 — Oxidizer',
+  'Class 5.2 — Organic Peroxide',
+  'Class 6.1 — Toxic Substance',
+  'Class 6.2 — Infectious Substance',
+  'Class 7 — Radioactive',
+  'Class 8 — Corrosive',
+  'Class 9 — Miscellaneous DG',
+];
+
+const BLANK = { name: '', length: '4', width: '4', height: '4', weight: '500', packagingWeight: '0', qty: '1', isDG: false, dgClass: '', dgCanCombine: true };
 
 export default function AddCargoScreen({ navigation }) {
   const { items, addItem, updateItem, removeItem } = useWizard();
@@ -194,6 +212,10 @@ export default function AddCargoScreen({ navigation }) {
       Alert.alert('Required', 'Please enter an item name.');
       return;
     }
+    if (form.isDG && !form.dgClass) {
+      Alert.alert('Required', 'Please select a DG Class for dangerous goods.');
+      return;
+    }
     const name   = form.name.trim();
     const length = parseFloat(form.length)          || 4;
     const width  = parseFloat(form.width)           || 4;
@@ -208,6 +230,9 @@ export default function AddCargoScreen({ navigation }) {
       weight,
       packagingWeight: parseFloat(form.packagingWeight) || 0,
       qty:             parseInt(form.qty)               || 1,
+      isDG:            form.isDG,
+      dgClass:         form.isDG ? form.dgClass : '',
+      dgCanCombine:    form.isDG ? form.dgCanCombine : true,
     });
 
     // Save to server catalog if it's a custom (not built-in) item
@@ -385,6 +410,58 @@ export default function AddCargoScreen({ navigation }) {
                   </View>
                 </View>
 
+                {/* DG toggle */}
+                <View style={s.dgSection}>
+                  <View style={s.dgToggleRow}>
+                    <Text style={s.dgToggleIcon}>⚠</Text>
+                    <Text style={s.dgToggleTxt}>Dangerous Goods (DG)</Text>
+                    <Switch
+                      value={form.isDG}
+                      onValueChange={v => setForm(p => ({ ...p, isDG: v, dgClass: '', dgCanCombine: true }))}
+                      trackColor={{ false: '#cbd5e1', true: '#fed7aa' }}
+                      thumbColor={form.isDG ? '#ea580c' : '#94a3b8'}
+                      style={{ marginLeft: 'auto' }}
+                    />
+                  </View>
+
+                  {form.isDG && (
+                    <View style={s.dgFields}>
+                      <Text style={s.lbl}>DG Class</Text>
+                      <ScrollView horizontal showsHorizontalScrollIndicator={false} style={s.chipScroll}>
+                        {DG_CLASSES.map(cls => (
+                          <TouchableOpacity
+                            key={cls}
+                            style={[s.dgChip, form.dgClass === cls && s.dgChipActive]}
+                            onPress={() => setForm(p => ({ ...p, dgClass: cls }))}
+                          >
+                            <Text style={[s.dgChipTxt, form.dgClass === cls && s.dgChipTxtActive]}>{cls}</Text>
+                          </TouchableOpacity>
+                        ))}
+                      </ScrollView>
+
+                      <Text style={s.lbl}>Can combine with other items?</Text>
+                      <View style={s.dgCombineRow}>
+                        <TouchableOpacity
+                          style={[s.dgCombineBtn, form.dgCanCombine && s.dgCombineBtnActive]}
+                          onPress={() => setForm(p => ({ ...p, dgCanCombine: true }))}
+                        >
+                          <Text style={[s.dgCombineTxt, form.dgCanCombine && s.dgCombineTxtActive]}>✓ Yes — can combine</Text>
+                        </TouchableOpacity>
+                        <TouchableOpacity
+                          style={[s.dgCombineBtn, !form.dgCanCombine && s.dgCombineBtnActive]}
+                          onPress={() => setForm(p => ({ ...p, dgCanCombine: false }))}
+                        >
+                          <Text style={[s.dgCombineTxt, !form.dgCanCombine && s.dgCombineTxtActive]}>✕ No — must be isolated</Text>
+                        </TouchableOpacity>
+                      </View>
+
+                      <View style={s.dgNote}>
+                        <Text style={s.dgNoteTxt}>🚛 A DG-certified truck will be required. A 15% DG surcharge applies.</Text>
+                      </View>
+                    </View>
+                  )}
+                </View>
+
                 <TouchableOpacity style={s.addBtn} onPress={handleAdd}>
                   <Text style={s.addBtnTxt}>＋ Add to List</Text>
                 </TouchableOpacity>
@@ -428,12 +505,16 @@ export default function AddCargoScreen({ navigation }) {
                 {items.map(item => {
                   const isExp = expandedId === item._id;
                   return (
-                    <View key={String(item._id)} style={s.itemCard}>
+                    <View key={String(item._id)} style={[s.itemCard, item.isDG && s.itemCardDG]}>
                       <View style={s.itemRow}>
                         <View style={{ flex: 1 }}>
-                          <Text style={s.itemName} numberOfLines={1}>{item.name}</Text>
+                          <View style={{ flexDirection: 'row', alignItems: 'center', flexWrap: 'wrap', gap: 4 }}>
+                            <Text style={s.itemName} numberOfLines={1}>{item.name}</Text>
+                            {item.isDG && <View style={s.dgItemBadge}><Text style={s.dgItemBadgeTxt}>⚠ DG</Text></View>}
+                          </View>
                           <Text style={s.itemDims}>
                             {item.length}×{item.width}×{item.height} ft{'\n'}{item.weight} lbs · qty {item.qty}
+                            {item.isDG && item.dgClass ? `\n${item.dgClass}` : ''}
                           </Text>
                         </View>
                         <View style={s.itemBtns}>
@@ -563,6 +644,29 @@ const s = StyleSheet.create({
   editBox:    { marginTop: 8, paddingTop: 8, borderTopWidth: 1, borderTopColor: C.border },
   saveBtn:    { marginTop: 8, backgroundColor: C.primary, borderRadius: 7, paddingVertical: 7, alignItems: 'center' },
   saveBtnTxt: { color: '#fff', fontSize: 12, fontWeight: '800' },
+
+  // DG section
+  dgSection:       { marginTop: 10, borderTopWidth: 1, borderTopColor: C.border, paddingTop: 10 },
+  dgToggleRow:     { flexDirection: 'row', alignItems: 'center', gap: 6, paddingVertical: 8, paddingHorizontal: 10, borderRadius: 8, borderWidth: 1.5, borderColor: C.border, backgroundColor: C.surface },
+  dgToggleIcon:    { fontSize: 14 },
+  dgToggleTxt:     { fontSize: 12, fontWeight: '700', color: C.text, flex: 1 },
+  dgFields:        { marginTop: 8, padding: 10, backgroundColor: '#fff7ed', borderRadius: 10, borderWidth: 1.5, borderColor: '#fed7aa' },
+  dgChip:          { paddingHorizontal: 8, paddingVertical: 4, marginRight: 5, borderRadius: 14, borderWidth: 1.5, borderColor: '#fed7aa', backgroundColor: '#fff7ed' },
+  dgChipActive:    { borderColor: '#ea580c', backgroundColor: '#ffedd5' },
+  dgChipTxt:       { fontSize: 10, color: '#9a3412', fontWeight: '600' },
+  dgChipTxtActive: { color: '#c2410c', fontWeight: '800' },
+  dgCombineRow:    { flexDirection: 'row', gap: 6, marginTop: 4 },
+  dgCombineBtn:    { flex: 1, paddingVertical: 6, paddingHorizontal: 8, borderRadius: 8, borderWidth: 1.5, borderColor: '#fed7aa', backgroundColor: '#fff7ed', alignItems: 'center' },
+  dgCombineBtnActive: { borderColor: '#ea580c', backgroundColor: '#ffedd5' },
+  dgCombineTxt:    { fontSize: 10, color: '#9a3412', fontWeight: '600', textAlign: 'center' },
+  dgCombineTxtActive: { color: '#c2410c', fontWeight: '800' },
+  dgNote:          { marginTop: 8, padding: 7, backgroundColor: '#ffedd5', borderRadius: 6, borderWidth: 1, borderColor: '#fdba74' },
+  dgNoteTxt:       { fontSize: 10, color: '#c2410c', fontWeight: '700', lineHeight: 15 },
+
+  // Item card DG variant
+  itemCardDG:    { borderColor: '#fed7aa', backgroundColor: '#fffbeb' },
+  dgItemBadge:   { backgroundColor: '#ffedd5', borderRadius: 4, paddingHorizontal: 5, paddingVertical: 1, borderWidth: 1, borderColor: '#fed7aa' },
+  dgItemBadgeTxt:{ fontSize: 8, fontWeight: '800', color: '#9a3412' },
 
   // Bottom bar
   bottomBar:  { padding: 10, paddingHorizontal: 12, backgroundColor: C.surface, borderTopWidth: 1, borderTopColor: C.border },
