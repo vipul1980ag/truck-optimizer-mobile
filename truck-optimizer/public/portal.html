@@ -89,6 +89,57 @@
             <button class="btn-add" onclick="portalAddItem()">＋ Add</button>
           </div>
         </div>
+
+        <!-- Stacking option -->
+        <div class="field stackable-row">
+          <label class="stackable-label">
+            <input type="checkbox" id="p-stackable" checked>
+            <span class="stackable-icon">📦</span>
+            <span class="stackable-text">Stackable — other items can be placed on top</span>
+          </label>
+        </div>
+
+        <!-- DG Declaration -->
+        <div class="dg-section">
+          <label class="dg-toggle-label">
+            <input type="checkbox" id="p-is-dg" onchange="portalToggleDG()">
+            <span class="dg-toggle-icon">⚠</span>
+            <span class="dg-toggle-text">Dangerous Goods (DG)</span>
+          </label>
+          <div id="p-dg-fields" style="display:none">
+            <div class="field-row" style="margin-top:10px">
+              <div class="field">
+                <label>DG Class</label>
+                <select id="p-dg-class">
+                  <option value="">— Select DG Class —</option>
+                  <option>Class 1 — Explosives</option>
+                  <option>Class 2.1 — Flammable Gas</option>
+                  <option>Class 2.2 — Non-Flammable Gas</option>
+                  <option>Class 2.3 — Toxic Gas</option>
+                  <option>Class 3 — Flammable Liquid</option>
+                  <option>Class 4.1 — Flammable Solid</option>
+                  <option>Class 4.2 — Spontaneously Combustible</option>
+                  <option>Class 4.3 — Dangerous When Wet</option>
+                  <option>Class 5.1 — Oxidizer</option>
+                  <option>Class 5.2 — Organic Peroxide</option>
+                  <option>Class 6.1 — Toxic Substance</option>
+                  <option>Class 6.2 — Infectious Substance</option>
+                  <option>Class 7 — Radioactive</option>
+                  <option>Class 8 — Corrosive</option>
+                  <option>Class 9 — Miscellaneous DG</option>
+                </select>
+              </div>
+              <div class="field">
+                <label>Can combine with other items?</label>
+                <select id="p-dg-combine">
+                  <option value="true">Yes — can combine</option>
+                  <option value="false">No — must be isolated</option>
+                </select>
+              </div>
+            </div>
+            <div class="dg-truck-note">🚛 A DG-certified truck will be required for this shipment. A 15% DG surcharge applies.</div>
+          </div>
+        </div>
       </div>
     </div>
     <div class="save-status" id="p-save-status" style="text-align:center;margin-top:8px;"></div>

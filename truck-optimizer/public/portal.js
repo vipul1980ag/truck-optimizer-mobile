@@ -265,10 +265,11 @@ function portalResetCategory() {
   document.getElementById('p-weight').value      = '500';
   document.getElementById('p-pkg-weight').value  = '0';
   document.getElementById('p-qty').value         = '1';
-  document.getElementById('p-is-dg').checked     = false;
+  document.getElementById('p-stackable').checked  = true;
+  document.getElementById('p-is-dg').checked      = false;
   document.getElementById('p-dg-fields').style.display = 'none';
-  document.getElementById('p-dg-class').value    = '';
-  document.getElementById('p-dg-combine').value  = 'true';
+  document.getElementById('p-dg-class').value     = '';
+  document.getElementById('p-dg-combine').value   = 'true';
 }
 
 // ── Auth State ────────────────────────────────────────────────────────────────
@@ -431,6 +432,7 @@ function portalAddItem() {
   const packagingWeight = parseFloat(document.getElementById('p-pkg-weight').value) || 0;
   const qty    = parseInt(document.getElementById('p-qty').value, 10)  || 1;
 
+  const stackable    = document.getElementById('p-stackable').checked;
   const isDG         = document.getElementById('p-is-dg').checked;
   const dgClass      = isDG ? (document.getElementById('p-dg-class').value || '') : '';
   const dgCanCombine = isDG ? (document.getElementById('p-dg-combine').value !== 'false') : true;
@@ -449,6 +451,7 @@ function portalAddItem() {
     packagingWeight,
     qty,
     rotate:         true,
+    stackable,
     customerId:     null,
     isDG,
     dgClass,
@@ -548,7 +551,7 @@ function renderItemList() {
             ${esc(it.name)} <span style="font-weight:400;color:var(--text2);">×${it.qty}</span>
             ${it.isDG ? `<span class="dg-badge">⚠ DG</span>` : ''}
           </div>
-          <div class="item-row-meta">${it.length}×${it.width}×${it.height} ft &nbsp;·&nbsp; ${it.weight.toLocaleString()} lbs${it.packagingWeight ? ` + ${it.packagingWeight.toLocaleString()} pkg` : ''}${it.isDG && it.dgClass ? ` &nbsp;·&nbsp; ${esc(it.dgClass)}` : ''}</div>
+          <div class="item-row-meta">${it.length}×${it.width}×${it.height} ft &nbsp;·&nbsp; ${it.weight.toLocaleString()} lbs${it.packagingWeight ? ` + ${it.packagingWeight.toLocaleString()} pkg` : ''}${it.isDG && it.dgClass ? ` &nbsp;·&nbsp; ${esc(it.dgClass)}` : ''}${it.stackable === false ? ' &nbsp;·&nbsp; <span style="color:#c2410c;font-weight:700;">🚫 No Stack</span>' : ''}</div>
         </div>
         <button class="btn-remove" onclick="portalRemoveItem(${it.id})">✕</button>
       </div>`).join('') +

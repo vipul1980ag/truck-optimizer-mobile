@@ -239,11 +239,11 @@ app.post('/api/catalog', (req, res) => {
 
 app.post('/api/optimize', (req, res) => {
   try {
-    const { trucks, carriers, customers, items } = req.body;
+    const { trucks, carriers, customers, items, config } = req.body;
     if (!trucks?.length)  return res.status(400).json({ error: 'Please add at least one own-fleet truck.' });
     if (!items?.length)   return res.status(400).json({ error: 'Please add at least one item.' });
 
-    const { packers, unplaced, splitWarn } = optimize({ trucks, items, customers: customers || [] });
+    const { packers, unplaced, splitWarn } = optimize({ trucks, items, customers: customers || [], config: config || {} });
     const analysis = analyzeRoutes({ customers: customers || [], items, trucks, carriers: carriers || [] });
 
     // Strip non-serialisable Float32Array hmap before sending

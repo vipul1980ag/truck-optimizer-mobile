@@ -2,12 +2,19 @@
 
 const { TruckPacker } = require('./packer');
 
-function optimize({ trucks, items, customers }) {
+function optimize({ trucks, items, customers, config = {} }) {
   const allItems = [];
   for (const item of items) for (let i = 0; i < item.qty; i++) allItems.push({ ...item });
-  allItems.sort((a, b) => (b.length * b.width * b.height) - (a.length * a.width * a.height));
 
-  const packers   = trucks.map(t => new TruckPacker(t));
+  // Sort order: volume desc (default), weight desc, or keep insertion order
+  const sortOrder = config.sortOrder || 'volume_desc';
+  if (sortOrder === 'weight_desc') {
+    allItems.sort((a, b) => (b.weight || 0) - (a.weight || 0));
+  } else {
+    allItems.sort((a, b) => (b.length * b.width * b.height) - (a.length * a.width * a.height));
+  }
+
+  const packers = trucks.map(t => new TruckPacker(t, config));
   const unplaced  = [];
   const splitWarn = [];
 

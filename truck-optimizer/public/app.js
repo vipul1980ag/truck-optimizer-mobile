@@ -128,9 +128,10 @@ async function addItem() {
   const weight     = num('i-weight') || 0;
   const qty        = parseInt(document.getElementById('i-qty').value) || 1;
   const rotate     = document.getElementById('i-rotate').checked;
+  const stackable  = document.getElementById('i-stackable').checked;
   const custId     = document.getElementById('i-customer').value;
   const customerId = custId ? parseInt(custId) : null;
-  items.push({ id: nextItemId++, name, length, width, height, weight, qty, rotate, customerId });
+  items.push({ id: nextItemId++, name, length, width, height, weight, qty, rotate, stackable, customerId });
   document.getElementById('i-name').value = '';
   renderSidebar(); await saveToServer();
 }
@@ -258,7 +259,7 @@ function renderSidebar() {
               <div>
                 <div class="entity-name">${esc(i.name)} ${custBadge}</div>
                 <div class="entity-dims">${i.length}×${i.width}×${i.height} ${dimUnit()} · ${fmt(i.weight)} ${wtUnit()} · Qty ${i.qty}</div>
-                <div class="entity-dims">${i.rotate ? '↻ rotatable' : '⚠ fixed orient.'}</div>
+                <div class="entity-dims">${i.rotate ? '↻ rotatable' : '⚠ fixed orient.'} · ${i.stackable !== false ? '📦 stackable' : '🚫 no stack'}</div>
               </div>
             </div>
             <button class="btn btn-danger" onclick="removeItem(${i.id})">✕</button>
@@ -372,6 +373,23 @@ function renderRouteAnalysis(zoneGroups, consolidations) {
 // ═══════════════════════════════════════════════════
 //  OPTIMIZE (calls backend)
 // ═══════════════════════════════════════════════════
+function toggleLoadConfig() {
+  const panel = document.getElementById('load-config-panel');
+  const btn   = document.querySelector('.load-config-toggle');
+  const open  = panel.style.display === 'none';
+  panel.style.display = open ? '' : 'none';
+  btn.textContent = open ? '⚙ Load Configuration ▴' : '⚙ Load Configuration ▾';
+}
+
+function getLoadConfig() {
+  return {
+    stackAxis:  (document.getElementById('lc-stack-axis')  || {}).value || 'height_first',
+    loadFrom:   (document.getElementById('lc-load-from')   || {}).value || 'back',
+    sortOrder:  (document.getElementById('lc-sort-order')  || {}).value || 'volume_desc',
+    centerMass: (document.getElementById('lc-center-mass') || {}).checked || false,
+  };
+}
+
 async function runOptimize() {
   if (trucks.length === 0) { alert('Please add at least one own-fleet truck.'); return; }
   if (items.length === 0)  { alert('Please add at least one item.'); return; }
@@ -382,7 +400,7 @@ async function runOptimize() {
     const res = await fetch('/api/optimize', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ trucks, carriers, customers, items })
+      body: JSON.stringify({ trucks, carriers, customers, items, config: getLoadConfig() })
     });
     const data = await res.json();
     if (!res.ok) { alert('Optimization failed: ' + (data.error || res.statusText)); return; }

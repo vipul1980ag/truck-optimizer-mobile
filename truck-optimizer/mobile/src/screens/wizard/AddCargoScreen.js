@@ -158,7 +158,7 @@ const DG_CLASSES = [
   'Class 9 — Miscellaneous DG',
 ];
 
-const BLANK = { name: '', length: '4', width: '4', height: '4', weight: '500', packagingWeight: '0', qty: '1', isDG: false, dgClass: '', dgCanCombine: true };
+const BLANK = { name: '', length: '4', width: '4', height: '4', weight: '500', packagingWeight: '0', qty: '1', stackable: true, isDG: false, dgClass: '', dgCanCombine: true };
 
 export default function AddCargoScreen({ navigation }) {
   const { items, addItem, updateItem, removeItem } = useWizard();
@@ -230,6 +230,7 @@ export default function AddCargoScreen({ navigation }) {
       weight,
       packagingWeight: parseFloat(form.packagingWeight) || 0,
       qty:             parseInt(form.qty)               || 1,
+      stackable:       form.stackable,
       isDG:            form.isDG,
       dgClass:         form.isDG ? form.dgClass : '',
       dgCanCombine:    form.isDG ? form.dgCanCombine : true,
@@ -408,6 +409,19 @@ export default function AddCargoScreen({ navigation }) {
                     <Text style={s.lbl}>Pkg Wt</Text>
                     <TextInput style={s.input} value={form.packagingWeight} onChangeText={f('packagingWeight')} keyboardType="decimal-pad" />
                   </View>
+                </View>
+
+                {/* Stackable toggle */}
+                <View style={s.stackableRow}>
+                  <Text style={s.stackableIcon}>📦</Text>
+                  <Text style={s.stackableTxt}>Stackable — items can be placed on top</Text>
+                  <Switch
+                    value={form.stackable}
+                    onValueChange={v => setForm(p => ({ ...p, stackable: v }))}
+                    trackColor={{ false: '#cbd5e1', true: '#bfdbfe' }}
+                    thumbColor={form.stackable ? C.primary : '#94a3b8'}
+                    style={{ marginLeft: 'auto' }}
+                  />
                 </View>
 
                 {/* DG toggle */}
@@ -644,6 +658,11 @@ const s = StyleSheet.create({
   editBox:    { marginTop: 8, paddingTop: 8, borderTopWidth: 1, borderTopColor: C.border },
   saveBtn:    { marginTop: 8, backgroundColor: C.primary, borderRadius: 7, paddingVertical: 7, alignItems: 'center' },
   saveBtnTxt: { color: '#fff', fontSize: 12, fontWeight: '800' },
+
+  // Stackable row
+  stackableRow:  { flexDirection: 'row', alignItems: 'center', gap: 6, paddingVertical: 8, paddingHorizontal: 10, borderRadius: 8, borderWidth: 1.5, borderColor: C.border, backgroundColor: C.surface, marginTop: 8 },
+  stackableIcon: { fontSize: 14 },
+  stackableTxt:  { fontSize: 12, fontWeight: '600', color: C.text, flex: 1 },
 
   // DG section
   dgSection:       { marginTop: 10, borderTopWidth: 1, borderTopColor: C.border, paddingTop: 10 },

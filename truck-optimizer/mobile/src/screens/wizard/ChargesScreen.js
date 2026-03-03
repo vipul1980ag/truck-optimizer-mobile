@@ -57,6 +57,7 @@ export default function ChargesScreen({ navigation }) {
         rotate:         true,
         customerId:     null,
         shippingOption,
+        stackable:      i.stackable !== false,
         isDG:           i.isDG || false,
         dgClass:        i.dgClass || '',
         dgCanCombine:   i.dgCanCombine !== false,
