@@ -547,6 +547,17 @@ body {
 }
 .cat-back-btn:hover { background: var(--border); }
 
+.custom-item-hint {
+  font-size: 12px; color: var(--text2); margin-bottom: 10px;
+  display: flex; align-items: center; gap: 8px;
+}
+.custom-item-btn {
+  background: none; border: 1.5px dashed var(--accent); color: var(--accent);
+  border-radius: 6px; padding: 3px 10px; font-size: 12px; font-weight: 700;
+  cursor: pointer; transition: background 0.15s;
+}
+.custom-item-btn:hover { background: rgba(99,102,241,0.08); }
+
 /* ── Nav right (auth) ────────────────────────────────────────────────────── */
 .nav-right { display: flex; align-items: center; gap: 10px; }
 .nav-auth-btn {
