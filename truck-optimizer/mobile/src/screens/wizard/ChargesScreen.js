@@ -67,7 +67,7 @@ export default function ChargesScreen({ navigation }) {
         items:   [...(fresh.items || []), ...newItems],
         nextIds: { ...fresh.nextIds, item: nextId },
       });
-      navigation.navigate('Confirm', { totalItems, totalWeight, estimate });
+      navigation.navigate('Confirm', { totalItems, totalWeight, estimate, hasDG, dgCount: dgItems.length, dgSurcharge: Math.round(dgSurcharge) });
     } catch (e) {
       Alert.alert('Error', 'Could not save booking: ' + e.message);
     } finally {
