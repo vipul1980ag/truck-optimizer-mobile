@@ -6,7 +6,7 @@ import { C } from '../../theme';
 
 export default function ConfirmScreen({ navigation, route }) {
   const { resetWizard, shippingOption } = useWizard();
-  const { totalItems, totalWeight, estimate } = route.params || {};
+  const { totalItems, totalWeight, estimate, hasDG, dgCount, dgSurcharge } = route.params || {};
 
   function startNew() {
     resetWizard();
@@ -43,14 +43,28 @@ export default function ConfirmScreen({ navigation, route }) {
             </Text>
           </View>
           {!!estimate && (
-            <View style={[s.row, { borderBottomWidth: 0 }]}>
+            <View style={s.row}>
               <Text style={s.rowLbl}>Estimated cost</Text>
               <Text style={[s.rowVal, { color: C.primary, fontSize: 16 }]}>
                 ${estimate.toLocaleString(undefined, { maximumFractionDigits: 0 })}
               </Text>
             </View>
           )}
+          {hasDG && (
+            <View style={[s.row, { borderBottomWidth: 0 }]}>
+              <Text style={[s.rowLbl, { color: '#c2410c' }]}>⚠ DG items</Text>
+              <Text style={[s.rowVal, { color: '#c2410c' }]}>
+                {dgCount} item{dgCount !== 1 ? 's' : ''} · +${(dgSurcharge || 0).toLocaleString()} surcharge
+              </Text>
+            </View>
+          )}
         </View>
+
+        {hasDG && (
+          <View style={s.dgNote}>
+            <Text style={s.dgNoteTxt}>🚛 A DG-certified truck will be assigned. Our team will confirm DG documentation requirements.</Text>
+          </View>
+        )}
 
         <Text style={s.note}>Our team will contact you to confirm pickup details and final pricing.</Text>
 
@@ -83,6 +97,8 @@ const s = StyleSheet.create({
   rowVal:   { fontSize: 13, fontWeight: '700', color: C.text },
 
   note:   { fontSize: 12, color: C.text2, textAlign: 'center', lineHeight: 18, marginBottom: 28, paddingHorizontal: 10 },
+  dgNote: { backgroundColor: '#fff7ed', borderRadius: 10, padding: 12, width: '100%', borderWidth: 1, borderColor: '#fed7aa', marginBottom: 12 },
+  dgNoteTxt: { fontSize: 12, color: '#c2410c', fontWeight: '700', textAlign: 'center', lineHeight: 18 },
 
   newBtn:    { backgroundColor: C.primary, borderRadius: 12, paddingVertical: 14, paddingHorizontal: 32, alignItems: 'center', width: '100%' },
   newBtnTxt: { color: '#fff', fontSize: 15, fontWeight: '900' },

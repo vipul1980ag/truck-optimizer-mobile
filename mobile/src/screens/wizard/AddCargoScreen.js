@@ -265,24 +265,33 @@ export default function AddCargoScreen({ navigation }) {
   function startEdit(item) {
     setExpandedId(item._id);
     setEditForm({
-      name:   item.name,
-      length: String(item.length),
-      width:  String(item.width),
-      height: String(item.height),
-      weight: String(item.weight),
-      qty:    String(item.qty),
+      name:         item.name,
+      length:       String(item.length),
+      width:        String(item.width),
+      height:       String(item.height),
+      weight:       String(item.weight),
+      qty:          String(item.qty),
+      stackable:    item.stackable !== false,
+      isDG:         item.isDG || false,
+      dgClass:      item.dgClass || '',
+      dgCanCombine: item.dgCanCombine !== false,
     });
   }
 
   function saveEdit(item) {
     if (!editForm.name.trim()) { Alert.alert('Required', 'Item name cannot be empty.'); return; }
+    if (editForm.isDG && !editForm.dgClass) { Alert.alert('Required', 'Please select a DG Class.'); return; }
     updateItem(item._id, {
-      name:   editForm.name.trim(),
-      length: parseFloat(editForm.length) || item.length,
-      width:  parseFloat(editForm.width)  || item.width,
-      height: parseFloat(editForm.height) || item.height,
-      weight: parseFloat(editForm.weight) || item.weight,
-      qty:    parseInt(editForm.qty)      || item.qty,
+      name:         editForm.name.trim(),
+      length:       parseFloat(editForm.length) || item.length,
+      width:        parseFloat(editForm.width)  || item.width,
+      height:       parseFloat(editForm.height) || item.height,
+      weight:       parseFloat(editForm.weight) || item.weight,
+      qty:          parseInt(editForm.qty)      || item.qty,
+      stackable:    editForm.stackable !== false,
+      isDG:         editForm.isDG || false,
+      dgClass:      editForm.isDG ? (editForm.dgClass || '') : '',
+      dgCanCombine: editForm.isDG ? (editForm.dgCanCombine !== false) : true,
     });
     setExpandedId(null);
   }
@@ -527,9 +536,12 @@ export default function AddCargoScreen({ navigation }) {
                             {item.isDG && <View style={s.dgItemBadge}><Text style={s.dgItemBadgeTxt}>⚠ DG</Text></View>}
                           </View>
                           <Text style={s.itemDims}>
-                            {item.length}×{item.width}×{item.height} ft{'\n'}{item.weight} lbs · qty {item.qty}
+                            {item.length}×{item.width}×{item.height} ft · {item.weight} lbs · qty {item.qty}
                             {item.isDG && item.dgClass ? `\n${item.dgClass}` : ''}
                           </Text>
+                          {item.stackable === false && (
+                            <View style={s.noStackBadge}><Text style={s.noStackBadgeTxt}>🚫 No Stack</Text></View>
+                          )}
                         </View>
                         <View style={s.itemBtns}>
                           <TouchableOpacity style={s.iconBtn} onPress={() => isExp ? setExpandedId(null) : startEdit(item)}>
@@ -566,6 +578,45 @@ export default function AddCargoScreen({ navigation }) {
                           </View>
                           <Text style={s.lbl}>Weight (lbs)</Text>
                           <TextInput style={s.input} value={editForm.weight} onChangeText={ef('weight')} keyboardType="decimal-pad" />
+
+                          {/* Stackable toggle in edit */}
+                          <View style={[s.stackableRow, { marginTop: 8 }]}>
+                            <Text style={s.stackableIcon}>📦</Text>
+                            <Text style={s.stackableTxt}>Stackable</Text>
+                            <Switch
+                              value={editForm.stackable !== false}
+                              onValueChange={v => setEditForm(p => ({ ...p, stackable: v }))}
+                              trackColor={{ false: '#cbd5e1', true: '#bfdbfe' }}
+                              thumbColor={editForm.stackable !== false ? C.primary : '#94a3b8'}
+                              style={{ marginLeft: 'auto' }}
+                            />
+                          </View>
+
+                          {/* DG toggle in edit */}
+                          <View style={[s.dgToggleRow, { marginTop: 8 }]}>
+                            <Text style={s.dgToggleIcon}>⚠</Text>
+                            <Text style={s.dgToggleTxt}>Dangerous Goods</Text>
+                            <Switch
+                              value={editForm.isDG || false}
+                              onValueChange={v => setEditForm(p => ({ ...p, isDG: v, dgClass: '', dgCanCombine: true }))}
+                              trackColor={{ false: '#cbd5e1', true: '#fed7aa' }}
+                              thumbColor={editForm.isDG ? '#ea580c' : '#94a3b8'}
+                              style={{ marginLeft: 'auto' }}
+                            />
+                          </View>
+                          {editForm.isDG && (
+                            <View style={s.dgFields}>
+                              <Text style={s.lbl}>DG Class</Text>
+                              <ScrollView horizontal showsHorizontalScrollIndicator={false} style={s.chipScroll}>
+                                {DG_CLASSES.map(cls => (
+                                  <TouchableOpacity key={cls} style={[s.dgChip, editForm.dgClass === cls && s.dgChipActive]} onPress={() => setEditForm(p => ({ ...p, dgClass: cls }))}>
+                                    <Text style={[s.dgChipTxt, editForm.dgClass === cls && s.dgChipTxtActive]}>{cls}</Text>
+                                  </TouchableOpacity>
+                                ))}
+                              </ScrollView>
+                            </View>
+                          )}
+
                           <TouchableOpacity style={s.saveBtn} onPress={() => saveEdit(item)}>
                             <Text style={s.saveBtnTxt}>Save</Text>
                           </TouchableOpacity>
@@ -686,6 +737,8 @@ const s = StyleSheet.create({
   itemCardDG:    { borderColor: '#fed7aa', backgroundColor: '#fffbeb' },
   dgItemBadge:   { backgroundColor: '#ffedd5', borderRadius: 4, paddingHorizontal: 5, paddingVertical: 1, borderWidth: 1, borderColor: '#fed7aa' },
   dgItemBadgeTxt:{ fontSize: 8, fontWeight: '800', color: '#9a3412' },
+  noStackBadge:  { marginTop: 3, alignSelf: 'flex-start', backgroundColor: '#fee2e2', borderRadius: 4, paddingHorizontal: 5, paddingVertical: 1, borderWidth: 1, borderColor: '#fecaca' },
+  noStackBadgeTxt:{ fontSize: 8, fontWeight: '800', color: '#991b1b' },
 
   // Bottom bar
   bottomBar:  { padding: 10, paddingHorizontal: 12, backgroundColor: C.surface, borderTopWidth: 1, borderTopColor: C.border },
