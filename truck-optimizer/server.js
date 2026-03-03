@@ -73,7 +73,8 @@ const SEED = {
     { id: 5, name: 'Large Crate',  length: 5, width: 4, height: 4, weight: 3500, qty: 2,  rotate: false, customerId: 3 },
     { id: 6, name: 'Small Box',    length: 2, width: 2, height: 2, weight: 150,  qty: 15, rotate: true,  customerId: 3 },
   ],
-  users:   [],
+  users:        [],
+  catalogItems: [],
   nextIds: { truck: 3, carrier: 3, carrierTruck: 5, customer: 4, item: 7, color: 3, user: 1 },
 };
 
@@ -193,8 +194,47 @@ app.put('/api/data', (req, res) => {
   if (existing.nextIds && update.nextIds) {
     update.nextIds.user = existing.nextIds.user || update.nextIds.user;
   }
+  // Preserve custom catalog items
+  if (existing.catalogItems && existing.catalogItems.length) update.catalogItems = existing.catalogItems;
   writeStore(update);
   res.json({ ok: true });
+});
+
+// ── Custom Catalog ──────────────────────────────────────────────────────────
+app.get('/api/catalog', (req, res) => {
+  const store    = readStore();
+  const category = req.query.category; // optional filter: 'household' | 'industrial'
+  const items    = store.catalogItems || [];
+  res.json(category ? items.filter(i => i.category === category) : items);
+});
+
+app.post('/api/catalog', (req, res) => {
+  const { name, category, l, w, h, wt } = req.body || {};
+  if (!name || !category || !l || !w || !h)
+    return res.status(400).json({ error: 'name, category, l, w, h are required.' });
+
+  const store = readStore();
+  if (!store.catalogItems) store.catalogItems = [];
+
+  // Deduplicate by name + category (case-insensitive)
+  const exists = store.catalogItems.find(
+    i => i.name.toLowerCase() === name.toLowerCase().trim() && i.category === category
+  );
+  if (exists) return res.json({ ok: true, item: exists, duplicate: true });
+
+  const item = {
+    id:       Date.now(),
+    name:     name.trim(),
+    category,
+    l:        parseFloat(l)  || 4,
+    w:        parseFloat(w)  || 4,
+    h:        parseFloat(h)  || 4,
+    wt:       parseFloat(wt) || 0,
+    addedAt:  new Date().toISOString(),
+  };
+  store.catalogItems.push(item);
+  writeStore(store);
+  res.json({ ok: true, item });
 });
 
 app.post('/api/optimize', (req, res) => {

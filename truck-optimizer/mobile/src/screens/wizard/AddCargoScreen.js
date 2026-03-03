@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   View, Text, StyleSheet, ScrollView, TextInput,
   TouchableOpacity, Alert, KeyboardAvoidingView, Platform,
@@ -6,6 +6,7 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useWizard } from '../../WizardContext';
 import { C } from '../../theme';
+const API_BASE = process.env.EXPO_PUBLIC_API_URL || 'https://truck-capacity-optimizer.onrender.com';
 
 // ── Catalogs ──────────────────────────────────────────────────────────────────
 const MOBILE_HOUSEHOLD = [
@@ -144,14 +145,30 @@ const BLANK = { name: '', length: '4', width: '4', height: '4', weight: '500', p
 export default function AddCargoScreen({ navigation }) {
   const { items, addItem, updateItem, removeItem } = useWizard();
 
-  const [step,        setStep]        = useState(1);
-  const [category,    setCategory]    = useState(null);
-  const [selectedCat, setSelectedCat] = useState(null);
-  const [form,        setForm]        = useState(BLANK);
-  const [expandedId,  setExpandedId]  = useState(null);
-  const [editForm,    setEditForm]    = useState({});
+  const [step,         setStep]         = useState(1);
+  const [category,     setCategory]     = useState(null);
+  const [selectedCat,  setSelectedCat]  = useState(null);
+  const [form,         setForm]         = useState(BLANK);
+  const [expandedId,   setExpandedId]   = useState(null);
+  const [editForm,     setEditForm]     = useState({});
+  const [serverCatalog, setServerCatalog] = useState([]);
 
-  const catalog  = category === 'household' ? MOBILE_HOUSEHOLD : MOBILE_INDUSTRIAL;
+  useEffect(() => {
+    fetch(`${API_BASE}/api/catalog`)
+      .then(r => r.json())
+      .then(data => setServerCatalog(Array.isArray(data) ? data : []))
+      .catch(() => {});
+  }, []);
+
+  // Merge server custom items into the local catalog for the selected category
+  function buildCatalog(cat) {
+    const base = cat === 'household' ? MOBILE_HOUSEHOLD : MOBILE_INDUSTRIAL;
+    const custom = serverCatalog.filter(i => i.category === cat);
+    if (!custom.length) return base;
+    return [...base, { cat: '⭐ User-Added Items', items: custom.map(i => ({ name: i.name, l: i.l, w: i.w, h: i.h, wt: i.wt })) }];
+  }
+
+  const catalog  = buildCatalog(category);
   const catItems = selectedCat
     ? (catalog.find(c => c.cat === selectedCat)?.items || [])
     : [];
@@ -177,15 +194,40 @@ export default function AddCargoScreen({ navigation }) {
       Alert.alert('Required', 'Please enter an item name.');
       return;
     }
+    const name   = form.name.trim();
+    const length = parseFloat(form.length)          || 4;
+    const width  = parseFloat(form.width)           || 4;
+    const height = parseFloat(form.height)          || 4;
+    const weight = parseFloat(form.weight)          || 0;
+
     addItem({
-      name:            form.name.trim(),
-      length:          parseFloat(form.length)          || 4,
-      width:           parseFloat(form.width)           || 4,
-      height:          parseFloat(form.height)          || 4,
-      weight:          parseFloat(form.weight)          || 0,
+      name,
+      length,
+      width,
+      height,
+      weight,
       packagingWeight: parseFloat(form.packagingWeight) || 0,
       qty:             parseInt(form.qty)               || 1,
     });
+
+    // Save to server catalog if it's a custom (not built-in) item
+    const allBuiltIn = [...MOBILE_HOUSEHOLD, ...MOBILE_INDUSTRIAL].flatMap(g => g.items);
+    const isBuiltIn  = allBuiltIn.some(i => i.name.toLowerCase() === name.toLowerCase());
+    if (!isBuiltIn && category) {
+      fetch(`${API_BASE}/api/catalog`, {
+        method:  'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body:    JSON.stringify({ name, category, l: length, w: width, h: height, wt: weight }),
+      })
+        .then(r => r.json())
+        .then(data => {
+          if (data.ok && !data.duplicate) {
+            setServerCatalog(prev => [...prev, data.item]);
+          }
+        })
+        .catch(() => {});
+    }
+
     // Reset form, stay on same screen
     setStep(1);
     setCategory(null);
