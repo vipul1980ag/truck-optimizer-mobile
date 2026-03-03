@@ -395,3 +395,43 @@ html.light .pay-overdue { color: #991b1b; }
   cursor: pointer; transition: background 0.15s, color 0.15s, border-color 0.15s;
 }
 .ctab.active { background: var(--primary); color: #fff; border-color: var(--primary); }
+
+
+/* ── Load Configuration panel ─────────────────────────────────────────────── */
+.load-config-bar {
+  padding: 6px 16px 0;
+  border-top: 1px solid var(--border);
+}
+.load-config-toggle {
+  background: none; border: 1px solid var(--border); border-radius: 7px;
+  padding: 5px 14px; font-size: 11px; font-weight: 700; color: var(--text2);
+  cursor: pointer; transition: all 0.15s;
+}
+.load-config-toggle:hover { background: var(--surface2); color: var(--text); }
+
+.load-config-panel {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 14px 16px;
+  margin: 8px 0;
+}
+.load-config-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+}
+@media (max-width: 600px) { .load-config-grid { grid-template-columns: 1fr; } }
+
+.load-config-field { display: flex; flex-direction: column; gap: 4px; }
+.lc-label { font-size: 10px; font-weight: 700; color: var(--text2); text-transform: uppercase; letter-spacing: 0.4px; }
+.lc-select {
+  border: 1.5px solid var(--border); border-radius: 7px;
+  padding: 6px 10px; font-size: 12px; color: var(--text);
+  background: var(--surface2); outline: none;
+  transition: border-color 0.15s;
+}
+.lc-select:focus { border-color: var(--primary); }
+
+.load-config-check { justify-content: flex-end; }
+.chk-label { display: flex; align-items: flex-start; gap: 7px; font-size: 12px; font-weight: 600; color: var(--text); cursor: pointer; }

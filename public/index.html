@@ -149,11 +149,51 @@
           <div class="form-group full"><label class="chk-label">
             <input type="checkbox" id="i-rotate" checked> Allow rotation (all orientations)
           </label></div>
+          <div class="form-group full"><label class="chk-label">
+            <input type="checkbox" id="i-stackable" checked> Stackable (other items can be placed on top)
+          </label></div>
         </div>
         <button class="btn btn-primary btn-full" onclick="addItem()">Add Item</button>
       </div>
       <div id="item-catalog"></div>
       <div id="item-list"></div>
+    </div>
+
+    <!-- ── Load Configuration ── -->
+    <div class="load-config-bar" id="load-config-bar">
+      <button class="load-config-toggle" onclick="toggleLoadConfig()">⚙ Load Configuration ▾</button>
+      <div class="load-config-panel" id="load-config-panel" style="display:none">
+        <div class="load-config-grid">
+          <div class="load-config-field">
+            <label class="lc-label">Stacking Axis Order</label>
+            <select id="lc-stack-axis" class="lc-select">
+              <option value="height_first">Height First (minimize stack height)</option>
+              <option value="length_first">Length First (fill along truck length)</option>
+              <option value="width_first">Width First (fill across truck width)</option>
+            </select>
+          </div>
+          <div class="load-config-field">
+            <label class="lc-label">Load Direction</label>
+            <select id="lc-load-from" class="lc-select">
+              <option value="back">Rear-to-Front (load through back door)</option>
+              <option value="front">Front-to-Rear (fill from cab end first)</option>
+            </select>
+          </div>
+          <div class="load-config-field">
+            <label class="lc-label">Sort Items By</label>
+            <select id="lc-sort-order" class="lc-select">
+              <option value="volume_desc">Largest Volume First</option>
+              <option value="weight_desc">Heaviest First</option>
+            </select>
+          </div>
+          <div class="load-config-field load-config-check">
+            <label class="chk-label">
+              <input type="checkbox" id="lc-center-mass"> Shift Mass to Center
+              <span style="font-size:10px;color:#64748b;display:block;margin-top:2px;">Balance cargo weight along truck length</span>
+            </label>
+          </div>
+        </div>
+      </div>
     </div>
 
     <div class="opt-bar">
