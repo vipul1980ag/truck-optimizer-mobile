@@ -183,11 +183,13 @@ const PORTAL_INDUSTRIAL = [
 
 let _portalCategory = null; // 'household' | 'industrial'
 
-function portalSetCategory(type) {
+async function portalSetCategory(type) {
   _portalCategory = type;
   const sel = document.getElementById('p-item-select');
   sel.innerHTML = '<option value="">— Choose an item —</option>';
   const catalog = type === 'household' ? PORTAL_HOUSEHOLD : PORTAL_INDUSTRIAL;
+
+  // Built-in items
   catalog.forEach(group => {
     const og = document.createElement('optgroup');
     og.label = group.cat;
@@ -199,6 +201,24 @@ function portalSetCategory(type) {
     });
     sel.appendChild(og);
   });
+
+  // Custom items from server
+  try {
+    const res   = await fetch('/api/catalog?category=' + type);
+    const custom = await res.json();
+    if (custom.length) {
+      const og = document.createElement('optgroup');
+      og.label = '⭐ User-Added Items';
+      custom.forEach(item => {
+        const opt = document.createElement('option');
+        opt.value = JSON.stringify({ name: item.name, l: item.l, w: item.w, h: item.h, wt: item.wt });
+        opt.textContent = item.name;
+        og.appendChild(opt);
+      });
+      sel.appendChild(og);
+    }
+  } catch (_) {}
+
   document.getElementById('p-step1').style.display = 'none';
   document.getElementById('p-step2').style.display = 'block';
 }
@@ -404,6 +424,17 @@ function portalAddItem() {
     rotate:         true,
     customerId:     null,
   });
+
+  // If item name not in built-in catalog, save it to server catalog for future users
+  const allBuiltIn = [...PORTAL_HOUSEHOLD, ...PORTAL_INDUSTRIAL].flatMap(g => g.items);
+  const isBuiltIn  = allBuiltIn.some(i => i.name.toLowerCase() === name.toLowerCase());
+  if (!isBuiltIn && _portalCategory) {
+    fetch('/api/catalog', {
+      method:  'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body:    JSON.stringify({ name, category: _portalCategory, l: length, w: width, h: height, wt: weight }),
+    }).catch(() => {});
+  }
 
   // Reset form and stay on same screen — right panel updates
   portalResetCategory();
