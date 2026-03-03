@@ -235,6 +235,19 @@ function portalPickItem(val) {
   document.getElementById('p-qty').value        = '1';
 }
 
+function portalEnterCustomItem() {
+  // Clear the dropdown selection and form so user can type freely
+  document.getElementById('p-item-select').value = '';
+  document.getElementById('p-name').value        = '';
+  document.getElementById('p-length').value      = '4';
+  document.getElementById('p-width').value       = '4';
+  document.getElementById('p-height').value      = '4';
+  document.getElementById('p-weight').value      = '100';
+  document.getElementById('p-pkg-weight').value  = '0';
+  document.getElementById('p-qty').value         = '1';
+  document.getElementById('p-name').focus();
+}
+
 function portalResetCategory() {
   _portalCategory = null;
   document.getElementById('p-step1').style.display = 'block';
