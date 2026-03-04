@@ -633,9 +633,9 @@ export default function AddCargoScreen({ navigation }) {
         {/* ── Bottom bar ── */}
         {items.length > 0 && (
           <View style={s.bottomBar}>
-            <TouchableOpacity style={s.proceedBtn} onPress={() => navigation.navigate('ShipOption')}>
+            <TouchableOpacity style={s.proceedBtn} onPress={() => navigation.navigate('ReviewCargo')}>
               <Text style={s.proceedTxt}>
-                Next: Choose Shipping ({items.length} item{items.length !== 1 ? 's' : ''}) →
+                Review Cargo ({items.length} item{items.length !== 1 ? 's' : ''}) →
               </Text>
             </TouchableOpacity>
           </View>
