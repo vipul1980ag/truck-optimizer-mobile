@@ -561,12 +561,26 @@ function renderItemList() {
 // ── Booking wizard ─────────────────────────────────────────────────────────────
 let _wizardShipping = null;
 let _bookingEstimate = null;
+let _wizardStart = null;   // { label, lat, lng }
+let _wizardDest  = null;   // { label, lat, lng }
+let _wizardRoute = null;   // { index, distance_km, duration_min, geometry, toll_cost }
+let _leafletMap  = null;
+let _leafletRouteLayer = null;
 
 function openBookingModal() {
   _wizardShipping = null;
   _bookingEstimate = null;
+  _wizardStart = null;
+  _wizardDest  = null;
+  _wizardRoute = null;
   document.querySelectorAll('.ship-opt').forEach(el => el.classList.remove('selected'));
   document.getElementById('btn-see-charges').disabled = true;
+  // Reset location inputs
+  const si = document.getElementById('bm-start-input'); if (si) si.value = '';
+  const di = document.getElementById('bm-dest-input');  if (di) di.value = '';
+  const sc = document.getElementById('bm-start-confirmed'); if (sc) sc.style.display = 'none';
+  const dc = document.getElementById('bm-dest-confirmed');  if (dc) dc.style.display = 'none';
+  const fr = document.getElementById('btn-find-routes'); if (fr) fr.disabled = true;
   showBookingStep('shipping');
   document.getElementById('booking-modal').classList.add('open');
 }
@@ -580,7 +594,7 @@ function bookingOverlayClick(e) {
 }
 
 function showBookingStep(step) {
-  ['shipping', 'charges', 'confirm'].forEach(s => {
+  ['shipping', 'location', 'route', 'charges', 'confirm'].forEach(s => {
     document.getElementById('bm-step-' + s).style.display = s === step ? '' : 'none';
   });
 }
@@ -592,10 +606,185 @@ function selectShipping(type) {
   document.getElementById('btn-see-charges').disabled = false;
 }
 
+function showLocationStep() {
+  showBookingStep('location');
+}
+
+function onLocationInput(field) {
+  if (field === 'start') { _wizardStart = null; updateFindRoutesBtn(); }
+  else                   { _wizardDest  = null; updateFindRoutesBtn(); }
+}
+
+function updateFindRoutesBtn() {
+  const btn = document.getElementById('btn-find-routes');
+  if (btn) btn.disabled = !(_wizardStart && _wizardDest);
+}
+
+async function portalGeocode(field) {
+  const inputId  = field === 'start' ? 'bm-start-input'       : 'bm-dest-input';
+  const sugId    = field === 'start' ? 'bm-start-suggestions'  : 'bm-dest-suggestions';
+  const btnId    = field === 'start' ? 'btn-start-search'      : 'btn-dest-search';
+  const confId   = field === 'start' ? 'bm-start-confirmed'    : 'bm-dest-confirmed';
+  const query    = document.getElementById(inputId)?.value?.trim();
+  if (!query) return;
+
+  const btn = document.getElementById(btnId);
+  btn.textContent = '⏳'; btn.disabled = true;
+  if (field === 'start') _wizardStart = null; else _wizardDest = null;
+  updateFindRoutesBtn();
+
+  try {
+    const results = await fetch('/api/geocode', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ query }),
+    }).then(r => r.json());
+
+    const sugEl = document.getElementById(sugId);
+    if (!results.length) {
+      sugEl.innerHTML = '<div class="location-suggestion-item" style="color:var(--text2);font-style:italic;">No results found</div>';
+    } else {
+      sugEl.innerHTML = results.map((r, i) =>
+        `<div class="location-suggestion-item" onclick="portalSelectLocation('${field}', ${i})" data-idx="${i}">${esc(r.label)}</div>`
+      ).join('');
+      sugEl._data = results;
+    }
+    sugEl.style.display = '';
+    document.getElementById(confId).style.display = 'none';
+  } catch (e) {
+    alert('Geocoding failed: ' + e.message);
+  } finally {
+    btn.textContent = '🔍'; btn.disabled = false;
+  }
+}
+
+function portalSelectLocation(field, idx) {
+  const sugId  = field === 'start' ? 'bm-start-suggestions' : 'bm-dest-suggestions';
+  const inputId = field === 'start' ? 'bm-start-input'       : 'bm-dest-input';
+  const confId  = field === 'start' ? 'bm-start-confirmed'   : 'bm-dest-confirmed';
+  const sugEl  = document.getElementById(sugId);
+  const result = sugEl._data?.[idx];
+  if (!result) return;
+
+  document.getElementById(inputId).value = result.label;
+  sugEl.style.display = 'none';
+  sugEl.innerHTML = '';
+
+  const confEl = document.getElementById(confId);
+  confEl.textContent = '✓ ' + result.label;
+  confEl.style.display = '';
+
+  if (field === 'start') _wizardStart = result;
+  else                   _wizardDest  = result;
+  updateFindRoutesBtn();
+}
+
+async function portalFindRoutes() {
+  if (!_wizardStart || !_wizardDest) return;
+  const listEl = document.getElementById('bm-routes-list');
+  const tollEl = document.getElementById('bm-toll-info');
+  const confBtn = document.getElementById('btn-confirm-route');
+  listEl.innerHTML = '<p style="text-align:center;color:var(--text2);font-size:13px;padding:16px;">Finding routes…</p>';
+  tollEl.style.display = 'none';
+  if (confBtn) confBtn.disabled = true;
+  document.getElementById('bm-route-sub').textContent =
+    `${_wizardStart.label.split(',')[0]} → ${_wizardDest.label.split(',')[0]}`;
+  showBookingStep('route');
+
+  // Init map
+  if (_leafletMap) { _leafletMap.remove(); _leafletMap = null; _leafletRouteLayer = null; }
+  _leafletMap = L.map('bm-map');
+  L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { attribution: '© OpenStreetMap' }).addTo(_leafletMap);
+  _leafletMap.setView([(_wizardStart.lat + _wizardDest.lat) / 2, (_wizardStart.lng + _wizardDest.lng) / 2], 6);
+
+  try {
+    const routes = await fetch('/api/routes', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ from: _wizardStart, to: _wizardDest }),
+    }).then(r => r.json());
+
+    if (!Array.isArray(routes) || !routes.length) {
+      listEl.innerHTML = '<p style="color:var(--danger);font-size:13px;padding:12px;">No routes found between these locations.</p>';
+      return;
+    }
+
+    listEl._routes = routes;
+    listEl.innerHTML = routes.map((r, i) => `
+      <div class="route-card" id="route-card-${i}" onclick="portalSelectRoute(${i})">
+        <div class="route-card-left">
+          <div class="route-card-label">Route ${i + 1}</div>
+        </div>
+        <div class="route-card-right">
+          <div class="route-card-dist">${r.distance_km} km</div>
+          <div class="route-card-dur">${minsToHM(r.duration_min)}</div>
+        </div>
+      </div>`).join('');
+  } catch (e) {
+    listEl.innerHTML = `<p style="color:var(--danger);font-size:13px;padding:12px;">Routing failed: ${esc(e.message)}</p>`;
+  }
+}
+
+function minsToHM(mins) {
+  const h = Math.floor(mins / 60), m = mins % 60;
+  return h > 0 ? `${h}h ${m}m` : `${m}m`;
+}
+
+async function portalSelectRoute(idx) {
+  const listEl  = document.getElementById('bm-routes-list');
+  const routes  = listEl._routes;
+  if (!routes) return;
+  const route = routes[idx];
+  _wizardRoute = { ...route, toll_cost: 0 };
+
+  // Highlight selected card
+  document.querySelectorAll('.route-card').forEach((c, i) => {
+    c.classList.toggle('selected', i === idx);
+  });
+
+  // Draw on map
+  if (_leafletRouteLayer) { _leafletMap.removeLayer(_leafletRouteLayer); _leafletRouteLayer = null; }
+  _leafletRouteLayer = L.geoJSON(route.geometry, { style: { color: '#2563eb', weight: 4, opacity: 0.85 } }).addTo(_leafletMap);
+  L.marker([_wizardStart.lat, _wizardStart.lng]).bindPopup('📍 Start').addTo(_leafletMap);
+  L.marker([_wizardDest.lat, _wizardDest.lng]).bindPopup('🏁 Destination').addTo(_leafletMap);
+  _leafletMap.fitBounds(_leafletRouteLayer.getBounds(), { padding: [20, 20] });
+
+  // Fetch tolls
+  const tollEl = document.getElementById('bm-toll-info');
+  tollEl.innerHTML = '⏳ Calculating toll costs…'; tollEl.style.display = '';
+  const confBtn = document.getElementById('btn-confirm-route');
+  if (confBtn) confBtn.disabled = true;
+
+  try {
+    const vehicleType = '2AxlesTruck'; // default
+    const tollData = await fetch('/api/tolls', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ geometry: route.geometry, vehicleType }),
+    }).then(r => r.json());
+    const toll_cost = tollData.toll_cost || 0;
+    _wizardRoute = { ...route, toll_cost };
+    tollEl.innerHTML = toll_cost > 0
+      ? `🚦 <strong>Estimated Tolls: $${toll_cost.toFixed(2)}</strong>`
+      : '🚦 No toll data available for this route.';
+  } catch (_) {
+    tollEl.innerHTML = '🚦 Toll data unavailable.';
+  } finally {
+    if (confBtn) confBtn.disabled = false;
+  }
+}
+
 async function showChargesStep() {
   showBookingStep('charges');
   const el = document.getElementById('bm-charges-content');
   el.innerHTML = '<p style="text-align:center;color:var(--text2);font-size:13px;padding:20px;">Loading rates…</p>';
+
+  const distance_km    = _wizardRoute ? _wizardRoute.distance_km : 160.9; // fallback ~100mi
+  const distance_miles = distance_km * 0.621371;
+  const toll_cost      = _wizardRoute ? (_wizardRoute.toll_cost || 0) : 0;
+
+  // Update subtitle
+  const sub = document.getElementById('bm-charges-sub');
+  if (sub) sub.textContent = _wizardRoute
+    ? `Based on ${distance_km.toFixed(0)} km (${distance_miles.toFixed(0)} mi) actual route`
+    : 'Based on estimated distance';
 
   try {
     const data  = await fetch('/api/data').then(r => r.json());
@@ -614,22 +803,25 @@ async function showChargesStep() {
     const hasDG    = items.some(i => i.isDG);
     const dgItems  = items.filter(i => i.isDG);
 
-    const truckVol   = truck.length * truck.width * truck.height;
-    const fullCost   = truck.baseRate + truck.ratePerMi * 100;
-    const pct        = Math.min(totalVol / truckVol, 1);
-    const baseCost   = _wizardShipping === 'shared'
+    const truckVol    = truck.length * truck.width * truck.height;
+    const fullCost    = truck.baseRate + truck.ratePerMi * distance_miles;
+    const pct         = Math.min(totalVol / truckVol, 1);
+    const baseCost    = _wizardShipping === 'shared'
       ? Math.max(fullCost * pct, fullCost * 0.25)
       : fullCost;
     const dgSurcharge = hasDG ? baseCost * 0.15 : 0;
-    const estimate    = baseCost + dgSurcharge;
+    const estimate    = baseCost + dgSurcharge + toll_cost;
 
-    _bookingEstimate = { estimate, totalUnits, totalWeight, hasDG };
+    _bookingEstimate = { estimate, totalUnits, totalWeight, hasDG, distance_km, toll_cost };
 
     const sharedRow = _wizardShipping === 'shared'
       ? `<div class="charges-row"><span>Your share (${(pct * 100).toFixed(0)}%)</span><span>×${pct.toFixed(2)}</span></div>`
       : '';
     const dgRow = hasDG
       ? `<div class="charges-row-dg"><span>⚠ DG surcharge (15%)</span><span>+$${Math.round(dgSurcharge).toLocaleString()}</span></div>`
+      : '';
+    const tollRow = toll_cost > 0
+      ? `<div class="charges-row" style="color:#7c3aed;font-weight:700;"><span>🚦 Toll charges</span><span>+$${toll_cost.toFixed(2)}</span></div>`
       : '';
     const dgWarning = hasDG
       ? `<div class="dg-warning-banner">
@@ -649,20 +841,22 @@ async function showChargesStep() {
         <div class="charges-row"><span>Total items</span><span>${items.length} type${items.length !== 1 ? 's' : ''} · ${totalUnits} unit${totalUnits !== 1 ? 's' : ''}</span></div>
         <div class="charges-row"><span>Total weight</span><span>${totalWeight.toLocaleString()} lbs</span></div>
         <div class="charges-row"><span>Total volume</span><span>${totalVol.toFixed(1)} cu ft</span></div>
+        <div class="charges-row"><span>Route distance</span><span>${distance_km.toFixed(0)} km (${distance_miles.toFixed(0)} mi)</span></div>
         <div class="charges-row"><span>Truck utilization</span><span>${(pct * 100).toFixed(0)}% of ${esc(truck.name)}</span></div>
       </div>
       <div class="charges-card">
-        <div class="charges-section-lbl">💰 Estimated Charges <span style="font-size:10px;font-weight:400;color:var(--text2);">100-mi base estimate</span></div>
+        <div class="charges-section-lbl">💰 Estimated Charges</div>
         <div class="charges-row"><span>Base rate</span><span>$${truck.baseRate.toLocaleString()}</span></div>
-        <div class="charges-row"><span>Per-mile (100 mi)</span><span>$${(truck.ratePerMi * 100).toLocaleString()}</span></div>
+        <div class="charges-row"><span>Per-mile (${distance_miles.toFixed(0)} mi)</span><span>$${(truck.ratePerMi * distance_miles).toLocaleString(undefined, {maximumFractionDigits:0})}</span></div>
         ${sharedRow}
         ${dgRow}
+        ${tollRow}
         <div class="charges-row charges-total">
           <span>Estimated Total</span>
           <span style="color:var(--primary);font-size:22px;letter-spacing:-0.4px;">$${Math.round(estimate).toLocaleString()}</span>
         </div>
         <p style="font-size:10px;color:var(--text2);margin-top:10px;line-height:1.6;">
-          * Final price confirmed at pickup based on actual distance and weight.
+          * Based on ${distance_km.toFixed(0)} km actual route. Final price confirmed at pickup.
         </p>
       </div>`;
   } catch (e) {
@@ -671,7 +865,7 @@ async function showChargesStep() {
 }
 
 async function confirmWebBooking() {
-  const btn = document.querySelector('.btn-bm-confirm');
+  const btn = document.querySelector('#bm-step-charges .btn-bm-confirm');
   btn.textContent = 'Saving…';
   btn.disabled = true;
   try {
@@ -687,14 +881,16 @@ async function confirmWebBooking() {
       body: JSON.stringify({ ...fresh, items: updatedItems }),
     });
 
-    const { estimate, totalUnits, totalWeight, hasDG } = _bookingEstimate || {};
+    const { estimate, totalUnits, totalWeight, hasDG, distance_km, toll_cost } = _bookingEstimate || {};
     const sumEl = document.getElementById('bm-confirm-summary');
     sumEl.innerHTML = `
       <div class="bm-confirm-grid">
         <div class="bcg-row"><span>Items submitted</span><span>${items.length} type${items.length !== 1 ? 's' : ''} · ${totalUnits || 0} units</span></div>
         <div class="bcg-row"><span>Total weight</span><span>${(totalWeight || 0).toLocaleString()} lbs</span></div>
         <div class="bcg-row"><span>Shipping type</span><span>${_wizardShipping === 'shared' ? '🤝 Share Truck (LTL)' : '🚚 Private Truck (FTL)'}</span></div>
+        ${distance_km ? `<div class="bcg-row"><span>Route distance</span><span>${distance_km.toFixed(0)} km</span></div>` : ''}
         ${estimate != null ? `<div class="bcg-row"><span>Estimated cost</span><span style="color:var(--primary);font-weight:900;font-size:16px;">$${Math.round(estimate).toLocaleString()}</span></div>` : ''}
+        ${toll_cost > 0 ? `<div class="bcg-row"><span>🚦 Tolls</span><span style="color:#7c3aed;font-weight:700;">$${toll_cost.toFixed(2)}</span></div>` : ''}
         ${hasDG ? `<div class="bcg-row"><span>DG note</span><span style="color:#c2410c;">⚠ DG-certified truck required</span></div>` : ''}
       </div>`;
 

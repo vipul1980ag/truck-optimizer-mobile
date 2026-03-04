@@ -1,9 +1,10 @@
 'use strict';
 
-const express = require('express');
-const fs      = require('fs');
-const path    = require('path');
-const crypto  = require('crypto');
+const express  = require('express');
+const fs       = require('fs');
+const path     = require('path');
+const crypto   = require('crypto');
+const polyline = require('@mapbox/polyline');
 
 const { optimize }      = require('./engine/optimizer');
 const { analyzeRoutes } = require('./engine/routes');
@@ -291,6 +292,81 @@ app.post('/api/optimize', (req, res) => {
     res.json({ packers: out, unplaced, splitWarn, analysis, truckZoneSummary });
   } catch (err) {
     res.status(500).json({ error: err.message });
+  }
+});
+
+// ── Routing / Geocoding / Tolls ─────────────────────────────────────────────
+
+app.post('/api/geocode', async (req, res) => {
+  const { query } = req.body || {};
+  if (!query || !query.trim()) return res.status(400).json({ error: 'query is required' });
+  try {
+    const url = `https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(query.trim())}&format=json&limit=5&addressdetails=0`;
+    const r   = await fetch(url, {
+      headers: { 'User-Agent': 'TruckOptimizer/1.0 (contact@truckoptimizer.com)' },
+    });
+    const data = await r.json();
+    const results = data.map(p => ({
+      label: p.display_name,
+      lat:   parseFloat(p.lat),
+      lng:   parseFloat(p.lon),
+    }));
+    res.json(results);
+  } catch (err) {
+    res.status(500).json({ error: 'Geocoding failed: ' + err.message });
+  }
+});
+
+app.post('/api/routes', async (req, res) => {
+  const { from, to } = req.body || {};
+  if (!from?.lat || !from?.lng || !to?.lat || !to?.lng)
+    return res.status(400).json({ error: 'from and to (lat, lng) are required' });
+  try {
+    const url = `http://router.project-osrm.org/route/v1/driving/${from.lng},${from.lat};${to.lng},${to.lat}?alternatives=true&geometries=geojson&overview=full&steps=false`;
+    const r   = await fetch(url);
+    const data = await r.json();
+    if (data.code !== 'Ok' || !data.routes?.length)
+      return res.status(400).json({ error: 'No route found between these locations.' });
+    const routes = data.routes.map((route, index) => ({
+      index,
+      distance_km:  Math.round((route.distance / 1000) * 10) / 10,
+      duration_min: Math.round(route.duration / 60),
+      geometry:     route.geometry,  // GeoJSON LineString
+    }));
+    res.json(routes);
+  } catch (err) {
+    res.status(500).json({ error: 'Routing failed: ' + err.message });
+  }
+});
+
+app.post('/api/tolls', async (req, res) => {
+  const { geometry, vehicleType = '2AxlesTruck' } = req.body || {};
+  if (!geometry?.coordinates?.length)
+    return res.status(400).json({ error: 'geometry (GeoJSON LineString) is required' });
+
+  const apiKey = process.env.TOLLGURU_API_KEY;
+  if (!apiKey) return res.json({ toll_cost: 0, note: 'Toll data unavailable (no API key)' });
+
+  try {
+    // TollGuru expects [lat, lng] pairs; OSRM GeoJSON has [lng, lat]
+    const coords  = geometry.coordinates.map(([lng, lat]) => [lat, lng]);
+    const encoded = polyline.encode(coords);
+
+    const r = await fetch('https://apis.tollguru.com/toll/v2/complete-polyline-from-mapping-service', {
+      method:  'POST',
+      headers: { 'Content-Type': 'application/json', 'x-api-key': apiKey },
+      body: JSON.stringify({
+        mapProvider: 'osrm',
+        polyline:    encoded,
+        vehicleType,
+        departure_time: Math.floor(Date.now() / 1000),
+      }),
+    });
+    const data = await r.json();
+    const toll_cost = data?.summary?.total?.toll ?? data?.summary?.totalToll ?? 0;
+    res.json({ toll_cost: parseFloat(toll_cost) || 0 });
+  } catch (err) {
+    res.json({ toll_cost: 0, note: 'Toll lookup failed: ' + err.message });
   }
 });
 

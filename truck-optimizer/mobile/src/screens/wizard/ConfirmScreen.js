@@ -6,7 +6,7 @@ import { C } from '../../theme';
 
 export default function ConfirmScreen({ navigation, route }) {
   const { resetWizard, shippingOption } = useWizard();
-  const { totalItems, totalWeight, estimate, hasDG, dgCount, dgSurcharge } = route.params || {};
+  const { totalItems, totalWeight, estimate, hasDG, dgCount, dgSurcharge, distanceKm, tollCost } = route.params || {};
 
   function startNew() {
     resetWizard();
@@ -42,12 +42,24 @@ export default function ConfirmScreen({ navigation, route }) {
               {shippingOption === 'shared' ? '🤝 Share Truck (LTL)' : '🚚 Private Truck (FTL)'}
             </Text>
           </View>
+          {!!distanceKm && (
+            <View style={s.row}>
+              <Text style={s.rowLbl}>Route distance</Text>
+              <Text style={s.rowVal}>{distanceKm.toFixed(0)} km</Text>
+            </View>
+          )}
           {!!estimate && (
             <View style={s.row}>
               <Text style={s.rowLbl}>Estimated cost</Text>
               <Text style={[s.rowVal, { color: C.primary, fontSize: 16 }]}>
                 ${estimate.toLocaleString(undefined, { maximumFractionDigits: 0 })}
               </Text>
+            </View>
+          )}
+          {!!tollCost && tollCost > 0 && (
+            <View style={s.row}>
+              <Text style={[s.rowLbl, { color: '#7c3aed' }]}>🚦 Toll charges</Text>
+              <Text style={[s.rowVal, { color: '#7c3aed' }]}>${tollCost.toFixed(2)}</Text>
             </View>
           )}
           {hasDG && (

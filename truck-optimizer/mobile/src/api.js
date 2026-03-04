@@ -23,6 +23,9 @@ export const api = {
   paymentConfig:()     => request('GET',  '/api/payment/config'),
   createOrder:  (body) => request('POST', '/api/payment/create-order', body),
   captureOrder: (body) => request('POST', '/api/payment/capture-order', body),
+  geocode:      (query)            => request('POST', '/api/geocode', { query }),
+  getRoutes:    (from, to)         => request('POST', '/api/routes',  { from, to }),
+  getTolls:     (geometry, vehicleType) => request('POST', '/api/tolls', { geometry, vehicleType }),
 };
 
 export const authApi = {

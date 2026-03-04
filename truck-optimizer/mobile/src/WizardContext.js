@@ -3,8 +3,11 @@ import React, { createContext, useContext, useState } from 'react';
 const WizardContext = createContext(null);
 
 export function WizardProvider({ children }) {
-  const [items,          setItems]  = useState([]);
-  const [shippingOption, setOption] = useState(null); // 'shared' | 'private'
+  const [items,          setItems]         = useState([]);
+  const [shippingOption, setOption]        = useState(null); // 'shared' | 'private'
+  const [startLocation,  setStartLocation] = useState(null); // {label, lat, lng}
+  const [destLocation,   setDestLocation]  = useState(null); // {label, lat, lng}
+  const [selectedRoute,  setSelectedRoute] = useState(null); // {index, distance_km, duration_min, geometry, toll_cost}
 
   function addItem(item) {
     setItems(prev => [...prev, { ...item, _id: Date.now() + Math.random() }]);
@@ -18,12 +21,18 @@ export function WizardProvider({ children }) {
   function resetWizard() {
     setItems([]);
     setOption(null);
+    setStartLocation(null);
+    setDestLocation(null);
+    setSelectedRoute(null);
   }
 
   return (
     <WizardContext.Provider value={{
       items, addItem, updateItem, removeItem,
       shippingOption, setShippingOption: setOption,
+      startLocation, setStartLocation,
+      destLocation,  setDestLocation,
+      selectedRoute, setSelectedRoute,
       resetWizard,
     }}>
       {children}

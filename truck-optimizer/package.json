@@ -10,6 +10,7 @@
     "node": ">=18"
   },
   "dependencies": {
+    "@mapbox/polyline": "^1.2.1",
     "express": "^4.18.2"
   }
 }

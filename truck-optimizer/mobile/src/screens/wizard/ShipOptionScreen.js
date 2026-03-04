@@ -78,10 +78,10 @@ export default function ShipOptionScreen({ navigation }) {
 
         <TouchableOpacity
           style={[s.nextBtn, !shippingOption && s.nextBtnDisabled]}
-          onPress={() => shippingOption && navigation.navigate('Charges')}
+          onPress={() => shippingOption && navigation.navigate('Location')}
           activeOpacity={shippingOption ? 0.8 : 1}
         >
-          <Text style={s.nextBtnTxt}>See Estimated Charges →</Text>
+          <Text style={s.nextBtnTxt}>Next: Enter Route →</Text>
         </TouchableOpacity>
       </ScrollView>
     </SafeAreaView>
