@@ -143,7 +143,7 @@ export default function ReviewCargoScreen({ navigation }) {
         <TouchableOpacity style={s.addMoreBtn} onPress={() => navigation.goBack()}>
           <Text style={s.addMoreTxt}>＋ Add More</Text>
         </TouchableOpacity>
-        <TouchableOpacity style={s.confirmBtn} onPress={() => navigation.navigate('ShipOption')}>
+        <TouchableOpacity style={s.confirmBtn} onPress={() => navigation.navigate('Route')}>
           <Text style={s.confirmTxt}>Confirm →</Text>
         </TouchableOpacity>
       </View>

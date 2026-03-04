@@ -10,7 +10,7 @@ const { optimize }      = require('./engine/optimizer');
 const { analyzeRoutes } = require('./engine/routes');
 
 const app = express();
-app.use(express.json());
+app.use(express.json({ limit: '5mb' }));
 
 // ── PayPal config ───────────────────────────────────────────────────────────
 // Replace these with your real PayPal sandbox (or live) credentials.

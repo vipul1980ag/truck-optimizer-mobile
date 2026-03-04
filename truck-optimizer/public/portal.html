@@ -176,54 +176,18 @@
 <div id="booking-modal" class="booking-modal-overlay" onclick="bookingOverlayClick(event)">
   <div class="booking-modal-card">
 
-    <!-- Step 1: Shipping option -->
-    <div id="bm-step-shipping">
+    <!-- Step 1: Location + Shipping (combined) -->
+    <div id="bm-step-location">
       <div class="bm-head">
         <div>
-          <div class="bm-title">🚛 Choose Shipping</div>
-          <div class="bm-sub">How would you like to ship your cargo?</div>
+          <div class="bm-title">🚛 New Booking</div>
+          <div class="bm-sub">Enter locations and choose how to ship</div>
         </div>
         <button class="bm-close" onclick="closeBookingModal()">✕</button>
       </div>
       <div class="bm-body">
-        <div class="ship-options">
-          <button class="ship-opt" id="ship-opt-shared" onclick="selectShipping('shared')">
-            <div class="ship-opt-top">
-              <span class="ship-opt-icon">🤝</span>
-              <div>
-                <div class="ship-opt-title">Share Truck</div>
-                <div class="ship-opt-sub">LTL — Less Than Truckload</div>
-              </div>
-              <span class="ship-opt-tag tag-green">Best Value</span>
-            </div>
-            <div class="ship-opt-desc">Split the truck with other customers going the same way. Lower cost, flexible pickup windows.</div>
-          </button>
-          <button class="ship-opt" id="ship-opt-private" onclick="selectShipping('private')">
-            <div class="ship-opt-top">
-              <span class="ship-opt-icon">🚚</span>
-              <div>
-                <div class="ship-opt-title">Private Truck</div>
-                <div class="ship-opt-sub">FTL — Full Truckload</div>
-              </div>
-              <span class="ship-opt-tag tag-blue">Fastest</span>
-            </div>
-            <div class="ship-opt-desc">A dedicated truck exclusively for your cargo. Faster delivery and full scheduling control.</div>
-          </button>
-        </div>
-        <button class="btn-bm-next" id="btn-see-charges" onclick="showLocationStep()" disabled>Next: Enter Route →</button>
-      </div>
-    </div>
-
-    <!-- Step 2: Location -->
-    <div id="bm-step-location" style="display:none">
-      <div class="bm-head">
-        <div>
-          <div class="bm-title">📍 Route & Location</div>
-          <div class="bm-sub">Enter pickup and delivery addresses</div>
-        </div>
-        <button class="bm-close" onclick="showBookingStep('shipping')">←</button>
-      </div>
-      <div class="bm-body">
+        <!-- Locations -->
+        <div class="loc-section-label">📍 Route</div>
         <div class="location-field-wrap">
           <label class="loc-label">Start Location (Pickup)</label>
           <div class="loc-input-row">
@@ -243,6 +207,33 @@
           <div id="bm-dest-suggestions" class="location-suggestions" style="display:none"></div>
         </div>
         <div id="bm-dest-confirmed" class="loc-confirmed" style="display:none"></div>
+
+        <!-- Shipping option -->
+        <div class="loc-section-label" style="margin-top:16px;">💡 Want to save on shipping costs?</div>
+        <div class="ship-options">
+          <button class="ship-opt" id="ship-opt-shared" onclick="selectShipping('shared')">
+            <div class="ship-opt-top">
+              <span class="ship-opt-icon">🤝</span>
+              <div>
+                <div class="ship-opt-title">Share the Truck</div>
+                <div class="ship-opt-sub">LTL — Save up to 60%</div>
+              </div>
+              <span class="ship-opt-tag tag-green">Best Value</span>
+            </div>
+            <div class="ship-opt-desc">Your cargo shares space with others. Lower cost, ideal for smaller loads.</div>
+          </button>
+          <button class="ship-opt" id="ship-opt-private" onclick="selectShipping('private')">
+            <div class="ship-opt-top">
+              <span class="ship-opt-icon">🚚</span>
+              <div>
+                <div class="ship-opt-title">Private Truck</div>
+                <div class="ship-opt-sub">FTL — Full truck reserved</div>
+              </div>
+              <span class="ship-opt-tag tag-blue">Fastest</span>
+            </div>
+            <div class="ship-opt-desc">A dedicated truck exclusively for your cargo. Full scheduling control.</div>
+          </button>
+        </div>
 
         <button class="btn-bm-next" id="btn-find-routes" onclick="portalFindRoutes()" disabled>Find Routes 🗺️</button>
       </div>
