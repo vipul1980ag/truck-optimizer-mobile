@@ -51,8 +51,30 @@ function LocationField({ label, value, onChangeText, onSearch, loading, suggesti
   );
 }
 
+const SHIP_OPTS = [
+  {
+    value: 'shared',
+    icon: '🤝',
+    title: 'Share the Truck (LTL)',
+    desc: 'Save money — your cargo shares space with others. Ideal for smaller loads.',
+    badge: 'Save up to 60%',
+    badgeColor: '#16a34a',
+  },
+  {
+    value: 'private',
+    icon: '🚚',
+    title: 'Private Truck (FTL)',
+    desc: 'A dedicated truck exclusively for your cargo. Best for large or urgent shipments.',
+    badge: 'Full control',
+    badgeColor: '#2563eb',
+  },
+];
+
 export default function LocationScreen({ navigation }) {
-  const { setStartLocation, setDestLocation, startLocation, destLocation } = useWizard();
+  const {
+    setStartLocation, setDestLocation, startLocation, destLocation,
+    shippingOption, setShippingOption,
+  } = useWizard();
 
   const [startText,        setStartText]        = useState(startLocation?.label || '');
   const [destText,         setDestText]          = useState(destLocation?.label || '');
@@ -86,13 +108,15 @@ export default function LocationScreen({ navigation }) {
     setLocation(item);
   }
 
-  const bothSet = !!(startLocation && destLocation);
+  const canProceed = !!(startLocation && destLocation && shippingOption);
 
   return (
     <SafeAreaView style={s.safe} edges={['bottom']}>
       <ScrollView contentContainerStyle={s.container} keyboardShouldPersistTaps="handled">
+
+        {/* Locations */}
         <Text style={s.heading}>📍 Where is your cargo going?</Text>
-        <Text style={s.sub}>Enter pickup and delivery locations to find the best route</Text>
+        <Text style={s.sub}>Enter pickup and delivery locations</Text>
 
         <LocationField
           label="Start Location (Pickup)"
@@ -103,7 +127,6 @@ export default function LocationScreen({ navigation }) {
           suggestions={startSuggestions}
           onSelectSuggestion={item => selectSuggestion(item, setStartText, setStartSuggestions, setStartLocation)}
         />
-
         {startLocation && (
           <View style={s.confirmedBadge}>
             <Text style={s.confirmedTxt}>✓ {startLocation.label}</Text>
@@ -119,20 +142,57 @@ export default function LocationScreen({ navigation }) {
           suggestions={destSuggestions}
           onSelectSuggestion={item => selectSuggestion(item, setDestText, setDestSuggestions, setDestLocation)}
         />
-
         {destLocation && (
           <View style={s.confirmedBadge}>
             <Text style={s.confirmedTxt}>✓ {destLocation.label}</Text>
           </View>
         )}
 
+        {/* Shipping option */}
+        <Text style={s.sectionHead}>💡 Want to save on shipping costs?</Text>
+        <Text style={s.sectionSub}>Choose how you want to ship your cargo</Text>
+
+        {SHIP_OPTS.map(opt => (
+          <TouchableOpacity
+            key={opt.value}
+            style={[s.optCard, shippingOption === opt.value && s.optCardSelected]}
+            onPress={() => setShippingOption(opt.value)}
+            activeOpacity={0.85}
+          >
+            <View style={s.optLeft}>
+              <Text style={s.optIcon}>{opt.icon}</Text>
+            </View>
+            <View style={{ flex: 1 }}>
+              <View style={s.optTitleRow}>
+                <Text style={[s.optTitle, shippingOption === opt.value && s.optTitleSelected]}>
+                  {opt.title}
+                </Text>
+                <View style={[s.badge, { backgroundColor: opt.badgeColor }]}>
+                  <Text style={s.badgeTxt}>{opt.badge}</Text>
+                </View>
+              </View>
+              <Text style={s.optDesc}>{opt.desc}</Text>
+            </View>
+            {shippingOption === opt.value && (
+              <Text style={s.checkMark}>✓</Text>
+            )}
+          </TouchableOpacity>
+        ))}
+
         <TouchableOpacity
-          style={[s.nextBtn, !bothSet && s.nextBtnDisabled]}
-          onPress={() => bothSet && navigation.navigate('Route')}
-          activeOpacity={bothSet ? 0.8 : 1}
+          style={[s.nextBtn, !canProceed && s.nextBtnDisabled]}
+          onPress={() => canProceed && navigation.navigate('AddCargo')}
+          activeOpacity={canProceed ? 0.8 : 1}
         >
-          <Text style={s.nextBtnTxt}>Find Routes 🗺️</Text>
+          <Text style={s.nextBtnTxt}>
+            {!startLocation || !destLocation
+              ? 'Set locations above'
+              : !shippingOption
+              ? 'Choose shipping type above'
+              : 'Start Adding Cargo 📦'}
+          </Text>
         </TouchableOpacity>
+
       </ScrollView>
     </SafeAreaView>
   );
@@ -140,10 +200,10 @@ export default function LocationScreen({ navigation }) {
 
 const s = StyleSheet.create({
   safe:      { flex: 1, backgroundColor: C.bg },
-  container: { flexGrow: 1, padding: 20 },
+  container: { flexGrow: 1, padding: 20, paddingBottom: 32 },
 
   heading: { fontSize: 20, fontWeight: '900', color: C.text, marginBottom: 4 },
-  sub:     { fontSize: 13, color: C.text2, marginBottom: 24, lineHeight: 19 },
+  sub:     { fontSize: 13, color: C.text2, marginBottom: 20, lineHeight: 19 },
 
   fieldWrap:  { marginBottom: 8, zIndex: 10 },
   fieldLabel: { fontSize: 12, fontWeight: '700', color: C.text2, marginBottom: 6, textTransform: 'uppercase', letterSpacing: 0.5 },
@@ -172,6 +232,27 @@ const s = StyleSheet.create({
     marginBottom: 16, borderWidth: 1, borderColor: '#86efac',
   },
   confirmedTxt: { fontSize: 12, color: '#166534', fontWeight: '700', lineHeight: 16 },
+
+  sectionHead: { fontSize: 16, fontWeight: '900', color: C.text, marginTop: 8, marginBottom: 4 },
+  sectionSub:  { fontSize: 12, color: C.text2, marginBottom: 14 },
+
+  optCard: {
+    flexDirection: 'row', alignItems: 'center', gap: 12,
+    backgroundColor: C.surface, borderRadius: 14, padding: 14,
+    borderWidth: 2, borderColor: C.border, marginBottom: 10,
+  },
+  optCardSelected: { borderColor: C.primary, backgroundColor: '#eff6ff' },
+  optLeft:  { width: 40, alignItems: 'center' },
+  optIcon:  { fontSize: 26 },
+  optTitleRow: { flexDirection: 'row', alignItems: 'center', gap: 8, flexWrap: 'wrap', marginBottom: 4 },
+  optTitle:    { fontSize: 14, fontWeight: '800', color: C.text },
+  optTitleSelected: { color: C.primary },
+  optDesc:  { fontSize: 12, color: C.text2, lineHeight: 17 },
+
+  badge:    { borderRadius: 20, paddingHorizontal: 8, paddingVertical: 2 },
+  badgeTxt: { color: '#fff', fontSize: 10, fontWeight: '800' },
+
+  checkMark: { fontSize: 18, color: C.primary, fontWeight: '900', marginLeft: 4 },
 
   nextBtn:         { marginTop: 24, backgroundColor: C.primary, borderRadius: 12, paddingVertical: 15, alignItems: 'center' },
   nextBtnDisabled: { backgroundColor: '#cbd5e1' },

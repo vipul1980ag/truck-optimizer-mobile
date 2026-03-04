@@ -574,14 +574,15 @@ function openBookingModal() {
   _wizardDest  = null;
   _wizardRoute = null;
   document.querySelectorAll('.ship-opt').forEach(el => el.classList.remove('selected'));
-  document.getElementById('btn-see-charges').disabled = true;
   // Reset location inputs
   const si = document.getElementById('bm-start-input'); if (si) si.value = '';
   const di = document.getElementById('bm-dest-input');  if (di) di.value = '';
   const sc = document.getElementById('bm-start-confirmed'); if (sc) sc.style.display = 'none';
   const dc = document.getElementById('bm-dest-confirmed');  if (dc) dc.style.display = 'none';
-  const fr = document.getElementById('btn-find-routes'); if (fr) fr.disabled = true;
-  showBookingStep('shipping');
+  const ss = document.getElementById('bm-start-suggestions'); if (ss) ss.style.display = 'none';
+  const ds = document.getElementById('bm-dest-suggestions');  if (ds) ds.style.display = 'none';
+  updateFindRoutesBtn();
+  showBookingStep('location');
   document.getElementById('booking-modal').classList.add('open');
 }
 
@@ -594,8 +595,9 @@ function bookingOverlayClick(e) {
 }
 
 function showBookingStep(step) {
-  ['shipping', 'location', 'route', 'charges', 'confirm'].forEach(s => {
-    document.getElementById('bm-step-' + s).style.display = s === step ? '' : 'none';
+  ['location', 'route', 'charges', 'confirm'].forEach(s => {
+    const el = document.getElementById('bm-step-' + s);
+    if (el) el.style.display = s === step ? '' : 'none';
   });
 }
 
@@ -603,21 +605,18 @@ function selectShipping(type) {
   _wizardShipping = type;
   document.querySelectorAll('.ship-opt').forEach(el => el.classList.remove('selected'));
   document.getElementById('ship-opt-' + type).classList.add('selected');
-  document.getElementById('btn-see-charges').disabled = false;
-}
-
-function showLocationStep() {
-  showBookingStep('location');
+  updateFindRoutesBtn();
 }
 
 function onLocationInput(field) {
-  if (field === 'start') { _wizardStart = null; updateFindRoutesBtn(); }
-  else                   { _wizardDest  = null; updateFindRoutesBtn(); }
+  if (field === 'start') { _wizardStart = null; }
+  else                   { _wizardDest  = null; }
+  updateFindRoutesBtn();
 }
 
 function updateFindRoutesBtn() {
   const btn = document.getElementById('btn-find-routes');
-  if (btn) btn.disabled = !(_wizardStart && _wizardDest);
+  if (btn) btn.disabled = !(_wizardStart && _wizardDest && _wizardShipping);
 }
 
 async function portalGeocode(field) {
