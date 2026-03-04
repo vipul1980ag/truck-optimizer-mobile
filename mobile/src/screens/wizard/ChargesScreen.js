@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import {
-  View, Text, StyleSheet, TouchableOpacity, ActivityIndicator, ScrollView, Alert,
+  View, Text, StyleSheet, TouchableOpacity, ActivityIndicator, ScrollView, Alert, TextInput, KeyboardAvoidingView, Platform,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useWizard } from '../../WizardContext';
@@ -9,9 +9,11 @@ import { C } from '../../theme';
 
 export default function ChargesScreen({ navigation }) {
   const { items, shippingOption, selectedRoute } = useWizard();
-  const [truck,    setTruck]    = useState(null);
-  const [loading,  setLoading]  = useState(true);
-  const [saving,   setSaving]   = useState(false);
+  const [truck,             setTruck]             = useState(null);
+  const [loading,           setLoading]           = useState(true);
+  const [saving,            setSaving]            = useState(false);
+  const [manualTollText,    setManualTollText]    = useState('');
+  const [additionalText,    setAdditionalText]    = useState('');
 
   useEffect(() => {
     api.getData()
@@ -32,6 +34,9 @@ export default function ChargesScreen({ navigation }) {
   const distance_miles = distance_km * 0.621371;
   const toll_cost      = selectedRoute ? (selectedRoute.toll_cost || 0) : 0;
 
+  const manualToll       = parseFloat(manualTollText)    || 0;
+  const additionalCharge = parseFloat(additionalText)    || 0;
+
   // Cost estimate
   let truckVol = 0, fullCost = 0, baseCost = 0, dgSurcharge = 0, estimate = 0, pct = 0;
   if (truck) {
@@ -42,7 +47,7 @@ export default function ChargesScreen({ navigation }) {
       ? Math.max(fullCost * pct, fullCost * 0.25)
       : fullCost;
     dgSurcharge = hasDG ? baseCost * 0.15 : 0;
-    estimate    = baseCost + dgSurcharge + toll_cost;
+    estimate    = baseCost + dgSurcharge + toll_cost + manualToll + additionalCharge;
   }
 
   async function confirmBooking() {
@@ -72,7 +77,7 @@ export default function ChargesScreen({ navigation }) {
         items:   [...(fresh.items || []), ...newItems],
         nextIds: { ...fresh.nextIds, item: nextId },
       });
-      navigation.navigate('Confirm', { totalItems, totalWeight, estimate, hasDG, dgCount: dgItems.length, dgSurcharge: Math.round(dgSurcharge), distanceKm: distance_km, tollCost: toll_cost });
+      navigation.navigate('Confirm', { totalItems, totalWeight, estimate, hasDG, dgCount: dgItems.length, dgSurcharge: Math.round(dgSurcharge), distanceKm: distance_km, tollCost: toll_cost, manualToll, additionalCharge });
     } catch (e) {
       Alert.alert('Error', 'Could not save booking: ' + e.message);
     } finally {
@@ -164,6 +169,18 @@ export default function ChargesScreen({ navigation }) {
                 <Text style={[s.rowVal, { color: '#7c3aed' }]}>+${toll_cost.toFixed(2)}</Text>
               </View>
             )}
+            {manualToll > 0 && (
+              <View style={s.row}>
+                <Text style={[s.rowLbl, { color: '#7c3aed', fontWeight: '700' }]}>🚦 Manual toll</Text>
+                <Text style={[s.rowVal, { color: '#7c3aed' }]}>+${manualToll.toFixed(2)}</Text>
+              </View>
+            )}
+            {additionalCharge > 0 && (
+              <View style={s.row}>
+                <Text style={[s.rowLbl, { color: '#0369a1', fontWeight: '700' }]}>➕ Additional charges</Text>
+                <Text style={[s.rowVal, { color: '#0369a1' }]}>+${additionalCharge.toFixed(2)}</Text>
+              </View>
+            )}
             <View style={[s.row, s.totalRow]}>
               <Text style={s.totalLbl}>Estimated Total</Text>
               <Text style={s.totalVal}>${estimate.toLocaleString(undefined, { maximumFractionDigits: 0 })}</Text>
@@ -175,6 +192,33 @@ export default function ChargesScreen({ navigation }) {
             <Text style={s.optDesc}>Could not load truck rates. You can still confirm your booking.</Text>
           </View>
         )}
+
+        {/* Manual adjustments */}
+        <View style={s.card}>
+          <Text style={s.cardHead}>✏️ Manual Adjustments</Text>
+          <View style={s.inputRow}>
+            <Text style={s.inputLbl}>🚦 Toll charges ($)</Text>
+            <TextInput
+              style={s.input}
+              value={manualTollText}
+              onChangeText={setManualTollText}
+              keyboardType="decimal-pad"
+              placeholder="0.00"
+              placeholderTextColor={C.text3}
+            />
+          </View>
+          <View style={[s.inputRow, { borderBottomWidth: 0 }]}>
+            <Text style={s.inputLbl}>➕ Additional flat charges ($)</Text>
+            <TextInput
+              style={s.input}
+              value={additionalText}
+              onChangeText={setAdditionalText}
+              keyboardType="decimal-pad"
+              placeholder="0.00"
+              placeholderTextColor={C.text3}
+            />
+          </View>
+        </View>
 
       </ScrollView>
 
@@ -216,4 +260,8 @@ const s = StyleSheet.create({
   dgWarning:     { backgroundColor: '#fff7ed', borderRadius: 12, padding: 14, marginBottom: 14, borderWidth: 1.5, borderColor: '#fed7aa' },
   dgWarningTitle:{ fontSize: 14, fontWeight: '900', color: '#c2410c', marginBottom: 4 },
   dgWarningTxt:  { fontSize: 12, color: '#9a3412', lineHeight: 18 },
+
+  inputRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingVertical: 8, borderBottomWidth: 1, borderBottomColor: C.surface2 },
+  inputLbl: { fontSize: 13, color: C.text2, flex: 1 },
+  input:    { width: 90, backgroundColor: C.surface2, borderRadius: 8, paddingHorizontal: 10, paddingVertical: 6, fontSize: 13, color: C.text, fontWeight: '700', textAlign: 'right', borderWidth: 1, borderColor: C.border },
 });

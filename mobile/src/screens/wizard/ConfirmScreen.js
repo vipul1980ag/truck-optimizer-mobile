@@ -6,7 +6,7 @@ import { C } from '../../theme';
 
 export default function ConfirmScreen({ navigation, route }) {
   const { resetWizard, shippingOption } = useWizard();
-  const { totalItems, totalWeight, estimate, hasDG, dgCount, dgSurcharge, distanceKm, tollCost } = route.params || {};
+  const { totalItems, totalWeight, estimate, hasDG, dgCount, dgSurcharge, distanceKm, tollCost, manualToll, additionalCharge } = route.params || {};
 
   function startNew() {
     resetWizard();
@@ -60,6 +60,18 @@ export default function ConfirmScreen({ navigation, route }) {
             <View style={s.row}>
               <Text style={[s.rowLbl, { color: '#7c3aed' }]}>🚦 Toll charges</Text>
               <Text style={[s.rowVal, { color: '#7c3aed' }]}>${tollCost.toFixed(2)}</Text>
+            </View>
+          )}
+          {!!manualToll && manualToll > 0 && (
+            <View style={s.row}>
+              <Text style={[s.rowLbl, { color: '#7c3aed' }]}>🚦 Manual toll</Text>
+              <Text style={[s.rowVal, { color: '#7c3aed' }]}>${manualToll.toFixed(2)}</Text>
+            </View>
+          )}
+          {!!additionalCharge && additionalCharge > 0 && (
+            <View style={s.row}>
+              <Text style={[s.rowLbl, { color: '#0369a1' }]}>➕ Additional charges</Text>
+              <Text style={[s.rowVal, { color: '#0369a1' }]}>${additionalCharge.toFixed(2)}</Text>
             </View>
           )}
           {hasDG && (
