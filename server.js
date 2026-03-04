@@ -363,18 +363,14 @@ app.post('/api/tolls', async (req, res) => {
       }),
     });
     const data = await r.json();
-    console.log('[TollGuru] status:', r.status, 'response keys:', Object.keys(data || {}));
-    if (data?.route) console.log('[TollGuru] route.costs:', JSON.stringify(data.route.costs));
-    if (data?.summary) console.log('[TollGuru] summary:', JSON.stringify(data.summary));
 
-    // Try multiple known response paths
-    const toll_cost =
-      data?.route?.costs?.tag ??
-      data?.route?.costs?.minimumTollCost ??
-      data?.summary?.total?.toll ??
-      data?.summary?.totalToll ??
-      0;
-    res.json({ toll_cost: parseFloat(toll_cost) || 0 });
+    // Sum cheapest cost across all toll points on the route
+    const tolls = data?.route?.tolls || [];
+    const toll_cost = tolls.reduce((sum, t) => {
+      const cost = t.tagCost ?? t.prepaidCardCost ?? t.cashCost ?? t.licensePlateCost ?? 0;
+      return sum + (parseFloat(cost) || 0);
+    }, 0);
+    res.json({ toll_cost: Math.round(toll_cost * 100) / 100 });
   } catch (err) {
     res.json({ toll_cost: 0, note: 'Toll lookup failed: ' + err.message });
   }
