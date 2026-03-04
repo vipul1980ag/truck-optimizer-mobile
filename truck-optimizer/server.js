@@ -4,7 +4,6 @@ const express  = require('express');
 const fs       = require('fs');
 const path     = require('path');
 const crypto   = require('crypto');
-const polyline = require('@mapbox/polyline');
 
 const { optimize }      = require('./engine/optimizer');
 const { analyzeRoutes } = require('./engine/routes');
@@ -344,36 +343,7 @@ app.post('/api/tolls', async (req, res) => {
   if (!geometry?.coordinates?.length)
     return res.status(400).json({ error: 'geometry (GeoJSON LineString) is required' });
 
-  const apiKey = process.env.TOLLGURU_API_KEY;
-  if (!apiKey) return res.json({ toll_cost: 0, note: 'Toll data unavailable (no API key)' });
-
-  try {
-    // TollGuru expects [lat, lng] pairs; OSRM GeoJSON has [lng, lat]
-    const coords  = geometry.coordinates.map(([lng, lat]) => [lat, lng]);
-    const encoded = polyline.encode(coords);
-
-    const r = await fetch('https://apis.tollguru.com/toll/v2/complete-polyline-from-mapping-service', {
-      method:  'POST',
-      headers: { 'Content-Type': 'application/json', 'x-api-key': apiKey },
-      body: JSON.stringify({
-        mapProvider:    'osrm',
-        polyline:       encoded,
-        vehicleType,
-        departure_time: Math.floor(Date.now() / 1000),
-      }),
-    });
-    const data = await r.json();
-
-    // Sum cheapest cost across all toll points on the route
-    const tolls = data?.route?.tolls || [];
-    const toll_cost = tolls.reduce((sum, t) => {
-      const cost = t.tagCost ?? t.prepaidCardCost ?? t.cashCost ?? t.licensePlateCost ?? 0;
-      return sum + (parseFloat(cost) || 0);
-    }, 0);
-    res.json({ toll_cost: Math.round(toll_cost * 100) / 100 });
-  } catch (err) {
-    res.json({ toll_cost: 0, note: 'Toll lookup failed: ' + err.message });
-  }
+  res.json({ toll_cost: 0 });
 });
 
 // ── PayPal API Routes ───────────────────────────────────────────────────────
