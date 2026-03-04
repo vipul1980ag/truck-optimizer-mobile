@@ -1,21 +1,54 @@
 import React, { useState, useEffect } from 'react';
 import {
   View, Text, StyleSheet, FlatList, TextInput,
-  TouchableOpacity, Alert,
+  TouchableOpacity, Alert, ActivityIndicator,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useWizard } from '../../WizardContext';
+import { api } from '../../api';
 import { C } from '../../theme';
 
+function suggestTruck(trucks, totalWeight, totalVol, hasDG, hasFragile, category) {
+  const semi = trucks.find(t => t.maxWt >= 30000) || trucks[0];
+  const box  = trucks.find(t => t.maxWt <  30000) || trucks[0];
+  if (!semi || !box) return null;
+  const boxVol = box.length * box.width * box.height;
+
+  if (hasDG)                     return { truck: semi, reason: 'DG-certified truck required for dangerous goods' };
+  if (totalWeight > box.maxWt)   return { truck: semi, reason: `cargo weight (${totalWeight.toLocaleString()} lbs) exceeds box truck limit` };
+  if (totalVol > boxVol * 0.9)   return { truck: semi, reason: `cargo volume (${totalVol.toFixed(0)} cu ft) requires larger truck` };
+  if (category === 'industrial') return { truck: semi, reason: 'industrial cargo suits a large semi truck' };
+  if (hasFragile)                return { truck: box,  reason: 'handle-with-care items — box truck provides better control' };
+                                  return { truck: box,  reason: 'cargo fits efficiently in a box truck' };
+}
+
 export default function ReviewCargoScreen({ navigation }) {
-  const { items, updateItem, removeItem } = useWizard();
-  const [expandedId, setExpandedId] = useState(null);
-  const [editForm,   setEditForm]   = useState({});
+  const { items, updateItem, removeItem, cargoCategory } = useWizard();
+  const [expandedId,    setExpandedId]    = useState(null);
+  const [editForm,      setEditForm]      = useState({});
+  const [suggestion,    setSuggestion]    = useState(null); // {truck, reason}
+  const [trucksLoading, setTrucksLoading] = useState(true);
 
   // Auto go back if all items deleted
   useEffect(() => {
     if (items.length === 0) navigation.goBack();
   }, [items.length]);
+
+  useEffect(() => {
+    api.getData()
+      .then(data => {
+        const trucks = data.trucks || [];
+        if (!trucks.length) return;
+        const totalWeight = items.reduce((s, i) => s + (i.weight + (i.packagingWeight || 0)) * i.qty, 0);
+        const totalVol    = items.reduce((s, i) => s + i.length * i.width * i.height * i.qty, 0);
+        const hasDG       = items.some(i => i.isDG);
+        const hasFragile  = items.some(i => i.isFragile);
+        const result = suggestTruck(trucks, totalWeight, totalVol, hasDG, hasFragile, cargoCategory);
+        setSuggestion(result);
+      })
+      .catch(() => {})
+      .finally(() => setTrucksLoading(false));
+  }, []);
 
   function startEdit(item) {
     setExpandedId(item._id);
@@ -54,14 +87,31 @@ export default function ReviewCargoScreen({ navigation }) {
   const totalWeight = items.reduce((s, i) => s + (i.weight + (i.packagingWeight || 0)) * i.qty, 0);
   const totalVol    = items.reduce((s, i) => s + i.length * i.width * i.height * i.qty, 0);
 
+  const suggestedTruck = suggestion?.truck;
+  const suggestionReason = suggestion?.reason;
+  const utilizationPct = suggestedTruck
+    ? Math.max(
+        totalWeight / suggestedTruck.maxWt,
+        totalVol / (suggestedTruck.length * suggestedTruck.width * suggestedTruck.height)
+      )
+    : 0;
+
   function renderItem({ item }) {
     const isExpanded = expandedId === item._id;
     return (
-      <View style={s.card}>
+      <View style={[s.card, item.isDG && s.cardDG]}>
         {/* Summary row */}
         <View style={s.cardRow}>
           <View style={{ flex: 1 }}>
-            <Text style={s.itemName}>{item.name}</Text>
+            <View style={{ flexDirection: 'row', alignItems: 'center', flexWrap: 'wrap', gap: 4 }}>
+              <Text style={s.itemName}>{item.name}</Text>
+              {item.isDG && (
+                <View style={s.dgBadge}><Text style={s.dgBadgeTxt}>⚠ DG</Text></View>
+              )}
+              {item.isFragile && (
+                <View style={s.fragileBadge}><Text style={s.fragileBadgeTxt}>🔔 Handle with care</Text></View>
+              )}
+            </View>
             <Text style={s.itemDims}>
               {item.length}×{item.width}×{item.height} ft · {item.weight} lbs · qty {item.qty}
             </Text>
@@ -112,6 +162,29 @@ export default function ReviewCargoScreen({ navigation }) {
     );
   }
 
+  function ListFooter() {
+    if (trucksLoading) {
+      return (
+        <View style={s.suggestionCard}>
+          <ActivityIndicator color={C.primary} />
+          <Text style={[s.suggReason, { marginTop: 6 }]}>Analyzing cargo…</Text>
+        </View>
+      );
+    }
+    if (!suggestedTruck) return null;
+    return (
+      <View style={s.suggestionCard}>
+        <Text style={s.suggHead}>🚛 Recommended Truck</Text>
+        <Text style={s.suggName}>{suggestedTruck.name}</Text>
+        <Text style={s.suggReason}>{suggestionReason}</Text>
+        <View style={s.suggStats}>
+          <Text style={s.suggStat}>{suggestedTruck.length} ft · {suggestedTruck.maxWt.toLocaleString()} lbs max</Text>
+          <Text style={s.suggStat}>Utilization: {Math.min(Math.round(utilizationPct * 100), 100)}%</Text>
+        </View>
+      </View>
+    );
+  }
+
   return (
     <SafeAreaView style={s.safe} edges={['bottom']}>
       {/* Totals banner */}
@@ -136,12 +209,16 @@ export default function ReviewCargoScreen({ navigation }) {
         renderItem={renderItem}
         contentContainerStyle={s.list}
         keyboardShouldPersistTaps="handled"
+        ListFooterComponent={<ListFooter />}
       />
 
       {/* Bottom bar */}
       <View style={s.bottomBar}>
         <TouchableOpacity style={s.addMoreBtn} onPress={() => navigation.goBack()}>
           <Text style={s.addMoreTxt}>＋ Add More</Text>
+        </TouchableOpacity>
+        <TouchableOpacity style={s.viz3dBtn} onPress={() => navigation.navigate('Viz3D')}>
+          <Text style={s.viz3dTxt}>🧊 3D Load</Text>
         </TouchableOpacity>
         <TouchableOpacity style={s.confirmBtn} onPress={() => navigation.navigate('Route')}>
           <Text style={s.confirmTxt}>Confirm →</Text>
@@ -164,9 +241,15 @@ const s = StyleSheet.create({
   bannerLbl:  { fontSize: 10, color: '#64748b', marginTop: 2 },
 
   card:    { backgroundColor: C.surface, borderRadius: 12, padding: 14, marginBottom: 10, borderWidth: 1, borderColor: C.border },
+  cardDG:  { borderColor: '#fed7aa', backgroundColor: '#fffbeb' },
   cardRow: { flexDirection: 'row', alignItems: 'center' },
   itemName:{ fontSize: 14, fontWeight: '800', color: C.text },
   itemDims:{ fontSize: 11, color: C.text2, marginTop: 2 },
+
+  dgBadge:      { backgroundColor: '#ffedd5', borderRadius: 4, paddingHorizontal: 5, paddingVertical: 1, borderWidth: 1, borderColor: '#fed7aa' },
+  dgBadgeTxt:   { fontSize: 8, fontWeight: '800', color: '#9a3412' },
+  fragileBadge:    { backgroundColor: '#d1fae5', borderRadius: 4, paddingHorizontal: 5, paddingVertical: 1, borderWidth: 1, borderColor: '#6ee7b7' },
+  fragileBadgeTxt: { fontSize: 8, fontWeight: '800', color: '#065f46' },
 
   iconBtn:    { padding: 6, borderRadius: 8, backgroundColor: C.surface2, borderWidth: 1, borderColor: C.border },
   iconBtnTxt: { fontSize: 14 },
@@ -184,15 +267,25 @@ const s = StyleSheet.create({
   saveBtn:    { marginTop: 12, backgroundColor: C.primary, borderRadius: 8, paddingVertical: 10, alignItems: 'center' },
   saveBtnTxt: { color: '#fff', fontSize: 13, fontWeight: '800' },
 
+  // Truck suggestion card
+  suggestionCard: { backgroundColor: C.surface, borderRadius: 14, padding: 16, marginBottom: 10, borderWidth: 1.5, borderColor: C.primary, alignItems: 'center' },
+  suggHead:  { fontSize: 11, fontWeight: '700', color: C.text2, textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 4 },
+  suggName:  { fontSize: 18, fontWeight: '900', color: C.text, marginBottom: 4 },
+  suggReason:{ fontSize: 12, color: C.text2, textAlign: 'center', lineHeight: 17, marginBottom: 10 },
+  suggStats: { flexDirection: 'row', gap: 16 },
+  suggStat:  { fontSize: 11, color: C.primary, fontWeight: '700' },
+
   bottomBar: {
-    flexDirection: 'row', gap: 10, padding: 12, paddingHorizontal: 16,
+    flexDirection: 'row', gap: 8, padding: 12, paddingHorizontal: 16,
     backgroundColor: C.surface, borderTopWidth: 1, borderTopColor: C.border,
   },
   addMoreBtn: {
     flex: 1, paddingVertical: 12, borderRadius: 10,
     borderWidth: 1.5, borderColor: C.primary, alignItems: 'center',
   },
-  addMoreTxt: { color: C.primary, fontSize: 14, fontWeight: '800' },
+  addMoreTxt: { color: C.primary, fontSize: 13, fontWeight: '800' },
+  viz3dBtn:   { flex: 1, backgroundColor: '#0f172a', paddingVertical: 12, borderRadius: 10, alignItems: 'center', borderWidth: 1.5, borderColor: '#3b82f6' },
+  viz3dTxt:   { color: '#60a5fa', fontSize: 13, fontWeight: '800' },
   confirmBtn: { flex: 1, backgroundColor: C.primary, paddingVertical: 12, borderRadius: 10, alignItems: 'center' },
-  confirmTxt: { color: '#fff', fontSize: 14, fontWeight: '800' },
+  confirmTxt: { color: '#fff', fontSize: 13, fontWeight: '800' },
 });

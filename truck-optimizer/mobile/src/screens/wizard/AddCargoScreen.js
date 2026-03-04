@@ -158,10 +158,10 @@ const DG_CLASSES = [
   'Class 9 — Miscellaneous DG',
 ];
 
-const BLANK = { name: '', length: '4', width: '4', height: '4', weight: '500', packagingWeight: '0', qty: '1', stackable: true, isDG: false, dgClass: '', dgCanCombine: true };
+const BLANK = { name: '', length: '4', width: '4', height: '4', weight: '500', packagingWeight: '0', qty: '1', stackable: true, isDG: false, dgClass: '', dgCanCombine: true, isFragile: false };
 
 export default function AddCargoScreen({ navigation }) {
-  const { items, addItem, updateItem, removeItem } = useWizard();
+  const { items, addItem, updateItem, removeItem, setCargoCategory } = useWizard();
 
   const [step,         setStep]         = useState(1);
   const [category,     setCategory]     = useState(null);
@@ -234,6 +234,7 @@ export default function AddCargoScreen({ navigation }) {
       isDG:            form.isDG,
       dgClass:         form.isDG ? form.dgClass : '',
       dgCanCombine:    form.isDG ? form.dgCanCombine : true,
+      isFragile:       form.isFragile,
     });
 
     // Save to server catalog if it's a custom (not built-in) item
@@ -325,12 +326,12 @@ export default function AddCargoScreen({ navigation }) {
             {step === 1 && (
               <>
                 <Text style={s.lbl}>Select Category</Text>
-                <TouchableOpacity style={s.catBtn} onPress={() => { setCategory('household'); setStep(2); }}>
+                <TouchableOpacity style={s.catBtn} onPress={() => { setCategory('household'); setCargoCategory('household'); setStep(2); }}>
                   <Text style={s.catIcon}>🏠</Text>
                   <Text style={s.catLabel}>Household</Text>
                   <Text style={s.catSub}>Furniture · appliances · boxes</Text>
                 </TouchableOpacity>
-                <TouchableOpacity style={[s.catBtn, { marginTop: 8 }]} onPress={() => { setCategory('industrial'); setStep(2); }}>
+                <TouchableOpacity style={[s.catBtn, { marginTop: 8 }]} onPress={() => { setCategory('industrial'); setCargoCategory('industrial'); setStep(2); }}>
                   <Text style={s.catIcon}>🏭</Text>
                   <Text style={s.catLabel}>Industrial</Text>
                   <Text style={s.catSub}>Pallets · machinery · equipment</Text>
@@ -429,6 +430,19 @@ export default function AddCargoScreen({ navigation }) {
                     onValueChange={v => setForm(p => ({ ...p, stackable: v }))}
                     trackColor={{ false: '#cbd5e1', true: '#bfdbfe' }}
                     thumbColor={form.stackable ? C.primary : '#94a3b8'}
+                    style={{ marginLeft: 'auto' }}
+                  />
+                </View>
+
+                {/* Fragile toggle */}
+                <View style={s.stackableRow}>
+                  <Text style={s.stackableIcon}>🔔</Text>
+                  <Text style={s.stackableTxt}>Handle with care</Text>
+                  <Switch
+                    value={form.isFragile}
+                    onValueChange={v => setForm(p => ({ ...p, isFragile: v }))}
+                    trackColor={{ false: '#cbd5e1', true: '#d1fae5' }}
+                    thumbColor={form.isFragile ? '#10b981' : '#94a3b8'}
                     style={{ marginLeft: 'auto' }}
                   />
                 </View>
