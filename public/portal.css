@@ -917,3 +917,66 @@ body {
 .dg-warning-banner-icon { font-size: 18px; line-height: 1; flex-shrink: 0; margin-top: 1px; }
 .dg-warning-banner-text { font-size: 12px; color: #9a3412; line-height: 1.6; }
 .dg-warning-banner-title { font-weight: 800; }
+
+/* ── Route & Location wizard steps ─────────────────────────────────────────── */
+
+/* Location step */
+.location-field-wrap { position: relative; margin-bottom: 8px; }
+.loc-label { display: block; font-size: 11px; font-weight: 700; color: var(--text2); text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 6px; }
+.loc-input-row { display: flex; gap: 8px; }
+.loc-input { flex: 1; background: var(--surface); border: 1.5px solid var(--border); border-radius: 10px; padding: 10px 14px; font-size: 13px; color: var(--text); outline: none; }
+.loc-input:focus { border-color: var(--primary); }
+.loc-search-btn { background: var(--primary); color: #fff; border: none; border-radius: 10px; width: 42px; cursor: pointer; font-size: 16px; display: flex; align-items: center; justify-content: center; }
+.loc-search-btn:hover { background: var(--primary-dark, #1d4ed8); }
+.location-suggestions {
+  background: #fff; border: 1px solid var(--border); border-radius: 10px;
+  max-height: 180px; overflow-y: auto; z-index: 200;
+  box-shadow: 0 4px 16px rgba(0,0,0,0.12); margin-top: 4px;
+}
+.location-suggestion-item {
+  padding: 10px 14px; cursor: pointer; font-size: 12px; color: var(--text);
+  line-height: 1.5; border-bottom: 1px solid var(--surface2); min-height: 40px;
+}
+.location-suggestion-item:last-child { border-bottom: none; }
+.location-suggestion-item:hover { background: var(--surface2); }
+.loc-confirmed {
+  background: #dcfce7; border: 1px solid #86efac; border-radius: 8px;
+  padding: 6px 12px; font-size: 12px; color: #166534; font-weight: 700;
+  margin-bottom: 14px; line-height: 1.5; word-break: break-word;
+}
+
+/* Route step */
+.route-card {
+  border: 2px solid var(--border); border-radius: 12px; padding: 14px 16px;
+  margin-bottom: 10px; cursor: pointer; display: flex; justify-content: space-between;
+  align-items: center; background: var(--surface); transition: border-color 0.15s;
+}
+.route-card:hover { border-color: var(--primary); }
+.route-card.selected { border-color: var(--primary); background: rgba(37,99,235,0.05); }
+.route-card-left { flex: 1; }
+.route-card-label { font-size: 14px; font-weight: 800; color: var(--text); }
+.route-card.selected .route-card-label { color: var(--primary); }
+.route-card-right { text-align: right; }
+.route-card-dist { font-size: 18px; font-weight: 900; color: var(--text); }
+.route-card.selected .route-card-dist { color: var(--primary); }
+.route-card-dur { font-size: 12px; color: var(--text2); margin-top: 2px; }
+
+/* Map container */
+#bm-map { height: 300px; width: 100%; border-radius: 12px; margin: 12px 0; border: 1px solid var(--border); }
+
+/* Leaflet z-index fix inside modal */
+.booking-modal-card .leaflet-pane,
+.booking-modal-card .leaflet-top,
+.booking-modal-card .leaflet-bottom { z-index: auto; }
+
+/* Toll info */
+.bm-toll-info {
+  background: var(--surface); border: 1px solid var(--border); border-radius: 10px;
+  padding: 10px 14px; font-size: 13px; color: var(--text2); margin-bottom: 12px;
+}
+
+/* Confirm route button */
+#btn-confirm-route { margin-top: 8px; }
+
+/* Make bm-body scrollable for taller modal content */
+.bm-body { overflow-y: auto; max-height: 70vh; }

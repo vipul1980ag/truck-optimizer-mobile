@@ -5,6 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Truck Load Optimizer — Customer Portal</title>
 <link rel="stylesheet" href="portal.css">
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
 </head>
 <body>
 
@@ -209,18 +210,69 @@
             <div class="ship-opt-desc">A dedicated truck exclusively for your cargo. Faster delivery and full scheduling control.</div>
           </button>
         </div>
-        <button class="btn-bm-next" id="btn-see-charges" onclick="showChargesStep()" disabled>See Estimated Charges →</button>
+        <button class="btn-bm-next" id="btn-see-charges" onclick="showLocationStep()" disabled>Next: Enter Route →</button>
       </div>
     </div>
 
-    <!-- Step 2: Charges -->
+    <!-- Step 2: Location -->
+    <div id="bm-step-location" style="display:none">
+      <div class="bm-head">
+        <div>
+          <div class="bm-title">📍 Route & Location</div>
+          <div class="bm-sub">Enter pickup and delivery addresses</div>
+        </div>
+        <button class="bm-close" onclick="showBookingStep('shipping')">←</button>
+      </div>
+      <div class="bm-body">
+        <div class="location-field-wrap">
+          <label class="loc-label">Start Location (Pickup)</label>
+          <div class="loc-input-row">
+            <input type="text" id="bm-start-input" class="loc-input" placeholder="e.g. Berlin, Germany" oninput="onLocationInput('start')">
+            <button class="loc-search-btn" onclick="portalGeocode('start')" id="btn-start-search">🔍</button>
+          </div>
+          <div id="bm-start-suggestions" class="location-suggestions" style="display:none"></div>
+        </div>
+        <div id="bm-start-confirmed" class="loc-confirmed" style="display:none"></div>
+
+        <div class="location-field-wrap">
+          <label class="loc-label">Destination (Delivery)</label>
+          <div class="loc-input-row">
+            <input type="text" id="bm-dest-input" class="loc-input" placeholder="e.g. Munich, Germany" oninput="onLocationInput('dest')">
+            <button class="loc-search-btn" onclick="portalGeocode('dest')" id="btn-dest-search">🔍</button>
+          </div>
+          <div id="bm-dest-suggestions" class="location-suggestions" style="display:none"></div>
+        </div>
+        <div id="bm-dest-confirmed" class="loc-confirmed" style="display:none"></div>
+
+        <button class="btn-bm-next" id="btn-find-routes" onclick="portalFindRoutes()" disabled>Find Routes 🗺️</button>
+      </div>
+    </div>
+
+    <!-- Step 3: Route Selection -->
+    <div id="bm-step-route" style="display:none">
+      <div class="bm-head">
+        <div>
+          <div class="bm-title">🗺️ Select Route</div>
+          <div class="bm-sub" id="bm-route-sub">Choose the best route for your delivery</div>
+        </div>
+        <button class="bm-close" onclick="showBookingStep('location')">←</button>
+      </div>
+      <div class="bm-body">
+        <div id="bm-routes-list"></div>
+        <div id="bm-map"></div>
+        <div id="bm-toll-info" class="bm-toll-info" style="display:none"></div>
+        <button class="btn-bm-confirm" id="btn-confirm-route" onclick="showChargesStep()" disabled>Confirm Route & See Charges →</button>
+      </div>
+    </div>
+
+    <!-- Step 4: Charges -->
     <div id="bm-step-charges" style="display:none">
       <div class="bm-head">
         <div>
           <div class="bm-title">💰 Estimated Charges</div>
-          <div class="bm-sub">Based on 100-mile service estimate</div>
+          <div class="bm-sub" id="bm-charges-sub">Based on actual route distance</div>
         </div>
-        <button class="bm-close" onclick="showBookingStep('shipping')">←</button>
+        <button class="bm-close" onclick="showBookingStep('route')">←</button>
       </div>
       <div class="bm-body">
         <div id="bm-charges-content"></div>
@@ -341,6 +393,7 @@
   </div>
 </div>
 
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 <script src="portal.js"></script>
 </body>
 </html>

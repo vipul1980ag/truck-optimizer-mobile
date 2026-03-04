@@ -4,12 +4,14 @@ import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { Text, View, TouchableOpacity, ActivityIndicator } from 'react-native';
 
-import AuthScreen       from './src/screens/AuthScreen';
-import AddCargoScreen   from './src/screens/wizard/AddCargoScreen';
+import AuthScreen        from './src/screens/AuthScreen';
+import AddCargoScreen    from './src/screens/wizard/AddCargoScreen';
 import ReviewCargoScreen from './src/screens/wizard/ReviewCargoScreen';
-import ShipOptionScreen from './src/screens/wizard/ShipOptionScreen';
-import ChargesScreen    from './src/screens/wizard/ChargesScreen';
-import ConfirmScreen    from './src/screens/wizard/ConfirmScreen';
+import ShipOptionScreen  from './src/screens/wizard/ShipOptionScreen';
+import LocationScreen    from './src/screens/wizard/LocationScreen';
+import RouteScreen       from './src/screens/wizard/RouteScreen';
+import ChargesScreen     from './src/screens/wizard/ChargesScreen';
+import ConfirmScreen     from './src/screens/wizard/ConfirmScreen';
 
 import { AuthProvider, useAuth }     from './src/AuthContext';
 import { WizardProvider }            from './src/WizardContext';
@@ -61,6 +63,16 @@ function AppNavigator() {
             name="ShipOption"
             component={ShipOptionScreen}
             options={{ title: '🚛 Shipping Option' }}
+          />
+          <WizardStack.Screen
+            name="Location"
+            component={LocationScreen}
+            options={{ title: '📍 Route & Location' }}
+          />
+          <WizardStack.Screen
+            name="Route"
+            component={RouteScreen}
+            options={{ title: '🗺️ Select Route' }}
           />
           <WizardStack.Screen
             name="Charges"

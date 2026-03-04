@@ -8,7 +8,7 @@ import { api } from '../../api';
 import { C } from '../../theme';
 
 export default function ChargesScreen({ navigation }) {
-  const { items, shippingOption } = useWizard();
+  const { items, shippingOption, selectedRoute } = useWizard();
   const [truck,    setTruck]    = useState(null);
   const [loading,  setLoading]  = useState(true);
   const [saving,   setSaving]   = useState(false);
@@ -27,17 +27,22 @@ export default function ChargesScreen({ navigation }) {
   const hasDG       = items.some(i => i.isDG);
   const dgItems     = items.filter(i => i.isDG);
 
+  // Route & distance
+  const distance_km    = selectedRoute ? selectedRoute.distance_km : 160.9; // fallback ~100mi
+  const distance_miles = distance_km * 0.621371;
+  const toll_cost      = selectedRoute ? (selectedRoute.toll_cost || 0) : 0;
+
   // Cost estimate
   let truckVol = 0, fullCost = 0, baseCost = 0, dgSurcharge = 0, estimate = 0, pct = 0;
   if (truck) {
     truckVol  = truck.length * truck.width * truck.height;
-    fullCost  = truck.baseRate + truck.ratePerMi * 100;
+    fullCost  = truck.baseRate + truck.ratePerMi * distance_miles;
     pct       = Math.min(totalVol / truckVol, 1);
     baseCost  = shippingOption === 'shared'
       ? Math.max(fullCost * pct, fullCost * 0.25)
       : fullCost;
     dgSurcharge = hasDG ? baseCost * 0.15 : 0;
-    estimate    = baseCost + dgSurcharge;
+    estimate    = baseCost + dgSurcharge + toll_cost;
   }
 
   async function confirmBooking() {
@@ -67,7 +72,7 @@ export default function ChargesScreen({ navigation }) {
         items:   [...(fresh.items || []), ...newItems],
         nextIds: { ...fresh.nextIds, item: nextId },
       });
-      navigation.navigate('Confirm', { totalItems, totalWeight, estimate, hasDG, dgCount: dgItems.length, dgSurcharge: Math.round(dgSurcharge) });
+      navigation.navigate('Confirm', { totalItems, totalWeight, estimate, hasDG, dgCount: dgItems.length, dgSurcharge: Math.round(dgSurcharge), distanceKm: distance_km, tollCost: toll_cost });
     } catch (e) {
       Alert.alert('Error', 'Could not save booking: ' + e.message);
     } finally {
@@ -99,6 +104,10 @@ export default function ChargesScreen({ navigation }) {
               <Text style={s.rowVal}>{(pct * 100).toFixed(0)}% of {truck.name}</Text>
             </View>
           )}
+          <View style={s.row}>
+            <Text style={s.rowLbl}>Route distance</Text>
+            <Text style={s.rowVal}>{distance_km.toFixed(0)} km ({distance_miles.toFixed(0)} mi)</Text>
+          </View>
         </View>
 
         {/* Shipping option */}
@@ -134,8 +143,8 @@ export default function ChargesScreen({ navigation }) {
               <Text style={s.rowVal}>${truck.baseRate.toLocaleString()}</Text>
             </View>
             <View style={s.row}>
-              <Text style={s.rowLbl}>Per-mile (100 mi)</Text>
-              <Text style={s.rowVal}>${(truck.ratePerMi * 100).toLocaleString()}</Text>
+              <Text style={s.rowLbl}>Per-mile ({distance_miles.toFixed(0)} mi)</Text>
+              <Text style={s.rowVal}>${(truck.ratePerMi * distance_miles).toLocaleString(undefined, { maximumFractionDigits: 0 })}</Text>
             </View>
             {shippingOption === 'shared' && (
               <View style={s.row}>
@@ -149,11 +158,17 @@ export default function ChargesScreen({ navigation }) {
                 <Text style={[s.rowVal, { color: '#c2410c' }]}>+${Math.round(dgSurcharge).toLocaleString()}</Text>
               </View>
             )}
+            {toll_cost > 0 && (
+              <View style={s.row}>
+                <Text style={[s.rowLbl, { color: '#7c3aed', fontWeight: '700' }]}>🚦 Toll charges</Text>
+                <Text style={[s.rowVal, { color: '#7c3aed' }]}>+${toll_cost.toFixed(2)}</Text>
+              </View>
+            )}
             <View style={[s.row, s.totalRow]}>
               <Text style={s.totalLbl}>Estimated Total</Text>
               <Text style={s.totalVal}>${estimate.toLocaleString(undefined, { maximumFractionDigits: 0 })}</Text>
             </View>
-            <Text style={s.note}>* Final price confirmed at pickup based on actual distance and weight</Text>
+            <Text style={s.note}>* Based on {distance_km.toFixed(0)} km actual route distance. Final price confirmed at pickup.</Text>
           </View>
         ) : (
           <View style={s.card}>
