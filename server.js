@@ -300,15 +300,15 @@ app.post('/api/geocode', async (req, res) => {
   const { query } = req.body || {};
   if (!query || !query.trim()) return res.status(400).json({ error: 'query is required' });
   try {
-    const url = `https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(query.trim())}&format=json&limit=5&addressdetails=0`;
+    const url = `https://photon.komoot.io/api/?q=${encodeURIComponent(query.trim())}&limit=5`;
     const r   = await fetch(url, {
       headers: { 'User-Agent': 'TruckOptimizer/1.0 (contact@truckoptimizer.com)' },
     });
     const data = await r.json();
-    const results = data.map(p => ({
-      label: p.display_name,
-      lat:   parseFloat(p.lat),
-      lng:   parseFloat(p.lon),
+    const results = (data.features || []).map(f => ({
+      label: [f.properties.name, f.properties.city, f.properties.state, f.properties.country].filter(Boolean).join(', '),
+      lat:   f.geometry.coordinates[1],
+      lng:   f.geometry.coordinates[0],
     }));
     res.json(results);
   } catch (err) {
