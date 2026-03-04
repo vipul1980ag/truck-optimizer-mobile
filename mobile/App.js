@@ -11,6 +11,7 @@ import ReviewCargoScreen from './src/screens/wizard/ReviewCargoScreen';
 import RouteScreen       from './src/screens/wizard/RouteScreen';
 import ChargesScreen     from './src/screens/wizard/ChargesScreen';
 import ConfirmScreen     from './src/screens/wizard/ConfirmScreen';
+import Viz3DScreen      from './src/screens/wizard/Viz3DScreen';
 
 import { AuthProvider, useAuth }     from './src/AuthContext';
 import { WizardProvider }            from './src/WizardContext';
@@ -77,6 +78,11 @@ function AppNavigator() {
             name="Confirm"
             component={ConfirmScreen}
             options={{ headerShown: false }}
+          />
+          <WizardStack.Screen
+            name="Viz3D"
+            component={Viz3DScreen}
+            options={{ title: '🧊 3D Load View' }}
           />
         </WizardStack.Navigator>
       </NavigationContainer>
