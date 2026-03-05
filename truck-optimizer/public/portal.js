@@ -1027,22 +1027,22 @@ function buildViz3DHTML(items, truck, customers) {
     * { box-sizing: border-box; }
     body { margin: 0; overflow: hidden; background: #0f172a; font-family: Arial, sans-serif; }
     canvas { display: block; }
-    #hint  { position:absolute; top:8px; left:0; right:0; text-align:center;
-             color:#64748b; font-size:11px; pointer-events:none; }
-    #stats { position:absolute; bottom:8px; left:10px; right:10px;
-             color:#94a3b8; font-size:11px; background:rgba(15,23,42,0.7);
-             padding:6px 10px; border-radius:8px; pointer-events:none; }
-    #legend{ position:absolute; top:28px; right:8px; max-width:140px;
-             background:rgba(15,23,42,0.85); border-radius:8px; padding:6px 8px;
+    #hint  { position:absolute; top:10px; left:0; right:0; text-align:center;
+             color:#94a3b8; font-size:13px; pointer-events:none; }
+    #stats { position:absolute; bottom:10px; left:12px; right:12px;
+             color:#94a3b8; font-size:13px; background:rgba(15,23,42,0.8);
+             padding:8px 14px; border-radius:10px; pointer-events:none; }
+    #legend{ position:absolute; top:40px; right:12px; max-width:180px;
+             background:rgba(15,23,42,0.9); border-radius:10px; padding:10px 12px;
              border:1px solid #1e3a5f; }
-    .lrow  { display:flex; align-items:center; gap:5px; margin-bottom:3px; }
-    .ldot  { width:10px; height:10px; border-radius:3px; flex-shrink:0; }
-    .lname { color:#cbd5e1; font-size:9px; white-space:nowrap; overflow:hidden;
-             text-overflow:ellipsis; max-width:110px; }
+    .lrow  { display:flex; align-items:center; gap:7px; margin-bottom:5px; }
+    .ldot  { width:13px; height:13px; border-radius:4px; flex-shrink:0; }
+    .lname { color:#cbd5e1; font-size:12px; white-space:nowrap; overflow:hidden;
+             text-overflow:ellipsis; max-width:145px; }
   </style>
 </head>
 <body>
-<div id="hint">Drag to rotate · Pinch/scroll to zoom</div>
+<div id="hint">🖱 Drag to rotate &nbsp;·&nbsp; Scroll to zoom &nbsp;·&nbsp; Right-click to pan</div>
 <div id="stats">Packing…</div>
 <div id="legend"></div>
 <script src="https://cdn.jsdelivr.net/npm/three@0.134/build/three.min.js"></script>
@@ -1131,7 +1131,8 @@ renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
 document.body.appendChild(renderer.domElement);
 const controls = new THREE.OrbitControls(camera, renderer.domElement);
 controls.enableDamping = true; controls.dampingFactor = 0.12;
-controls.minDistance = 2; controls.maxDistance = 200;
+controls.minDistance = 1; controls.maxDistance = 500;
+controls.zoomSpeed = 1.5;
 
 scene.add(new THREE.AmbientLight(0xffffff, 0.65));
 const sun = new THREE.DirectionalLight(0xffffff, 0.85);
@@ -1153,32 +1154,31 @@ grid.position.set(TL/2, 0.002, TW/2); scene.add(grid);
 
 function hexToRgb(hex) { const n=parseInt(hex.replace('#',''),16); return [(n>>16)&255,(n>>8)&255,n&255]; }
 function makeLabel(text, hexColor, lineTwo) {
-  const CW=512, CH=lineTwo?160:100;
+  const CW=1024, CH=lineTwo?320:200;
   const canvas=document.createElement('canvas'); canvas.width=CW; canvas.height=CH;
   const ctx=canvas.getContext('2d');
   const [r,g,b]=hexToRgb(hexColor);
   const dr=Math.max(0,r-60),dg=Math.max(0,g-60),db=Math.max(0,b-60);
-  ctx.fillStyle='rgba('+dr+','+dg+','+db+',0.92)';
-  const rd=12; ctx.beginPath();
+  ctx.fillStyle='rgba('+dr+','+dg+','+db+',0.93)';
+  const rd=20; ctx.beginPath();
   ctx.moveTo(rd,0); ctx.lineTo(CW-rd,0); ctx.quadraticCurveTo(CW,0,CW,rd);
   ctx.lineTo(CW,CH-rd); ctx.quadraticCurveTo(CW,CH,CW-rd,CH);
   ctx.lineTo(rd,CH); ctx.quadraticCurveTo(0,CH,0,CH-rd);
   ctx.lineTo(0,rd); ctx.quadraticCurveTo(0,0,rd,0); ctx.closePath(); ctx.fill();
-  ctx.fillStyle='rgba('+r+','+g+','+b+',0.6)'; ctx.fillRect(0,0,CW,6);
-  ctx.fillStyle='#ffffff'; ctx.font='bold 34px Arial'; ctx.textAlign='center'; ctx.textBaseline='middle';
-  let t=text; while(t.length>1&&ctx.measureText(t).width>CW-24) t=t.slice(0,-1);
+  ctx.fillStyle='rgba('+r+','+g+','+b+',0.7)'; ctx.fillRect(0,0,CW,10);
+  ctx.fillStyle='#ffffff'; ctx.font='bold 72px Arial'; ctx.textAlign='center'; ctx.textBaseline='middle';
+  let t=text; while(t.length>1&&ctx.measureText(t).width>CW-40) t=t.slice(0,-1);
   if(t!==text) t+='\u2026';
-  ctx.fillText(t, CW/2, lineTwo?52:CH/2);
+  ctx.fillText(t, CW/2, lineTwo?100:CH/2);
   if(lineTwo) {
-    ctx.fillStyle='rgba(255,255,255,0.65)'; ctx.font='24px Arial';
-    let t2=lineTwo; while(t2.length>1&&ctx.measureText(t2).width>CW-24) t2=t2.slice(0,-1);
+    ctx.fillStyle='rgba(255,255,255,0.80)'; ctx.font='bold 54px Arial';
+    let t2=lineTwo; while(t2.length>1&&ctx.measureText(t2).width>CW-40) t2=t2.slice(0,-1);
     if(t2!==lineTwo) t2+='\u2026';
-    ctx.fillText(t2, CW/2, 108);
+    ctx.fillText(t2, CW/2, 220);
   }
   const tex=new THREE.CanvasTexture(canvas);
   const mat=new THREE.SpriteMaterial({ map:tex, transparent:true, depthTest:false, depthWrite:false });
   const sprite=new THREE.Sprite(mat);
-  const sw=Math.max(Math.min(2.5,0.8),1.0); sprite.scale.set(sw*(CW/CH),sw,1);
   return sprite;
 }
 
@@ -1197,8 +1197,8 @@ placements.forEach(p => {
   const custName = DATA.hasCustomers && custKey && DATA.customerInfo[custKey] ? DATA.customerInfo[custKey].name : null;
   const subLabel = custName ? '\uD83D\uDC64 '+custName : p.isDG ? '\u26a0 Dangerous Goods' : p.isFragile ? '\uD83D\uDD14 Handle with care' : null;
   const sprite=makeLabel(p.name, color, subLabel);
-  const sw=Math.max(p.l*0.9,1.2); const CW=512, CH=subLabel?160:100;
-  sprite.scale.set(sw,sw*(CH/CW),1);
+  const sw=Math.max(Math.min(p.l,p.w)*1.1, 1.8); const CH=subLabel?320:200;
+  sprite.scale.set(sw, sw*(CH/1024), 1);
   sprite.position.set(p.x+p.l/2, p.y+p.h/2, p.z+p.w/2); scene.add(sprite);
 });
 
@@ -1226,8 +1226,8 @@ const utilPct=Math.min(Math.round(placedVol/truckVol*100),100);
 const statsEl=document.getElementById('stats');
 statsEl.innerHTML=truck.name+' &nbsp;|&nbsp; '+placements.length+'/'+totalUnits+' units &nbsp;|&nbsp; '+utilPct+'% volume'+(unplaced.length?' &nbsp;|&nbsp; <span style="color:#fbbf24">\u26a0 '+unplaced.length+' unplaced</span>':'');
 
-const dist=Math.max(TL,TW,TH)*1.9;
-camera.position.set(TL/2+dist*0.55, TH/2+dist*0.45, TW/2+dist*0.75);
+const dist=Math.max(TL,TW,TH)*1.4;
+camera.position.set(TL/2+dist*0.55, TH/2+dist*0.55, TW/2+dist*0.85);
 camera.lookAt(truckCenter); controls.target.copy(truckCenter); controls.update();
 
 function animate() { requestAnimationFrame(animate); controls.update(); renderer.render(scene,camera); }
