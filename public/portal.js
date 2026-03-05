@@ -1161,8 +1161,10 @@ const grid = new THREE.GridHelper(Math.max(TL,TW)*1.05, 20, 0x1e3a5f, 0x1e3a5f);
 grid.position.set(TL/2, 0.002, TW/2); scene.add(grid);
 
 function hexToRgb(hex) { const n=parseInt(hex.replace('#',''),16); return [(n>>16)&255,(n>>8)&255,n&255]; }
-function makeLabel(text, hexColor, lineTwo) {
-  const CW=1024, CH=lineTwo?320:200;
+function makeLabel(text, hexColor, lineTwo, dimText) {
+  // Canvas height depends on how many lines: name / subLabel / dimensions
+  const CW = 1024;
+  const CH = lineTwo ? (dimText ? 430 : 320) : (dimText ? 290 : 200);
   const canvas=document.createElement('canvas'); canvas.width=CW; canvas.height=CH;
   const ctx=canvas.getContext('2d');
   const [r,g,b]=hexToRgb(hexColor);
@@ -1174,15 +1176,24 @@ function makeLabel(text, hexColor, lineTwo) {
   ctx.lineTo(rd,CH); ctx.quadraticCurveTo(0,CH,0,CH-rd);
   ctx.lineTo(0,rd); ctx.quadraticCurveTo(0,0,rd,0); ctx.closePath(); ctx.fill();
   ctx.fillStyle='rgba('+r+','+g+','+b+',0.7)'; ctx.fillRect(0,0,CW,10);
-  ctx.fillStyle='#ffffff'; ctx.font='bold 72px Arial'; ctx.textAlign='center'; ctx.textBaseline='middle';
+  ctx.textAlign='center'; ctx.textBaseline='middle';
+  // Line 1 — item name
+  ctx.fillStyle='#ffffff'; ctx.font='bold 72px Arial';
   let t=text; while(t.length>1&&ctx.measureText(t).width>CW-40) t=t.slice(0,-1);
   if(t!==text) t+='\u2026';
-  ctx.fillText(t, CW/2, lineTwo?100:CH/2);
+  const nameY = lineTwo ? 85 : (dimText ? 85 : CH/2);
+  ctx.fillText(t, CW/2, nameY);
+  // Line 2 — customer / DG / fragile sub-label
   if(lineTwo) {
     ctx.fillStyle='rgba(255,255,255,0.80)'; ctx.font='bold 54px Arial';
     let t2=lineTwo; while(t2.length>1&&ctx.measureText(t2).width>CW-40) t2=t2.slice(0,-1);
     if(t2!==lineTwo) t2+='\u2026';
-    ctx.fillText(t2, CW/2, 220);
+    ctx.fillText(t2, CW/2, dimText ? 205 : 220);
+  }
+  // Line 3 — dimensions
+  if(dimText) {
+    ctx.fillStyle='rgba(255,255,255,0.55)'; ctx.font='40px Arial';
+    ctx.fillText(dimText, CW/2, lineTwo ? 340 : 205);
   }
   const tex=new THREE.CanvasTexture(canvas);
   const mat=new THREE.SpriteMaterial({ map:tex, transparent:true, depthTest:false, depthWrite:false });
@@ -1205,8 +1216,10 @@ placements.forEach(p => {
   edges.position.copy(mesh.position); scene.add(edges);
   const custName = DATA.hasCustomers && custKey && DATA.customerInfo[custKey] ? DATA.customerInfo[custKey].name : null;
   const subLabel = custName ? '\uD83D\uDC64 '+custName : p.isDG ? '\u26a0 Dangerous Goods' : p.isFragile ? '\uD83D\uDD14 Handle with care' : null;
-  const sprite=makeLabel(p.name, color, subLabel);
-  const sw=Math.max(Math.min(p.l,p.w)*1.1, 1.8); const CH=subLabel?320:200;
+  const dimText  = p.l + '\xD7' + p.w + '\xD7' + p.h + ' ft';
+  const sprite=makeLabel(p.name, color, subLabel, dimText);
+  const sw=Math.max(Math.min(p.l,p.w)*1.1, 1.8);
+  const CH = subLabel ? 430 : 290;
   sprite.scale.set(sw, sw*(CH/1024), 1);
   sprite.position.set(p.x+p.l/2, p.y+p.h/2, p.z+p.w/2); scene.add(sprite);
   // store for drag interaction
@@ -1236,7 +1249,13 @@ const placedVol=placements.reduce((s,p)=>s+p.l*p.h*p.w,0);
 const truckVol=TL*TH*TW;
 const utilPct=Math.min(Math.round(placedVol/truckVol*100),100);
 const statsEl=document.getElementById('stats');
-statsEl.innerHTML=truck.name+' &nbsp;|&nbsp; '+placements.length+'/'+totalUnits+' units &nbsp;|&nbsp; '+utilPct+'% volume'+(unplaced.length?' &nbsp;|&nbsp; <span style="color:#fbbf24">\u26a0 '+unplaced.length+' unplaced</span>':'');
+statsEl.innerHTML=
+  '<span style="color:#60a5fa;font-weight:700;">\uD83D\uDE9B '+truck.name+'</span>'
+  +' &nbsp;\u00B7&nbsp; <span style="color:#94a3b8;">'+TL+'\xD7'+TW+'\xD7'+TH+' ft</span>'
+  +' &nbsp;\u00B7&nbsp; <span style="color:#cbd5e1;">'+truck.maxWt.toLocaleString()+' lbs max</span>'
+  +' &nbsp;|\u2009 '+placements.length+'/'+totalUnits+' units placed'
+  +' &nbsp;\u00B7&nbsp; '+utilPct+'% vol used'
+  +(unplaced.length?' &nbsp;\u00B7&nbsp; <span style="color:#fbbf24">\u26a0 '+unplaced.length+' unplaced</span>':'');
 
 // Position camera so truck CROSS-SECTION (H×W face) fills 70% of viewport.
 // Using cross-section diagonal instead of full 3D diagonal prevents the truck's
@@ -1281,7 +1300,8 @@ function selectObj(obj) {
   obj.edges.material.opacity = 0.6;
   document.getElementById('hint').style.display = 'none';
   document.getElementById('info').style.display = 'flex';
-  document.getElementById('iname').textContent = '✏ ' + obj.placement.name + ' — drag to reposition';
+  const p2=obj.placement;
+  document.getElementById('iname').textContent = '✏ ' + p2.name + '  \u2014  ' + p2.l + '\xD7' + p2.w + '\xD7' + p2.h + ' ft  \u00B7  drag to reposition';
 }
 
 function resetPositions() {
