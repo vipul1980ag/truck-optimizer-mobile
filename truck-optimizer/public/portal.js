@@ -1029,10 +1029,18 @@ function buildViz3DHTML(items, truck, customers) {
     canvas { display: block; }
     #hint  { position:absolute; top:10px; left:0; right:0; text-align:center;
              color:#94a3b8; font-size:13px; pointer-events:none; }
+    #info  { position:absolute; top:10px; left:10px; right:10px; display:none;
+             align-items:center; gap:10px; background:rgba(15,23,42,0.92);
+             padding:8px 14px; border-radius:10px; border:1px solid #3b82f6; }
+    #iname { color:#f1f5f9; font-size:13px; font-weight:700; flex:1; }
+    #ireset{ background:#1e3a5f; border:1px solid #3b82f6; color:#60a5fa;
+             font-size:11px; font-weight:700; padding:5px 12px; border-radius:6px;
+             cursor:pointer; white-space:nowrap; }
+    #ireset:hover { background:#2563eb; color:#fff; }
     #stats { position:absolute; bottom:10px; left:12px; right:12px;
              color:#94a3b8; font-size:13px; background:rgba(15,23,42,0.8);
              padding:8px 14px; border-radius:10px; pointer-events:none; }
-    #legend{ position:absolute; top:40px; right:12px; max-width:180px;
+    #legend{ position:absolute; top:50px; right:12px; max-width:180px;
              background:rgba(15,23,42,0.9); border-radius:10px; padding:10px 12px;
              border:1px solid #1e3a5f; }
     .lrow  { display:flex; align-items:center; gap:7px; margin-bottom:5px; }
@@ -1042,7 +1050,8 @@ function buildViz3DHTML(items, truck, customers) {
   </style>
 </head>
 <body>
-<div id="hint">🖱 Drag to rotate &nbsp;·&nbsp; Scroll to zoom &nbsp;·&nbsp; Right-click to pan</div>
+<div id="hint">🖱 Drag to rotate &nbsp;·&nbsp; Scroll to zoom &nbsp;·&nbsp; Click a box to move it</div>
+<div id="info"><span id="iname"></span><button id="ireset" onclick="resetPositions()">↺ Reset All</button><button id="ireset" onclick="deselect()" style="background:#1e3a5f;border:1px solid #475569;color:#94a3b8;font-size:11px;font-weight:700;padding:5px 10px;border-radius:6px;cursor:pointer;">✕ Done</button></div>
 <div id="stats">Packing…</div>
 <div id="legend"></div>
 <script src="https://cdn.jsdelivr.net/npm/three@0.134/build/three.min.js"></script>
@@ -1181,6 +1190,7 @@ function makeLabel(text, hexColor, lineTwo) {
   return sprite;
 }
 
+const boxObjects = [];
 placements.forEach(p => {
   const custKey = p.customerId != null ? String(p.customerId) : null;
   const color = DATA.hasCustomers && custKey && DATA.customerInfo[custKey]
@@ -1199,6 +1209,9 @@ placements.forEach(p => {
   const sw=Math.max(Math.min(p.l,p.w)*1.1, 1.8); const CH=subLabel?320:200;
   sprite.scale.set(sw, sw*(CH/1024), 1);
   sprite.position.set(p.x+p.l/2, p.y+p.h/2, p.z+p.w/2); scene.add(sprite);
+  // store for drag interaction
+  const origPos = new THREE.Vector3(p.x+p.l/2, p.y+p.h/2, p.z+p.w/2);
+  boxObjects.push({ mesh, edges, sprite, mat, placement:p, origPos });
 });
 
 const legendEl=document.getElementById('legend');
@@ -1238,6 +1251,95 @@ camera.position.set(
   truckCenter.z + camDist * 0.85 / dn
 );
 camera.lookAt(truckCenter); controls.target.copy(truckCenter); controls.update();
+
+// ── Drag-to-move interaction ──────────────────────────────────────────────────
+const raycaster = new THREE.Raycaster();
+const mouse2d   = new THREE.Vector2();
+const dragPlane = new THREE.Plane();
+const dragStart = new THREE.Vector3();
+const objStart  = new THREE.Vector3();
+let selected    = null;
+let isDragging  = false;
+
+function deselect() {
+  if (selected) {
+    selected.mat.emissive.set(0x000000);
+    selected.mat.opacity = 0.80;
+    selected.edges.material.opacity = 0.18;
+    selected = null;
+  }
+  document.getElementById('hint').style.display = '';
+  document.getElementById('info').style.display = 'none';
+  controls.enabled = true;
+}
+
+function selectObj(obj) {
+  if (selected && selected !== obj) deselect();
+  selected = obj;
+  obj.mat.emissive = new THREE.Color(0x334466);
+  obj.mat.opacity = 1.0;
+  obj.edges.material.opacity = 0.6;
+  document.getElementById('hint').style.display = 'none';
+  document.getElementById('info').style.display = 'flex';
+  document.getElementById('iname').textContent = '✏ ' + obj.placement.name + ' — drag to reposition';
+}
+
+function resetPositions() {
+  boxObjects.forEach(o => {
+    o.mesh.position.copy(o.origPos);
+    o.edges.position.copy(o.origPos);
+    o.sprite.position.copy(o.origPos);
+  });
+  deselect();
+}
+
+function getMouseNDC(e) {
+  const r = renderer.domElement.getBoundingClientRect();
+  mouse2d.x =  ((e.clientX - r.left) / r.width)  * 2 - 1;
+  mouse2d.y = -((e.clientY - r.top)  / r.height) * 2 + 1;
+}
+
+renderer.domElement.addEventListener('pointerdown', e => {
+  if (e.button !== 0) return;
+  getMouseNDC(e);
+  raycaster.setFromCamera(mouse2d, camera);
+  const hits = raycaster.intersectObjects(boxObjects.map(o => o.mesh));
+  if (hits.length) {
+    const obj = boxObjects.find(o => o.mesh === hits[0].object);
+    selectObj(obj);
+    controls.enabled = false;
+    const camDir = new THREE.Vector3();
+    camera.getWorldDirection(camDir);
+    dragPlane.setFromNormalAndCoplanarPoint(camDir.negate(), hits[0].point);
+    raycaster.ray.intersectPlane(dragPlane, dragStart);
+    objStart.copy(obj.mesh.position);
+    isDragging = true;
+    e.stopPropagation();
+  } else {
+    deselect();
+  }
+});
+
+renderer.domElement.addEventListener('pointermove', e => {
+  if (!isDragging || !selected) return;
+  getMouseNDC(e);
+  raycaster.setFromCamera(mouse2d, camera);
+  const pt = new THREE.Vector3();
+  if (!raycaster.ray.intersectPlane(dragPlane, pt)) return;
+  const delta = pt.clone().sub(dragStart);
+  const np = objStart.clone().add(delta);
+  const p = selected.placement;
+  np.x = Math.max(p.l/2, Math.min(TL - p.l/2, np.x));
+  np.y = Math.max(p.h/2, Math.min(TH - p.h/2, np.y));
+  np.z = Math.max(p.w/2, Math.min(TW - p.w/2, np.z));
+  selected.mesh.position.copy(np);
+  selected.edges.position.copy(np);
+  selected.sprite.position.copy(np);
+});
+
+renderer.domElement.addEventListener('pointerup', () => { isDragging = false; });
+window.addEventListener('keydown', e => { if (e.key === 'Escape') deselect(); });
+// ─────────────────────────────────────────────────────────────────────────────
 
 function animate() { requestAnimationFrame(animate); controls.update(); renderer.render(scene,camera); }
 animate();
