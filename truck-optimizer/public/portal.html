@@ -6,6 +6,7 @@
 <title>Truck Load Optimizer — Customer Portal</title>
 <link rel="stylesheet" href="portal.css">
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
+<script src="https://cdn.sheetjs.com/xlsx-0.20.3/package/dist/xlsx.full.min.js"></script>
 </head>
 <body>
 
@@ -201,6 +202,7 @@
       <button class="admin-tab-btn active" onclick="showAdminTab('fleet')">🚛 Fleet</button>
       <button class="admin-tab-btn" onclick="showAdminTab('customers')">👥 Customers</button>
       <button class="admin-tab-btn" onclick="showAdminTab('bookings')">📋 Bookings</button>
+      <button class="admin-tab-btn" onclick="showAdminTab('import')">📥 Import</button>
     </div>
 
     <!-- Fleet Tab -->
@@ -243,6 +245,83 @@
     <div id="tab-bookings" class="admin-tab-pane" style="display:none">
       <div id="bookings-list" class="admin-list"></div>
     </div>
+
+    <!-- Import Tab -->
+    <div id="tab-import" class="admin-tab-pane" style="display:none">
+
+      <!-- ── Trucks / Vehicles ── -->
+      <div class="import-section">
+        <div class="import-section-head">
+          <span class="import-section-title">🚛 Vehicles / Trucks</span>
+          <button class="btn-dl-template" onclick="downloadTemplate('trucks')">⬇ Template</button>
+        </div>
+        <p class="import-section-sub">Columns: <em>Name · Length (ft) · Width (ft) · Height (ft) · Max Weight (lbs) · Base Rate ($) · Rate/Mile ($/mi) · License Plate</em></p>
+        <div class="import-drop" id="import-drop-trucks" onclick="document.getElementById('import-file-trucks').click()" ondragover="importDragOver(event)" ondrop="importDrop(event,'trucks')">
+          <div class="import-drop-icon">📂</div>
+          <div class="import-drop-txt">Click to browse or drag &amp; drop an Excel / CSV file</div>
+          <input type="file" id="import-file-trucks" accept=".xlsx,.xls,.csv" style="display:none" onchange="handleImportFile('trucks',this)">
+        </div>
+        <div id="import-preview-trucks" class="import-preview" style="display:none">
+          <div class="import-preview-head">
+            <span id="import-count-trucks" class="import-count"></span>
+            <div style="display:flex;gap:8px;">
+              <button class="btn-import-confirm" onclick="confirmImport('trucks')">✓ Import</button>
+              <button class="btn-import-cancel" onclick="cancelImport('trucks')">✕ Clear</button>
+            </div>
+          </div>
+          <div class="import-table-wrap"><table id="import-table-trucks" class="import-table"></table></div>
+        </div>
+      </div>
+
+      <!-- ── Cargo Items ── -->
+      <div class="import-section">
+        <div class="import-section-head">
+          <span class="import-section-title">📦 Cargo Items</span>
+          <button class="btn-dl-template" onclick="downloadTemplate('items')">⬇ Template</button>
+        </div>
+        <p class="import-section-sub">Columns: <em>Name · Length (ft) · Width (ft) · Height (ft) · Weight (lbs) · Qty · Stackable · Dangerous Goods</em></p>
+        <div class="import-drop" id="import-drop-items" onclick="document.getElementById('import-file-items').click()" ondragover="importDragOver(event)" ondrop="importDrop(event,'items')">
+          <div class="import-drop-icon">📂</div>
+          <div class="import-drop-txt">Click to browse or drag &amp; drop an Excel / CSV file</div>
+          <input type="file" id="import-file-items" accept=".xlsx,.xls,.csv" style="display:none" onchange="handleImportFile('items',this)">
+        </div>
+        <div id="import-preview-items" class="import-preview" style="display:none">
+          <div class="import-preview-head">
+            <span id="import-count-items" class="import-count"></span>
+            <div style="display:flex;gap:8px;">
+              <button class="btn-import-confirm" onclick="confirmImport('items')">✓ Import</button>
+              <button class="btn-import-cancel" onclick="cancelImport('items')">✕ Clear</button>
+            </div>
+          </div>
+          <div class="import-table-wrap"><table id="import-table-items" class="import-table"></table></div>
+        </div>
+      </div>
+
+      <!-- ── Carriers / Shipping Partners ── -->
+      <div class="import-section">
+        <div class="import-section-head">
+          <span class="import-section-title">🤝 Carriers / Shipping Partners</span>
+          <button class="btn-dl-template" onclick="downloadTemplate('carriers')">⬇ Template</button>
+        </div>
+        <p class="import-section-sub">Columns: <em>Carrier Name · Truck Name · Length (ft) · Width (ft) · Height (ft) · Max Weight (lbs) · Base Rate ($) · Rate/Mile ($/mi)</em></p>
+        <div class="import-drop" id="import-drop-carriers" onclick="document.getElementById('import-file-carriers').click()" ondragover="importDragOver(event)" ondrop="importDrop(event,'carriers')">
+          <div class="import-drop-icon">📂</div>
+          <div class="import-drop-txt">Click to browse or drag &amp; drop an Excel / CSV file</div>
+          <input type="file" id="import-file-carriers" accept=".xlsx,.xls,.csv" style="display:none" onchange="handleImportFile('carriers',this)">
+        </div>
+        <div id="import-preview-carriers" class="import-preview" style="display:none">
+          <div class="import-preview-head">
+            <span id="import-count-carriers" class="import-count"></span>
+            <div style="display:flex;gap:8px;">
+              <button class="btn-import-confirm" onclick="confirmImport('carriers')">✓ Import</button>
+              <button class="btn-import-cancel" onclick="cancelImport('carriers')">✕ Clear</button>
+            </div>
+          </div>
+          <div class="import-table-wrap"><table id="import-table-carriers" class="import-table"></table></div>
+        </div>
+      </div>
+
+    </div><!-- /tab-import -->
   </div>
 </div>
 

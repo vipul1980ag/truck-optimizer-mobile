@@ -2202,5 +2202,167 @@ function esc(str) {
     .replace(/"/g, '&quot;');
 }
 
+// ── Excel Import ─────────────────────────────────────────────────────────────
+
+const IMPORT_SCHEMAS = {
+  trucks: {
+    headers: ['Name', 'Length (ft)', 'Width (ft)', 'Height (ft)', 'Max Weight (lbs)', 'Base Rate ($)', 'Rate/Mile ($/mi)', 'License Plate'],
+    example:  ['Semi Truck A', 53, 8.5, 9, 44000, 600, 3.50, 'TRK-001'],
+    map: r => ({
+      name:         String(r['Name'] || '').trim(),
+      length:       parseFloat(r['Length (ft)'])      || 0,
+      width:        parseFloat(r['Width (ft)'])       || 0,
+      height:       parseFloat(r['Height (ft)'])      || 0,
+      maxWt:        parseFloat(r['Max Weight (lbs)']) || 0,
+      baseRate:     parseFloat(r['Base Rate ($)'])    || 0,
+      ratePerMi:    parseFloat(r['Rate/Mile ($/mi)']) || 0,
+      licensePlate: String(r['License Plate'] || '').trim().toUpperCase(),
+    }),
+    validate: r => r.name && r.length > 0 && r.width > 0 && r.height > 0,
+    display:  r => [r.name, r.length, r.width, r.height, r.maxWt.toLocaleString(), '$' + r.baseRate, '$' + r.ratePerMi + '/mi', r.licensePlate || '—'],
+  },
+  items: {
+    headers: ['Name', 'Length (ft)', 'Width (ft)', 'Height (ft)', 'Weight (lbs)', 'Qty', 'Stackable', 'Dangerous Goods'],
+    example:  ['Standard Pallet', 4, 4, 5, 2000, 8, 'yes', 'no'],
+    map: r => ({
+      name:      String(r['Name'] || '').trim(),
+      length:    parseFloat(r['Length (ft)'])   || 0,
+      width:     parseFloat(r['Width (ft)'])    || 0,
+      height:    parseFloat(r['Height (ft)'])   || 0,
+      weight:    parseFloat(r['Weight (lbs)'])  || 0,
+      qty:       parseInt(r['Qty'])             || 1,
+      stackable: String(r['Stackable'] || 'yes').toLowerCase() !== 'no',
+      isDG:      String(r['Dangerous Goods'] || 'no').toLowerCase() === 'yes',
+    }),
+    validate: r => r.name && r.length > 0,
+    display:  r => [r.name, r.length, r.width, r.height, r.weight + ' lbs', r.qty, r.stackable ? 'yes' : 'no', r.isDG ? '⚠ yes' : 'no'],
+  },
+  carriers: {
+    headers: ['Carrier Name', 'Truck Name', 'Length (ft)', 'Width (ft)', 'Height (ft)', 'Max Weight (lbs)', 'Base Rate ($)', 'Rate/Mile ($/mi)'],
+    example:  ['FastFreight LLC', '53ft Dry Van', 53, 8.5, 9, 44000, 520, 3.20],
+    map: r => ({
+      carrierName: String(r['Carrier Name'] || '').trim(),
+      name:        String(r['Truck Name']   || '').trim(),
+      length:      parseFloat(r['Length (ft)'])      || 0,
+      width:       parseFloat(r['Width (ft)'])       || 0,
+      height:      parseFloat(r['Height (ft)'])      || 0,
+      maxWt:       parseFloat(r['Max Weight (lbs)']) || 0,
+      baseRate:    parseFloat(r['Base Rate ($)'])    || 0,
+      ratePerMi:   parseFloat(r['Rate/Mile ($/mi)']) || 0,
+    }),
+    validate: r => r.carrierName && r.name,
+    display:  r => [r.carrierName, r.name, r.length, r.width, r.height, r.maxWt.toLocaleString(), '$' + r.baseRate, '$' + r.ratePerMi + '/mi'],
+  },
+};
+
+const _importData = { trucks: [], items: [], carriers: [] };
+
+function importDragOver(e) { e.preventDefault(); e.currentTarget.classList.add('import-drop-hover'); }
+function importDrop(e, type) {
+  e.preventDefault();
+  e.currentTarget.classList.remove('import-drop-hover');
+  const file = e.dataTransfer.files[0];
+  if (!file) return;
+  parseImportFile(type, file);
+}
+
+function handleImportFile(type, input) {
+  const file = input.files[0];
+  if (!file) return;
+  parseImportFile(type, file);
+}
+
+function parseImportFile(type, file) {
+  const reader = new FileReader();
+  reader.onload = e => {
+    const wb = XLSX.read(e.target.result, { type: 'binary' });
+    const ws = wb.Sheets[wb.SheetNames[0]];
+    const rawRows = XLSX.utils.sheet_to_json(ws, { defval: '' });
+    const schema  = IMPORT_SCHEMAS[type];
+    const mapped  = rawRows.map(r => schema.map(r)).filter(schema.validate);
+    _importData[type] = mapped;
+    renderImportPreview(type, mapped);
+  };
+  reader.readAsBinaryString(file);
+}
+
+function renderImportPreview(type, rows) {
+  const schema   = IMPORT_SCHEMAS[type];
+  const countEl  = document.getElementById(`import-count-${type}`);
+  const tableEl  = document.getElementById(`import-table-${type}`);
+  const previewEl = document.getElementById(`import-preview-${type}`);
+
+  if (!rows.length) {
+    countEl.textContent = '0 valid rows found — make sure column headers match the template exactly';
+    countEl.style.color = 'var(--danger)';
+    tableEl.innerHTML   = '';
+    previewEl.style.display = 'block';
+    return;
+  }
+
+  countEl.textContent = `${rows.length} row${rows.length !== 1 ? 's' : ''} ready to import`;
+  countEl.style.color = 'var(--success, #16a34a)';
+
+  const shown = rows.slice(0, 25);
+  const head  = schema.headers.map(h => `<th>${esc(h)}</th>`).join('');
+  const body  = shown.map(r => `<tr>${schema.display(r).map(v => `<td>${esc(String(v ?? ''))}</td>`).join('')}</tr>`).join('');
+  const more  = rows.length > 25
+    ? `<tr><td colspan="${schema.headers.length}" class="import-more-row">… and ${rows.length - 25} more rows</td></tr>`
+    : '';
+  tableEl.innerHTML = `<thead><tr>${head}</tr></thead><tbody>${body}${more}</tbody>`;
+  previewEl.style.display = 'block';
+}
+
+function cancelImport(type) {
+  _importData[type] = [];
+  document.getElementById(`import-preview-${type}`).style.display = 'none';
+  const fi = document.getElementById(`import-file-${type}`);
+  if (fi) fi.value = '';
+}
+
+async function confirmImport(type) {
+  const rows = _importData[type];
+  if (!rows.length) return;
+  const btn = document.querySelector(`#import-preview-${type} .btn-import-confirm`);
+  btn.textContent = 'Importing…';
+  btn.disabled    = true;
+  try {
+    const res  = await fetch(`/api/import/${type}`, {
+      method:  'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body:    JSON.stringify({ rows }),
+    });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error || 'Import failed');
+    alert(`✅ Successfully imported ${data.imported} ${type}.`);
+    cancelImport(type);
+    // Refresh the relevant admin list
+    const fresh = await fetch('/api/data').then(r => r.json());
+    if (type === 'trucks')   { trucks = fresh.trucks || [];   renderFleetList(); }
+    if (type === 'items')    { /* items shown in cargo panel */               }
+    if (type === 'carriers') { renderCarrierList(fresh.carriers || []);       }
+    // Update stats
+    document.getElementById('s-trucks').textContent    = (fresh.trucks    || []).length;
+    document.getElementById('s-carriers').textContent  = (fresh.carriers  || []).length;
+    document.getElementById('s-customers').textContent = (fresh.customers || []).length;
+    document.getElementById('s-units').textContent     = (fresh.items     || []).length;
+  } catch (e) {
+    alert('Import error: ' + e.message);
+  } finally {
+    btn.textContent = '✓ Import';
+    btn.disabled    = false;
+  }
+}
+
+function downloadTemplate(type) {
+  const schema = IMPORT_SCHEMAS[type];
+  const wb = XLSX.utils.book_new();
+  const ws = XLSX.utils.aoa_to_sheet([schema.headers, schema.example]);
+  // Style header row (column widths)
+  ws['!cols'] = schema.headers.map(h => ({ wch: Math.max(h.length + 4, 14) }));
+  XLSX.utils.book_append_sheet(wb, ws, type.charAt(0).toUpperCase() + type.slice(1));
+  XLSX.writeFile(wb, `import-template-${type}.xlsx`);
+}
+
 // ── Start ─────────────────────────────────────────────────────────────────────
 init();
