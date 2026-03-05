@@ -293,6 +293,8 @@ function applyAuthState(loggedIn) {
   document.getElementById('cargo-lock').style.display     = loggedIn ? 'none' : '';
   document.getElementById('cargo-card').style.opacity     = loggedIn ? '1' : '0.35';
   document.getElementById('cargo-card').style.pointerEvents = loggedIn ? '' : 'none';
+  const adminBtn = document.getElementById('nav-admin-btn');
+  if (adminBtn) adminBtn.style.display = loggedIn ? 'inline-block' : 'none';
   if (loggedIn && _authUser) {
     document.getElementById('nav-user-email').textContent = _authUser.email;
   }
@@ -570,6 +572,8 @@ let _wizardStart = null;   // { label, lat, lng }
 let _wizardDest  = null;   // { label, lat, lng }
 let _wizardRoute = null;   // { index, distance_km, duration_min, geometry, toll_cost }
 let _wizardCustomers = [];   // LTL consignees added in customer step
+let _wizardTruck = null;   // { id, name, ... } — override truck selection
+let _wizardConsolidateTo = null;  // booking id to consolidate into
 let _leafletMap  = null;
 let _leafletRouteLayer = null;
 
@@ -580,6 +584,8 @@ function openBookingModal() {
   _wizardDest  = null;
   _wizardRoute = null;
   _wizardCustomers = [];
+  _wizardTruck = null;
+  _wizardConsolidateTo = null;
   document.querySelectorAll('.ship-opt').forEach(el => el.classList.remove('selected'));
   // Reset location inputs
   const si = document.getElementById('bm-start-input'); if (si) si.value = '';
@@ -832,37 +838,62 @@ async function portalSelectRoute(idx) {
   }
 }
 
+function _portalSuggestTruck(allTrucks, totalWeight, totalVol, hasDG, hasFragile) {
+  const semi = allTrucks.find(t => t.maxWt >= 30000) || allTrucks[0];
+  const box  = allTrucks.find(t => t.maxWt <  30000) || allTrucks[0];
+  if (!semi || !box) return null;
+  const boxVol = box.length * box.width * box.height;
+  if (hasDG)                    return { truck: semi, reason: 'DG-certified truck required' };
+  if (totalWeight > box.maxWt)  return { truck: semi, reason: `weight exceeds box truck limit` };
+  if (totalVol > boxVol * 0.9)  return { truck: semi, reason: `volume requires larger truck` };
+  if (hasFragile)               return { truck: box,  reason: 'fragile items suit box truck' };
+                                 return { truck: box,  reason: 'cargo fits in box truck' };
+}
+
+function useTruck(truckId) {
+  const data_trucks = trucks; // local state
+  const t = data_trucks.find(x => x.id === truckId);
+  if (!t) return;
+  _wizardTruck = t;
+  showChargesStep();
+}
+
+function joinShipment(bookingId) {
+  _wizardConsolidateTo = bookingId;
+  alert('You will join this shipment on confirm. ~15% savings applied.');
+}
+
 async function showChargesStep() {
   showBookingStep('charges');
   const el = document.getElementById('bm-charges-content');
   el.innerHTML = '<p style="text-align:center;color:var(--text2);font-size:13px;padding:20px;">Loading rates…</p>';
 
-  const distance_km    = _wizardRoute ? _wizardRoute.distance_km : 160.9; // fallback ~100mi
+  const distance_km    = _wizardRoute ? _wizardRoute.distance_km : 160.9;
   const distance_miles = distance_km * 0.621371;
   const toll_cost      = _wizardRoute ? (_wizardRoute.toll_cost || 0) : 0;
 
-  // Update subtitle
   const sub = document.getElementById('bm-charges-sub');
   if (sub) sub.textContent = _wizardRoute
     ? `Based on ${distance_km.toFixed(0)} km (${distance_miles.toFixed(0)} mi) actual route`
     : 'Based on estimated distance';
 
   try {
-    const data  = await fetch('/api/data').then(r => r.json());
-    const truck = (data.trucks || [])[0];
+    const data      = await fetch('/api/data').then(r => r.json());
+    const allTrucks = data.trucks || [];
+    const truck     = _wizardTruck || allTrucks[0];
 
     const totalUnits  = items.reduce((s, i) => s + i.qty, 0);
     const totalWeight = items.reduce((s, i) => s + (i.weight + (i.packagingWeight || 0)) * i.qty, 0);
     const totalVol    = items.reduce((s, i) => s + i.length * i.width * i.height * i.qty, 0);
+    const hasDG       = items.some(i => i.isDG);
+    const hasFragile  = items.some(i => i.isFragile);
+    const dgItems     = items.filter(i => i.isDG);
 
     if (!truck) {
       _bookingEstimate = { estimate: null, totalUnits, totalWeight };
       el.innerHTML = '<p style="color:var(--text2);font-size:13px;padding:12px 0;">No truck rates available. You can still confirm your booking.</p>';
       return;
     }
-
-    const hasDG    = items.some(i => i.isDG);
-    const dgItems  = items.filter(i => i.isDG);
 
     const truckVol    = truck.length * truck.width * truck.height;
     const fullCost    = truck.baseRate + truck.ratePerMi * distance_miles;
@@ -871,12 +902,60 @@ async function showChargesStep() {
       ? Math.max(fullCost * pct, fullCost * 0.25)
       : fullCost;
     const dgSurcharge = hasDG ? baseCost * 0.15 : 0;
-    const estimate    = baseCost + dgSurcharge + toll_cost;
+    let   estimate    = baseCost + dgSurcharge + toll_cost;
+    if (_wizardConsolidateTo) estimate = estimate * 0.85; // ~15% savings for joining
 
-    _bookingEstimate = { estimate, totalUnits, totalWeight, hasDG, distance_km, toll_cost };
+    _bookingEstimate = { estimate, totalUnits, totalWeight, hasDG, distance_km, toll_cost, totalVol, truck };
+
+    // ── B5: Consolidation card ──
+    let consolidationHtml = '';
+    if (_wizardStart && _wizardDest) {
+      try {
+        const matches = await fetch('/api/bookings/available-trucks', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            fromLat: _wizardStart.lat, fromLng: _wizardStart.lng,
+            toLat:   _wizardDest.lat,  toLng:   _wizardDest.lng,
+            neededWeight: totalWeight,  neededVol: totalVol,
+          }),
+        }).then(r => r.json());
+        if (matches.length) {
+          const m = matches[0];
+          const plate = m.truck.licensePlate ? `· ${esc(m.truck.licensePlate)}` : '';
+          consolidationHtml = `
+            <div class="consolidation-card">
+              <div class="consolidation-header">🚛 Shared truck available on this route</div>
+              <div class="consolidation-body">
+                <div>${esc(m.truck.name)} ${plate} · ${Math.round(m.remainingPct)}% capacity remaining</div>
+                <div style="font-size:11px;color:var(--text2);margin-top:3px;">${esc(m.booking.route?.fromLabel || '')} → ${esc(m.booking.route?.toLabel || '')}</div>
+              </div>
+              <button class="btn-join-shipment" onclick="joinShipment(${m.booking.id})">Join this shipment → save ~15%</button>
+            </div>`;
+        }
+      } catch (_) { /* consolidation is optional */ }
+    }
+
+    // ── B6: Dynamic truck swap card ──
+    let truckSwapHtml = '';
+    if (allTrucks.length > 1) {
+      const suggestion = _portalSuggestTruck(allTrucks, totalWeight, totalVol, hasDG, hasFragile);
+      const suggestedId = suggestion?.truck?.id;
+      if (suggestion && suggestedId !== truck.id) {
+        truckSwapHtml = `
+          <div class="truck-swap-card">
+            <div class="truck-swap-header">⚡ Suggested: ${esc(suggestion.truck.name)}</div>
+            <div class="truck-swap-body">${esc(suggestion.reason)}</div>
+            <button class="btn-use-truck" onclick="useTruck(${suggestion.truck.id})">Use this truck</button>
+          </div>`;
+      }
+    }
 
     const sharedRow = _wizardShipping === 'shared'
       ? `<div class="charges-row"><span>Your share (${(pct * 100).toFixed(0)}%)</span><span>×${pct.toFixed(2)}</span></div>`
+      : '';
+    const joinRow = _wizardConsolidateTo
+      ? `<div class="charges-row" style="color:var(--success);font-weight:700;"><span>🤝 Consolidation discount</span><span>−15%</span></div>`
       : '';
     const dgRow = hasDG
       ? `<div class="charges-row-dg"><span>⚠ DG surcharge (15%)</span><span>+$${Math.round(dgSurcharge).toLocaleString()}</span></div>`
@@ -896,6 +975,8 @@ async function showChargesStep() {
       : '';
 
     el.innerHTML = `
+      ${consolidationHtml}
+      ${truckSwapHtml}
       ${dgWarning}
       <div class="charges-card">
         <div class="charges-section-lbl">📦 Cargo Summary</div>
@@ -903,13 +984,15 @@ async function showChargesStep() {
         <div class="charges-row"><span>Total weight</span><span>${totalWeight.toLocaleString()} lbs</span></div>
         <div class="charges-row"><span>Total volume</span><span>${totalVol.toFixed(1)} cu ft</span></div>
         <div class="charges-row"><span>Route distance</span><span>${distance_km.toFixed(0)} km (${distance_miles.toFixed(0)} mi)</span></div>
-        <div class="charges-row"><span>Truck utilization</span><span>${(pct * 100).toFixed(0)}% of ${esc(truck.name)}</span></div>
+        <div class="charges-row"><span>Truck</span><span>${esc(truck.name)}${truck.licensePlate ? ' · ' + esc(truck.licensePlate) : ''}</span></div>
+        <div class="charges-row"><span>Truck utilization</span><span>${(pct * 100).toFixed(0)}% of capacity</span></div>
       </div>
       <div class="charges-card">
         <div class="charges-section-lbl">💰 Estimated Charges</div>
         <div class="charges-row"><span>Base rate</span><span>$${truck.baseRate.toLocaleString()}</span></div>
         <div class="charges-row"><span>Per-mile (${distance_miles.toFixed(0)} mi)</span><span>$${(truck.ratePerMi * distance_miles).toLocaleString(undefined, {maximumFractionDigits:0})}</span></div>
         ${sharedRow}
+        ${joinRow}
         ${dgRow}
         ${tollRow}
         <div class="charges-row charges-total">
@@ -942,7 +1025,41 @@ async function confirmWebBooking() {
       body: JSON.stringify({ ...fresh, items: updatedItems }),
     });
 
-    const { estimate, totalUnits, totalWeight, hasDG, distance_km, toll_cost } = _bookingEstimate || {};
+    const { estimate, totalUnits, totalWeight, hasDG, distance_km, toll_cost, totalVol, truck } = _bookingEstimate || {};
+
+    // B7: Save booking to bookings API
+    const truckId = (_wizardTruck || truck)?.id || (fresh.trucks?.[0]?.id);
+    if (truckId) {
+      const bookingPayload = {
+        truckId,
+        shippingOption: _wizardShipping,
+        route: {
+          fromLabel:    _wizardStart?.label,
+          fromLat:      _wizardStart?.lat,
+          fromLng:      _wizardStart?.lng,
+          toLabel:      _wizardDest?.label,
+          toLat:        _wizardDest?.lat,
+          toLng:        _wizardDest?.lng,
+          distance_km:  _wizardRoute?.distance_km,
+          duration_min: _wizardRoute?.duration_min,
+          geometry:     _wizardRoute?.geometry,
+        },
+        customers:   _wizardCustomers,
+        items:       items.map(i => ({ name: i.name, length: i.length, width: i.width, height: i.height, weight: i.weight, qty: i.qty })),
+        totalWeight: totalWeight || 0,
+        totalVol:    totalVol    || 0,
+        ...((_wizardConsolidateTo != null) ? { parentBookingId: _wizardConsolidateTo } : {}),
+      };
+      await fetch('/api/bookings', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(bookingPayload),
+      });
+      // Refresh bookings panel if open
+      const adminPanel = document.getElementById('admin-panel');
+      if (adminPanel && adminPanel.style.display !== 'none') renderBookings();
+    }
+
     const sumEl = document.getElementById('bm-confirm-summary');
     sumEl.innerHTML = `
       <div class="bm-confirm-grid">
@@ -1529,12 +1646,19 @@ function renderFleetList() {
   if (!el) return;
   const rows = [];
   for (const t of trucks) {
+    const plateBadge = t.licensePlate
+      ? `<span class="plate-badge">${esc(t.licensePlate)}</span>`
+      : `<span class="plate-badge" style="color:var(--text2);">—</span>`;
     rows.push(`
       <div class="ctx-row">
         <span style="font-size:16px;">🚛</span>
-        <div>
-          <div class="ctx-name">${esc(t.name)}</div>
-          <div class="ctx-meta">${t.length}×${t.width}×${t.height} ft · ${(t.maxWt || 0).toLocaleString()} lbs max</div>
+        <div style="flex:1;min-width:0;">
+          <div class="ctx-name">${esc(t.name)} ${plateBadge}</div>
+          <div class="ctx-meta">${t.length}×${t.width}×${t.height} ft · ${(t.maxWt || 0).toLocaleString()} lbs max · $${t.baseRate}/base + $${t.ratePerMi}/mi</div>
+        </div>
+        <div style="display:flex;gap:4px;flex-shrink:0;">
+          <button class="btn-fleet-edit" onclick="openTruckForm(${t.id})">✏</button>
+          <button class="btn-fleet-del"  onclick="deleteTruck(${t.id})">🗑</button>
         </div>
       </div>`);
   }
@@ -1553,6 +1677,151 @@ function renderFleetList() {
   el.innerHTML = rows.length
     ? '<div class="ctx-list">' + rows.join('') + '</div>'
     : '<p style="font-size:12px;color:var(--text2);">No fleet configured.</p>';
+}
+
+// ── Admin Panel ───────────────────────────────────────────────────────────────
+function toggleAdminPanel() {
+  const p = document.getElementById('admin-panel');
+  if (!p) return;
+  p.style.display = p.style.display === 'none' ? 'block' : 'none';
+  if (p.style.display === 'block') renderBookings();
+}
+
+function showAdminTab(tab) {
+  document.querySelectorAll('.admin-tab-pane').forEach(el => el.style.display = 'none');
+  document.querySelectorAll('.admin-tab-btn').forEach(el => el.classList.remove('active'));
+  const pane = document.getElementById('tab-' + tab);
+  if (pane) pane.style.display = 'block';
+  const btns = document.querySelectorAll('.admin-tab-btn');
+  btns.forEach(b => { if (b.textContent.toLowerCase().includes(tab.slice(0, 4))) b.classList.add('active'); });
+  if (tab === 'bookings') renderBookings();
+}
+
+function openTruckForm(truckId) {
+  const t = trucks.find(x => x.id === truckId);
+  if (!t) return;
+  document.getElementById('tf-form-title').textContent = '✏ Edit Truck';
+  document.getElementById('tf-name').value         = t.name || '';
+  document.getElementById('tf-length').value       = t.length || 53;
+  document.getElementById('tf-width').value        = t.width  || 8.5;
+  document.getElementById('tf-height').value       = t.height || 9;
+  document.getElementById('tf-maxwt').value        = t.maxWt  || 44000;
+  document.getElementById('tf-base-rate').value   = t.baseRate   || 600;
+  document.getElementById('tf-rate-per-mi').value = t.ratePerMi  || 3.50;
+  document.getElementById('tf-plate').value        = t.licensePlate || '';
+  document.getElementById('tf-edit-id').value      = truckId;
+  document.getElementById('tf-cancel-btn').style.display = 'inline-block';
+  showAdminTab('fleet');
+}
+
+function closeTruckForm() {
+  document.getElementById('tf-form-title').textContent = '＋ Add Truck';
+  document.getElementById('tf-name').value         = '';
+  document.getElementById('tf-length').value       = 53;
+  document.getElementById('tf-width').value        = 8.5;
+  document.getElementById('tf-height').value       = 9;
+  document.getElementById('tf-maxwt').value        = 44000;
+  document.getElementById('tf-base-rate').value   = 600;
+  document.getElementById('tf-rate-per-mi').value = 3.50;
+  document.getElementById('tf-plate').value        = '';
+  document.getElementById('tf-edit-id').value      = '';
+  document.getElementById('tf-cancel-btn').style.display = 'none';
+}
+
+async function saveTruck() {
+  const name         = document.getElementById('tf-name').value.trim();
+  const length       = parseFloat(document.getElementById('tf-length').value)       || 53;
+  const width        = parseFloat(document.getElementById('tf-width').value)        || 8.5;
+  const height       = parseFloat(document.getElementById('tf-height').value)       || 9;
+  const maxWt        = parseFloat(document.getElementById('tf-maxwt').value)        || 44000;
+  const baseRate     = parseFloat(document.getElementById('tf-base-rate').value)   || 600;
+  const ratePerMi   = parseFloat(document.getElementById('tf-rate-per-mi').value) || 3.50;
+  const licensePlate = document.getElementById('tf-plate').value.trim().toUpperCase();
+  const editId       = parseInt(document.getElementById('tf-edit-id').value, 10) || 0;
+
+  if (!name) { alert('Truck name is required.'); return; }
+
+  const existing = trucks.find(t => t.id === editId);
+  if (existing) {
+    Object.assign(existing, { name, length, width, height, maxWt, baseRate, ratePerMi, licensePlate });
+  } else {
+    trucks.push({ id: nextIds.truck++, name, length, width, height, maxWt, baseRate, ratePerMi, licensePlate });
+  }
+  await saveToServer();
+  closeTruckForm();
+  renderFleetList();
+}
+
+async function deleteTruck(id) {
+  if (!confirm('Delete this truck?')) return;
+  trucks = trucks.filter(t => t.id !== id);
+  await saveToServer();
+  renderFleetList();
+}
+
+// ── Bookings ──────────────────────────────────────────────────────────────────
+async function renderBookings() {
+  const el = document.getElementById('bookings-list');
+  if (!el) return;
+  el.innerHTML = '<p style="font-size:12px;color:var(--text2);text-align:center;padding:12px;">Loading…</p>';
+  try {
+    const [bookingsList, storeData] = await Promise.all([
+      fetch('/api/bookings').then(r => r.json()),
+      fetch('/api/data').then(r => r.json()),
+    ]);
+    if (!bookingsList.length) {
+      el.innerHTML = '<p style="font-size:12px;color:var(--text2);padding:12px 0;">No bookings yet.</p>';
+      return;
+    }
+    const allTrucks = storeData.trucks || [];
+    el.innerHTML = bookingsList.map(b => {
+      const t        = allTrucks.find(x => x.id === b.truckId);
+      const tName    = t ? esc(t.name) : '<em style="color:var(--text2);">[Truck deleted]</em>';
+      const plate    = t?.licensePlate ? `<span class="plate-badge">${esc(t.licensePlate)}</span>` : '';
+      const truckVol = t ? t.length * t.width * t.height : 0;
+      const wtPct    = t ? Math.min(100, Math.round((b.totalWeight || 0) / t.maxWt * 100)) : 0;
+      const volPct   = truckVol > 0 ? Math.min(100, Math.round((b.totalVol || 0) / truckVol * 100)) : 0;
+      const dist     = b.route?.distance_km ? `${b.route.distance_km} km` : '—';
+      const statusCls = b.status === 'active' ? 'status-active' : b.status === 'completed' ? 'status-completed' : 'status-cancelled';
+      const date     = b.createdAt ? new Date(b.createdAt).toLocaleDateString() : '—';
+      const fromLbl  = esc(b.route?.fromLabel || '—');
+      const toLbl    = esc(b.route?.toLabel   || '—');
+      const cancelBtn = b.status === 'active'
+        ? `<button class="btn-cancel-booking" onclick="cancelBooking(${b.id})">Cancel</button>` : '';
+      return `
+        <div class="booking-card">
+          <div class="booking-card-head">
+            <div>
+              <span class="booking-truck-name">${tName}</span> ${plate}
+              <span class="booking-status ${statusCls}">${b.status}</span>
+            </div>
+            <span class="booking-date">${date}</span>
+          </div>
+          <div class="booking-route">${fromLbl} → ${toLbl} · ${dist}</div>
+          <div class="booking-load-row">
+            <span class="booking-load-label">Weight: ${(b.totalWeight || 0).toLocaleString()} lbs${t ? ' / ' + t.maxWt.toLocaleString() + ' lbs' : ''}</span>
+            <div class="load-bar-wrap"><div class="load-bar" style="width:${wtPct}%;background:${wtPct >= 90 ? 'var(--danger)' : wtPct >= 70 ? 'var(--warning)' : 'var(--success)'};"></div></div>
+          </div>
+          <div class="booking-load-row">
+            <span class="booking-load-label">Volume: ${(b.totalVol || 0).toFixed(0)} cu ft${truckVol ? ' / ' + truckVol.toFixed(0) + ' cu ft' : ''}</span>
+            <div class="load-bar-wrap"><div class="load-bar" style="width:${volPct}%;background:${volPct >= 90 ? 'var(--danger)' : volPct >= 70 ? 'var(--warning)' : 'var(--primary)'};"></div></div>
+          </div>
+          <div class="booking-card-foot">${cancelBtn}</div>
+        </div>`;
+    }).join('');
+  } catch (e) {
+    el.innerHTML = `<p style="color:var(--danger);font-size:12px;">Could not load bookings: ${esc(e.message)}</p>`;
+  }
+}
+
+async function cancelBooking(id) {
+  if (!confirm('Cancel this booking?')) return;
+  await fetch(`/api/bookings/${id}`, {
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ status: 'cancelled' }),
+  });
+  renderBookings();
 }
 
 // ── Optimize ──────────────────────────────────────────────────────────────────

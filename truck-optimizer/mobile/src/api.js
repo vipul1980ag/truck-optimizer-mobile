@@ -26,6 +26,9 @@ export const api = {
   geocode:      (query)            => request('POST', '/api/geocode', { query }),
   getRoutes:    (from, to)         => request('POST', '/api/routes',  { from, to }),
   getTolls:     (geometry, vehicleType) => request('POST', '/api/tolls', { geometry, vehicleType }),
+  getAvailableTrucks: (fromLat, fromLng, toLat, toLng, neededWeight, neededVol) =>
+    request('POST', '/api/bookings/available-trucks', { fromLat, fromLng, toLat, toLng, neededWeight, neededVol }),
+  createBooking: (body) => request('POST', '/api/bookings', body),
 };
 
 export const authApi = {

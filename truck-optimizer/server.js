@@ -5,6 +5,27 @@ const fs       = require('fs');
 const path     = require('path');
 const crypto   = require('crypto');
 
+// ── Route-overlap helpers ────────────────────────────────────────────────────
+function haversineKm(lat1, lng1, lat2, lng2) {
+  const R = 6371;
+  const dLat = (lat2 - lat1) * Math.PI / 180;
+  const dLng = (lng2 - lng1) * Math.PI / 180;
+  const a = Math.sin(dLat / 2) ** 2
+    + Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) * Math.sin(dLng / 2) ** 2;
+  return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+}
+
+function pointToPolylineDist(lat, lng, coords) {
+  return Math.min(...coords.map(([ln, la]) => haversineKm(lat, lng, la, ln)));
+}
+
+function routeOverlaps(route, fromLat, fromLng, toLat, toLng) {
+  const coords = route.geometry?.coordinates;
+  if (!coords?.length) return false;
+  return pointToPolylineDist(fromLat, fromLng, coords) < 80
+      && pointToPolylineDist(toLat,   toLng,   coords) < 80;
+}
+
 const { optimize }      = require('./engine/optimizer');
 const { analyzeRoutes } = require('./engine/routes');
 
@@ -47,8 +68,8 @@ const STORE_PATH = path.join(DATA_DIR, 'store.json');
 const SEED = {
   version: 1,
   trucks: [
-    { id: 1, name: 'Semi Truck 1', length: 53, width: 8.5, height: 9,   maxWt: 44000, baseRate: 600,  ratePerMi: 3.50 },
-    { id: 2, name: 'Box Truck 1',  length: 20, width: 7.5, height: 7.5, maxWt: 12000, baseRate: 280,  ratePerMi: 2.20 },
+    { id: 1, name: 'Semi Truck 1', length: 53, width: 8.5, height: 9,   maxWt: 44000, baseRate: 600,  ratePerMi: 3.50, licensePlate: 'TRK-0001' },
+    { id: 2, name: 'Box Truck 1',  length: 20, width: 7.5, height: 7.5, maxWt: 12000, baseRate: 280,  ratePerMi: 2.20, licensePlate: 'BOX-0002' },
   ],
   carriers: [
     { id: 1, name: 'FastFreight LLC', trucks: [
@@ -75,14 +96,18 @@ const SEED = {
   ],
   users:        [],
   catalogItems: [],
-  nextIds: { truck: 3, carrier: 3, carrierTruck: 5, customer: 4, item: 7, color: 3, user: 1 },
+  bookings:     [],
+  nextIds: { truck: 3, carrier: 3, carrierTruck: 5, customer: 4, item: 7, color: 3, user: 1, booking: 1 },
 };
 
 // ── Persistence helpers ────────────────────────────────────────────────────
 function readStore() {
   try {
     if (fs.existsSync(STORE_PATH)) {
-      return JSON.parse(fs.readFileSync(STORE_PATH, 'utf8'));
+      const store = JSON.parse(fs.readFileSync(STORE_PATH, 'utf8'));
+      if (!store.bookings) store.bookings = [];
+      if (!store.nextIds.booking) store.nextIds.booking = 1;
+      return store;
     }
   } catch (_) {}
   return SEED;
@@ -512,6 +537,71 @@ paypal.Buttons({
 </script>
 </body>
 </html>`);
+});
+
+// ── Bookings ─────────────────────────────────────────────────────────────────
+
+// Available trucks for consolidation — must be before POST /api/bookings
+app.post('/api/bookings/available-trucks', (req, res) => {
+  const { fromLat, fromLng, toLat, toLng, neededWeight = 0, neededVol = 0 } = req.body || {};
+  const store = readStore();
+  const activeBookings = (store.bookings || []).filter(b => b.status === 'active');
+
+  const matches = [];
+  for (const booking of activeBookings) {
+    const truck = (store.trucks || []).find(t => t.id === booking.truckId);
+    if (!truck) continue;
+
+    const truckVol       = truck.length * truck.width * truck.height;
+    const remainingWeight = truck.maxWt - (booking.totalWeight || 0);
+    const remainingVol    = truckVol - (booking.totalVol || 0);
+    const remainingPct    = truckVol > 0 ? (remainingVol / truckVol) * 100 : 0;
+
+    if (remainingWeight < neededWeight) continue;
+    if (remainingVol    < neededVol)    continue;
+    if (remainingPct    < 5)            continue;
+    if (!routeOverlaps(booking.route || {}, fromLat, fromLng, toLat, toLng)) continue;
+
+    matches.push({ booking, truck, remainingWeight, remainingVol, remainingPct });
+  }
+  res.json(matches);
+});
+
+app.post('/api/bookings', (req, res) => {
+  const store = readStore();
+  const b = {
+    id:            store.nextIds.booking++,
+    status:        'active',
+    createdAt:     new Date().toISOString(),
+    ...req.body,
+  };
+  store.bookings.push(b);
+  writeStore(store);
+  res.json({ ok: true, booking: b });
+});
+
+app.get('/api/bookings', (req, res) => {
+  const store = readStore();
+  const list  = [...(store.bookings || [])].reverse();
+  res.json(list);
+});
+
+app.patch('/api/bookings/:id', (req, res) => {
+  const id    = Number(req.params.id);
+  const store = readStore();
+  const b     = (store.bookings || []).find(x => x.id === id);
+  if (!b) return res.status(404).json({ error: 'Booking not found' });
+  if (req.body.status) b.status = req.body.status;
+  writeStore(store);
+  res.json({ ok: true, booking: b });
+});
+
+app.delete('/api/bookings/:id', (req, res) => {
+  const id    = Number(req.params.id);
+  const store = readStore();
+  store.bookings = (store.bookings || []).filter(b => b.id !== id);
+  writeStore(store);
+  res.json({ ok: true });
 });
 
 const PORT = process.env.PORT || 3000;

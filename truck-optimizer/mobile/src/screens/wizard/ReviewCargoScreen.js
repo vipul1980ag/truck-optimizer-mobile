@@ -23,12 +23,15 @@ function suggestTruck(trucks, totalWeight, totalVol, hasDG, hasFragile, category
 }
 
 export default function ReviewCargoScreen({ navigation }) {
-  const { items, updateItem, removeItem, cargoCategory, customers } = useWizard();
+  const { items, updateItem, removeItem, cargoCategory, customers,
+          startLocation, destLocation, selectedTruck, setSelectedTruck } = useWizard();
   const customerMap = Object.fromEntries(customers.map(c => [c._id, c]));
-  const [expandedId,    setExpandedId]    = useState(null);
-  const [editForm,      setEditForm]      = useState({});
-  const [suggestion,    setSuggestion]    = useState(null); // {truck, reason}
-  const [trucksLoading, setTrucksLoading] = useState(true);
+  const [expandedId,      setExpandedId]      = useState(null);
+  const [editForm,        setEditForm]        = useState({});
+  const [suggestion,      setSuggestion]      = useState(null); // {truck, reason}
+  const [allTrucks,       setAllTrucks]       = useState([]);
+  const [trucksLoading,   setTrucksLoading]   = useState(true);
+  const [consolidation,   setConsolidation]   = useState(null); // best matching booking
 
   // Auto go back if all items deleted
   useEffect(() => {
@@ -39,6 +42,7 @@ export default function ReviewCargoScreen({ navigation }) {
     api.getData()
       .then(data => {
         const trucks = data.trucks || [];
+        setAllTrucks(trucks);
         if (!trucks.length) return;
         const totalWeight = items.reduce((s, i) => s + (i.weight + (i.packagingWeight || 0)) * i.qty, 0);
         const totalVol    = items.reduce((s, i) => s + i.length * i.width * i.height * i.qty, 0);
@@ -50,6 +54,20 @@ export default function ReviewCargoScreen({ navigation }) {
       .catch(() => {})
       .finally(() => setTrucksLoading(false));
   }, []);
+
+  // C3: Load consolidation options when route is known
+  useEffect(() => {
+    if (!startLocation || !destLocation) return;
+    const totalWeight = items.reduce((s, i) => s + (i.weight + (i.packagingWeight || 0)) * i.qty, 0);
+    const totalVol    = items.reduce((s, i) => s + i.length * i.width * i.height * i.qty, 0);
+    api.getAvailableTrucks(
+      startLocation.lat, startLocation.lng,
+      destLocation.lat,  destLocation.lng,
+      totalWeight, totalVol
+    )
+      .then(matches => { if (matches.length) setConsolidation(matches[0]); })
+      .catch(() => {}); // fail silently
+  }, [startLocation, destLocation]);
 
   function startEdit(item) {
     setExpandedId(item._id);
@@ -166,6 +184,22 @@ export default function ReviewCargoScreen({ navigation }) {
     );
   }
 
+  // C4: Show truck picker alert
+  function openTruckPicker() {
+    if (!allTrucks.length) return;
+    const options = allTrucks.map(t => t.name);
+    options.push('Cancel');
+    Alert.alert('Select Truck', 'Choose a truck for this booking', options.map((label, index) => ({
+      text: label,
+      style: index === options.length - 1 ? 'cancel' : 'default',
+      onPress: () => {
+        if (index < allTrucks.length) setSelectedTruck(allTrucks[index]);
+      },
+    })));
+  }
+
+  const effectiveTruck = selectedTruck || suggestedTruck;
+
   function ListFooter() {
     if (trucksLoading) {
       return (
@@ -175,17 +209,65 @@ export default function ReviewCargoScreen({ navigation }) {
         </View>
       );
     }
-    if (!suggestedTruck) return null;
+
+    const displayTruck = effectiveTruck?.truck || effectiveTruck;
+    const displayReason = selectedTruck ? 'Manually selected' : suggestionReason;
+    const displayUtil = displayTruck
+      ? Math.max(
+          totalWeight / displayTruck.maxWt,
+          totalVol / (displayTruck.length * displayTruck.width * displayTruck.height)
+        )
+      : 0;
+
     return (
-      <View style={s.suggestionCard}>
-        <Text style={s.suggHead}>🚛 Recommended Truck</Text>
-        <Text style={s.suggName}>{suggestedTruck.name}</Text>
-        <Text style={s.suggReason}>{suggestionReason}</Text>
-        <View style={s.suggStats}>
-          <Text style={s.suggStat}>{suggestedTruck.length} ft · {suggestedTruck.maxWt.toLocaleString()} lbs max</Text>
-          <Text style={s.suggStat}>Utilization: {Math.min(Math.round(utilizationPct * 100), 100)}%</Text>
-        </View>
-      </View>
+      <>
+        {displayTruck && (
+          <View style={s.suggestionCard}>
+            <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
+              <Text style={s.suggHead}>🚛 Recommended Truck</Text>
+              {allTrucks.length > 1 && (
+                <TouchableOpacity onPress={openTruckPicker}>
+                  <Text style={s.changeLink}>Change →</Text>
+                </TouchableOpacity>
+              )}
+            </View>
+            <Text style={s.suggName}>{displayTruck.name}{displayTruck.licensePlate ? ` · ${displayTruck.licensePlate}` : ''}</Text>
+            <Text style={s.suggReason}>{displayReason}</Text>
+            <View style={s.suggStats}>
+              <Text style={s.suggStat}>{displayTruck.length} ft · {displayTruck.maxWt.toLocaleString()} lbs max</Text>
+              <Text style={s.suggStat}>Utilization: {Math.min(Math.round(displayUtil * 100), 100)}%</Text>
+            </View>
+          </View>
+        )}
+
+        {/* C3: Consolidation banner */}
+        {consolidation && (
+          <View style={s.consolidationCard}>
+            <Text style={s.consolHead}>🚛 Route consolidation available</Text>
+            <Text style={s.consolBody}>
+              {consolidation.truck.name}{consolidation.truck.licensePlate ? ` · ${consolidation.truck.licensePlate}` : ''}
+            </Text>
+            <Text style={s.consolRoute}>
+              {consolidation.booking.route?.fromLabel || ''} → {consolidation.booking.route?.toLabel || ''}
+            </Text>
+            <Text style={s.consolCapacity}>
+              {Math.round(consolidation.remainingPct)}% capacity remaining
+            </Text>
+            <TouchableOpacity style={s.consolBtn} onPress={() => {
+              Alert.alert(
+                'Join Shipment',
+                `Join ${consolidation.truck.name} on this route? This may reduce your cost.`,
+                [
+                  { text: 'Cancel', style: 'cancel' },
+                  { text: 'Join', onPress: () => setSelectedTruck(consolidation.truck) },
+                ]
+              );
+            }}>
+              <Text style={s.consolBtnTxt}>Join this truck</Text>
+            </TouchableOpacity>
+          </View>
+        )}
+      </>
     );
   }
 
@@ -274,12 +356,25 @@ const s = StyleSheet.create({
   saveBtnTxt: { color: '#fff', fontSize: 13, fontWeight: '800' },
 
   // Truck suggestion card
-  suggestionCard: { backgroundColor: C.surface, borderRadius: 14, padding: 16, marginBottom: 10, borderWidth: 1.5, borderColor: C.primary, alignItems: 'center' },
+  suggestionCard: { backgroundColor: C.surface, borderRadius: 14, padding: 16, marginBottom: 10, borderWidth: 1.5, borderColor: C.primary },
   suggHead:  { fontSize: 11, fontWeight: '700', color: C.text2, textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 4 },
   suggName:  { fontSize: 18, fontWeight: '900', color: C.text, marginBottom: 4 },
-  suggReason:{ fontSize: 12, color: C.text2, textAlign: 'center', lineHeight: 17, marginBottom: 10 },
+  suggReason:{ fontSize: 12, color: C.text2, lineHeight: 17, marginBottom: 10 },
   suggStats: { flexDirection: 'row', gap: 16 },
   suggStat:  { fontSize: 11, color: C.primary, fontWeight: '700' },
+  changeLink: { fontSize: 12, fontWeight: '700', color: C.primary },
+
+  // Consolidation card
+  consolidationCard: {
+    backgroundColor: '#f0fdf4', borderRadius: 14, padding: 14, marginBottom: 10,
+    borderWidth: 1.5, borderColor: '#86efac',
+  },
+  consolHead:     { fontSize: 13, fontWeight: '900', color: '#15803d', marginBottom: 4 },
+  consolBody:     { fontSize: 13, fontWeight: '700', color: '#166534', marginBottom: 2 },
+  consolRoute:    { fontSize: 11, color: '#166534', marginBottom: 2 },
+  consolCapacity: { fontSize: 11, color: '#15803d', marginBottom: 10 },
+  consolBtn:      { backgroundColor: '#16a34a', borderRadius: 8, paddingVertical: 8, alignItems: 'center' },
+  consolBtnTxt:   { color: '#fff', fontSize: 13, fontWeight: '800' },
 
   bottomBar: {
     flexDirection: 'row', gap: 8, padding: 12, paddingHorizontal: 16,
