@@ -1160,20 +1160,20 @@ floor.rotation.x = -Math.PI/2; floor.position.set(TL/2, 0.001, TW/2); scene.add(
 const grid = new THREE.GridHelper(Math.max(TL,TW)*1.05, 20, 0x1e3a5f, 0x1e3a5f);
 grid.position.set(TL/2, 0.002, TW/2); scene.add(grid);
 
-// Truck dimension annotations (permanent, amber)
+// Truck dimension annotations (permanent, amber) — one on each side
 const truckDimGrp = new THREE.Group();
-// Length — along bottom front edge, offset outward in -Z
+// LENGTH — bottom edge of the visible long side (z=TW face), pushed downward
 dimLine(truckDimGrp,
-  new THREE.Vector3(0, 0, 0), new THREE.Vector3(TL, 0, 0),
-  new THREE.Vector3(0, 0, -1));
-// Width — along bottom right edge, offset outward in +X
+  new THREE.Vector3(0, 0, TW), new THREE.Vector3(TL, 0, TW),
+  new THREE.Vector3(0, -1, 0));
+// BREADTH — bottom edge of the right end face (x=TL), pushed outward in +X
 dimLine(truckDimGrp,
   new THREE.Vector3(TL, 0, 0), new THREE.Vector3(TL, 0, TW),
   new THREE.Vector3(1, 0, 0));
-// Height — along right-front vertical edge, offset outward in +X -Z
+// HEIGHT — near-right vertical edge (x=TL, z=TW), pushed out diagonally
 dimLine(truckDimGrp,
-  new THREE.Vector3(TL, 0, 0), new THREE.Vector3(TL, TH, 0),
-  new THREE.Vector3(1, 0, -1));
+  new THREE.Vector3(TL, 0, TW), new THREE.Vector3(TL, TH, TW),
+  new THREE.Vector3(1, 0, 1));
 scene.add(truckDimGrp);
 
 function hexToRgb(hex) { const n=parseInt(hex.replace('#',''),16); return [(n>>16)&255,(n>>8)&255,n&255]; }
