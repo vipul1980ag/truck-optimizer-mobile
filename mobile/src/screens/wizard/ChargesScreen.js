@@ -8,7 +8,8 @@ import { api } from '../../api';
 import { C } from '../../theme';
 
 export default function ChargesScreen({ navigation }) {
-  const { items, shippingOption, selectedRoute } = useWizard();
+  const { items, shippingOption, selectedRoute, selectedTruck,
+          startLocation, destLocation, customers } = useWizard();
   const [truck,             setTruck]             = useState(null);
   const [loading,           setLoading]           = useState(true);
   const [saving,            setSaving]            = useState(false);
@@ -17,10 +18,10 @@ export default function ChargesScreen({ navigation }) {
 
   useEffect(() => {
     api.getData()
-      .then(d => setTruck((d.trucks || [])[0] || null))
+      .then(d => setTruck(selectedTruck || (d.trucks || [])[0] || null))
       .catch(() => setTruck(null))
       .finally(() => setLoading(false));
-  }, []);
+  }, [selectedTruck]);
 
   // Cargo totals
   const totalItems  = items.reduce((s, i) => s + i.qty, 0);
@@ -77,6 +78,33 @@ export default function ChargesScreen({ navigation }) {
         items:   [...(fresh.items || []), ...newItems],
         nextIds: { ...fresh.nextIds, item: nextId },
       });
+
+      // C5: Save booking record
+      const inferredTruck = selectedTruck || truck;
+      if (inferredTruck?.id) {
+        try {
+          await api.createBooking({
+            truckId:       inferredTruck.id,
+            shippingOption,
+            route: {
+              fromLabel:    startLocation?.label,
+              fromLat:      startLocation?.lat,
+              fromLng:      startLocation?.lng,
+              toLabel:      destLocation?.label,
+              toLat:        destLocation?.lat,
+              toLng:        destLocation?.lng,
+              distance_km:  selectedRoute?.distance_km,
+              duration_min: selectedRoute?.duration_min,
+              geometry:     selectedRoute?.geometry,
+            },
+            customers:   customers.map(c => ({ _id: c._id, name: c.name, address: c.address })),
+            items:       items.map(i => ({ name: i.name, length: i.length, width: i.width, height: i.height, weight: i.weight, qty: i.qty })),
+            totalWeight,
+            totalVol,
+          });
+        } catch (_) { /* non-critical — booking save failure should not block confirm */ }
+      }
+
       navigation.navigate('Confirm', { totalItems, totalWeight, estimate, hasDG, dgCount: dgItems.length, dgSurcharge: Math.round(dgSurcharge), distanceKm: distance_km, tollCost: toll_cost, manualToll, additionalCharge });
     } catch (e) {
       Alert.alert('Error', 'Could not save booking: ' + e.message);
