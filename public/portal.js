@@ -920,7 +920,6 @@ async function showChargesStep() {
           * Based on ${distance_km.toFixed(0)} km actual route. Final price confirmed at pickup.
         </p>
       </div>`;
-  el.innerHTML += `<button class="btn-viz3d" onclick="openViz3DModal()" style="margin-top:12px;width:100%;">🧊 3D Load View</button>`;
   } catch (e) {
     el.innerHTML = `<p style="color:var(--danger);font-size:12px;">Could not load rates: ${esc(e.message)}</p>`;
   }

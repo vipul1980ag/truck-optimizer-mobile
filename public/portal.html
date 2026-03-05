@@ -174,7 +174,10 @@
 
       <!-- Proceed button (hidden when list is empty) -->
       <div id="p-proceed-bar" class="proceed-bar" style="display:none">
-        <button class="btn-proceed" onclick="openBookingModal()">Next: Choose Shipping →</button>
+        <div style="display:flex;gap:8px;">
+          <button class="btn-viz3d" onclick="openViz3DModal()">🧊 3D Load</button>
+          <button class="btn-proceed" style="flex:1;" onclick="openBookingModal()">Next: Choose Shipping →</button>
+        </div>
       </div>
     </div>
   </div>
