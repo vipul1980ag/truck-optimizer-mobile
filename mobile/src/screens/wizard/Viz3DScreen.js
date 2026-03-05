@@ -26,7 +26,7 @@ function suggestTruck(trucks, totalWeight, totalVol, hasDG, hasFragile, category
 //
 // Three.js BoxGeometry(xSize, ySize, zSize) matches this directly.
 //
-function buildVizHTML(items, truck) {
+function buildVizHTML(items, truck, customers = []) {
   const COLORS = [
     '#3b82f6','#22c55e','#f59e0b','#ef4444','#8b5cf6',
     '#06b6d4','#ec4899','#84cc16','#f97316','#14b8a6',
@@ -36,9 +36,17 @@ function buildVizHTML(items, truck) {
   let ci = 0;
   items.forEach(i => { if (!nameColors[i.name]) nameColors[i.name] = COLORS[ci++ % COLORS.length]; });
 
+  const hasCustomers = customers.length > 0;
+  const customerInfo = {};
+  if (hasCustomers) {
+    customers.forEach((c, idx) => {
+      customerInfo[String(c._id)] = { name: c.name, color: COLORS[idx % COLORS.length] };
+    });
+  }
+
   // Pass items and truck into the HTML as a JSON literal.
   // The packing algorithm runs entirely inside the WebView.
-  const DATA = JSON.stringify({ items, truck, nameColors });
+  const DATA = JSON.stringify({ items, truck, nameColors, hasCustomers, customerInfo });
 
   return `<!DOCTYPE html>
 <html>
@@ -91,7 +99,8 @@ function pack(items) {
     const qty = Math.max(1, parseInt(item.qty) || 1);
     for (let q = 0; q < qty; q++) {
       boxes.push({
-        name:      item.name,
+        name:       item.name,
+        customerId: item.customerId || null,
         il:        parseFloat(item.length) || 1,
         ih:        parseFloat(item.height) || 1,
         iw:        parseFloat(item.width)  || 1,
@@ -102,10 +111,12 @@ function pack(items) {
     }
   });
 
-  // Sort: non-stackable first (go to floor), then largest volume first
+  // Sort: non-stackable first (go to floor), fragile last (land on top), then largest volume first
   boxes.sort((a, b) => {
     if (!a.stackable && b.stackable) return -1;
     if (a.stackable && !b.stackable) return  1;
+    if (!a.isFragile && b.isFragile) return -1;   // fragile goes last
+    if (a.isFragile && !b.isFragile) return  1;
     return (b.il * b.ih * b.iw) - (a.il * a.ih * a.iw);
   });
 
@@ -124,10 +135,11 @@ function pack(items) {
       [box.ih, box.iw, box.il],
     ];
 
-    // Prefer low-y spaces first, then smallest volume (best fit)
-    const sorted = spaces.slice().sort((a, b) =>
-      a.y - b.y || (a.l * a.h * a.w) - (b.l * b.h * b.w)
-    );
+    // Fragile items prefer the highest available space (land on top); others prefer lowest
+    const sorted = spaces.slice().sort((a, b) => {
+      if (box.isFragile) return b.y - a.y || (a.l * a.h * a.w) - (b.l * b.h * b.w);
+      return a.y - b.y || (a.l * a.h * a.w) - (b.l * b.h * b.w);
+    });
 
     let placed = false;
     for (const sp of sorted) {
@@ -138,10 +150,11 @@ function pack(items) {
         placements.push({
           x: sp.x, y: sp.y, z: sp.z,
           l: ol,   h: oh,   w: ow,
-          name:      box.name,
-          stackable: box.stackable,
-          isFragile: box.isFragile,
-          isDG:      box.isDG,
+          name:       box.name,
+          customerId: box.customerId,
+          stackable:  box.stackable,
+          isFragile:  box.isFragile,
+          isDG:       box.isDG,
         });
 
         // Remove the consumed space
@@ -156,8 +169,8 @@ function pack(items) {
           if (rw > 0.01) spaces.push({ x: sp.x, y: sp.y, z: sp.z + ow, l: sp.l, h: sp.h, w: rw });
           if (rl > 0.01) spaces.push({ x: sp.x + ol, y: sp.y, z: sp.z, l: rl, h: oh, w: ow });
         }
-        // Top space: only when this box is stackable (so items stacked on it are always supported)
-        if (rh > 0.01 && box.stackable) {
+        // Top space: only when stackable AND not fragile (nothing placed on top of fragile items)
+        if (rh > 0.01 && box.stackable && !box.isFragile) {
           spaces.push({ x: sp.x, y: sp.y + oh, z: sp.z, l: ol, h: rh, w: ow });
         }
 
@@ -296,7 +309,10 @@ function makeLabel(text, hexColor, lineTwo) {
 
 // ─── Render placements ────────────────────────────────────────────────────────
 placements.forEach(p => {
-  const color = DATA.nameColors[p.name] || '#64748b';
+  const custKey = p.customerId != null ? String(p.customerId) : null;
+  const color = DATA.hasCustomers && custKey && DATA.customerInfo[custKey]
+    ? DATA.customerInfo[custKey].color
+    : (DATA.nameColors[p.name] || '#64748b');
 
   // Shrink slightly so adjacent boxes have a visible gap
   const gap = 0.04;
@@ -314,8 +330,12 @@ placements.forEach(p => {
   edges.position.copy(mesh.position);
   scene.add(edges);
 
-  // Label sprite (centered on box face)
-  const subLabel = p.isDG ? '\u26a0 Dangerous Goods' : p.isFragile ? '\uD83D\uDD14 Handle with care' : null;
+  // Label sprite — customer name takes priority as sub-label
+  const custName = DATA.hasCustomers && custKey && DATA.customerInfo[custKey]
+    ? DATA.customerInfo[custKey].name : null;
+  const subLabel = custName
+    ? '\uD83D\uDC64 ' + custName
+    : p.isDG ? '\u26a0 Dangerous Goods' : p.isFragile ? '\uD83D\uDD14 Handle with care' : null;
   const sprite = makeLabel(p.name, color, subLabel);
   const sw = Math.max(p.l * 0.9, 1.2);
   const CW = 512, CH = subLabel ? 160 : 100;
@@ -325,17 +345,28 @@ placements.forEach(p => {
 });
 
 // ─── Legend ───────────────────────────────────────────────────────────────────
-const seen = {};
-placements.forEach(p => { seen[p.name] = DATA.nameColors[p.name] || '#64748b'; });
 const legendEl = document.getElementById('legend');
-Object.entries(seen).forEach(([name, color]) => {
-  const row = document.createElement('div');
-  row.className = 'lrow';
-  row.innerHTML =
-    '<div class="ldot" style="background:' + color + '"></div>' +
-    '<span class="lname">' + name + '</span>';
-  legendEl.appendChild(row);
-});
+if (DATA.hasCustomers) {
+  Object.values(DATA.customerInfo).forEach(function(ci) {
+    const row = document.createElement('div');
+    row.className = 'lrow';
+    row.innerHTML =
+      '<div class="ldot" style="background:' + ci.color + '"></div>' +
+      '<span class="lname">' + ci.name + '</span>';
+    legendEl.appendChild(row);
+  });
+} else {
+  const seen = {};
+  placements.forEach(p => { seen[p.name] = DATA.nameColors[p.name] || '#64748b'; });
+  Object.entries(seen).forEach(function([name, color]) {
+    const row = document.createElement('div');
+    row.className = 'lrow';
+    row.innerHTML =
+      '<div class="ldot" style="background:' + color + '"></div>' +
+      '<span class="lname">' + name + '</span>';
+    legendEl.appendChild(row);
+  });
+}
 
 // ─── Stats bar ────────────────────────────────────────────────────────────────
 const totalUnits = DATA.items.reduce((s, i) => s + (parseInt(i.qty) || 1), 0);
@@ -376,7 +407,7 @@ window.addEventListener('resize', () => {
 
 // ── Screen ────────────────────────────────────────────────────────────────────
 export default function Viz3DScreen() {
-  const { items, cargoCategory } = useWizard();
+  const { items, cargoCategory, customers } = useWizard();
   const [html,    setHtml]    = useState(null);
   const [loading, setLoading] = useState(true);
   const [error,   setError]   = useState(null);
@@ -396,7 +427,7 @@ export default function Viz3DScreen() {
         const truck = suggestTruck(trucks, totalWeight, totalVol, hasDG, hasFragile, cargoCategory);
         if (!truck) throw new Error('Could not determine a suitable truck');
 
-        setHtml(buildVizHTML(items, truck));
+        setHtml(buildVizHTML(items, truck, customers));
       } catch (e) {
         setError(e.message);
       } finally {

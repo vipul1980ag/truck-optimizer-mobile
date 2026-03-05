@@ -266,6 +266,7 @@ function portalResetCategory() {
   document.getElementById('p-pkg-weight').value  = '0';
   document.getElementById('p-qty').value         = '1';
   document.getElementById('p-stackable').checked  = true;
+  document.getElementById('p-fragile').checked   = false;
   document.getElementById('p-is-dg').checked      = false;
   document.getElementById('p-dg-fields').style.display = 'none';
   document.getElementById('p-dg-class').value     = '';
@@ -433,6 +434,7 @@ function portalAddItem() {
   const qty    = parseInt(document.getElementById('p-qty').value, 10)  || 1;
 
   const stackable    = document.getElementById('p-stackable').checked;
+  const isFragile    = document.getElementById('p-fragile')?.checked || false;
   const isDG         = document.getElementById('p-is-dg').checked;
   const dgClass      = isDG ? (document.getElementById('p-dg-class').value || '') : '';
   const dgCanCombine = isDG ? (document.getElementById('p-dg-combine').value !== 'false') : true;
@@ -452,6 +454,7 @@ function portalAddItem() {
     qty,
     rotate:         true,
     stackable,
+    isFragile,
     customerId:     null,
     isDG,
     dgClass,
@@ -549,7 +552,9 @@ function renderItemList() {
         <div class="item-row-info">
           <div class="item-row-name">
             ${esc(it.name)} <span style="font-weight:400;color:var(--text2);">×${it.qty}</span>
-            ${it.isDG ? `<span class="dg-badge">⚠ DG</span>` : ''}
+            ${it.isDG      ? `<span class="dg-badge">⚠ DG</span>` : ''}
+            ${it.isFragile ? `<span class="fragile-badge">🔔 Fragile</span>` : ''}
+            ${it.customerId && _wizardCustomers.find(c => c.id === it.customerId) ? `<span class="customer-badge">👤 ${esc(_wizardCustomers.find(c => c.id === it.customerId).name)}</span>` : ''}
           </div>
           <div class="item-row-meta">${it.length}×${it.width}×${it.height} ft &nbsp;·&nbsp; ${it.weight.toLocaleString()} lbs${it.packagingWeight ? ` + ${it.packagingWeight.toLocaleString()} pkg` : ''}${it.isDG && it.dgClass ? ` &nbsp;·&nbsp; ${esc(it.dgClass)}` : ''}${it.stackable === false ? ' &nbsp;·&nbsp; <span style="color:#c2410c;font-weight:700;">🚫 No Stack</span>' : ''}</div>
         </div>
@@ -564,6 +569,7 @@ let _bookingEstimate = null;
 let _wizardStart = null;   // { label, lat, lng }
 let _wizardDest  = null;   // { label, lat, lng }
 let _wizardRoute = null;   // { index, distance_km, duration_min, geometry, toll_cost }
+let _wizardCustomers = [];   // LTL consignees added in customer step
 let _leafletMap  = null;
 let _leafletRouteLayer = null;
 
@@ -573,6 +579,7 @@ function openBookingModal() {
   _wizardStart = null;
   _wizardDest  = null;
   _wizardRoute = null;
+  _wizardCustomers = [];
   document.querySelectorAll('.ship-opt').forEach(el => el.classList.remove('selected'));
   // Reset location inputs
   const si = document.getElementById('bm-start-input'); if (si) si.value = '';
@@ -595,7 +602,7 @@ function bookingOverlayClick(e) {
 }
 
 function showBookingStep(step) {
-  ['location', 'route', 'charges', 'confirm'].forEach(s => {
+  ['location', 'customer', 'route', 'charges', 'confirm'].forEach(s => {
     const el = document.getElementById('bm-step-' + s);
     if (el) el.style.display = s === step ? '' : 'none';
   });
@@ -677,7 +684,16 @@ function portalSelectLocation(field, idx) {
   updateFindRoutesBtn();
 }
 
-async function portalFindRoutes() {
+function portalFindRoutes() {
+  if (_wizardShipping === 'shared') {
+    renderWizardCustomers();
+    showBookingStep('customer');
+    return;
+  }
+  portalFindRoutesActual();
+}
+
+async function portalFindRoutesActual() {
   if (!_wizardStart || !_wizardDest) return;
   const listEl = document.getElementById('bm-routes-list');
   const tollEl = document.getElementById('bm-toll-info');
@@ -720,6 +736,52 @@ async function portalFindRoutes() {
   } catch (e) {
     listEl.innerHTML = `<p style="color:var(--danger);font-size:13px;padding:12px;">Routing failed: ${esc(e.message)}</p>`;
   }
+}
+
+function proceedFromCustomers() {
+  portalFindRoutesActual();
+}
+
+function addWizardCustomer() {
+  const name = document.getElementById('wc-name')?.value?.trim();
+  if (!name) { alert('Customer name is required.'); return; }
+  _wizardCustomers.push({
+    id:      Date.now(),
+    name,
+    phone:   document.getElementById('wc-phone')?.value?.trim()   || '',
+    address: document.getElementById('wc-address')?.value?.trim() || '',
+    notes:   document.getElementById('wc-notes')?.value?.trim()   || '',
+    value:   document.getElementById('wc-value')?.value?.trim()   || '',
+  });
+  ['wc-name','wc-phone','wc-address','wc-notes','wc-value'].forEach(id => {
+    const el = document.getElementById(id); if (el) el.value = '';
+  });
+  renderWizardCustomers();
+}
+
+function removeWizardCustomer(id) {
+  _wizardCustomers = _wizardCustomers.filter(c => c.id !== id);
+  renderWizardCustomers();
+}
+
+function renderWizardCustomers() {
+  const el = document.getElementById('wc-list');
+  if (!el) return;
+  if (!_wizardCustomers.length) {
+    el.innerHTML = '<p style="font-size:12px;color:var(--text2);text-align:center;padding:8px 0;">No customers yet — skip to proceed without LTL customers.</p>';
+    return;
+  }
+  el.innerHTML = _wizardCustomers.map(c => `
+    <div class="wc-card">
+      <div style="flex:1;min-width:0;">
+        <div class="wc-name">${esc(c.name)}</div>
+        ${c.phone   ? `<div class="wc-meta">${esc(c.phone)}</div>` : ''}
+        ${c.address ? `<div class="wc-meta">${esc(c.address)}</div>` : ''}
+        ${c.value   ? `<span class="wc-value-badge">$${esc(c.value)}</span>` : ''}
+      </div>
+      <button class="btn-remove" onclick="removeWizardCustomer(${c.id})">✕</button>
+    </div>
+  `).join('');
 }
 
 function minsToHM(mins) {
@@ -858,6 +920,7 @@ async function showChargesStep() {
           * Based on ${distance_km.toFixed(0)} km actual route. Final price confirmed at pickup.
         </p>
       </div>`;
+  el.innerHTML += `<button class="btn-viz3d" onclick="openViz3DModal()" style="margin-top:12px;width:100%;">🧊 3D Load View</button>`;
   } catch (e) {
     el.innerHTML = `<p style="color:var(--danger);font-size:12px;">Could not load rates: ${esc(e.message)}</p>`;
   }
@@ -905,6 +968,275 @@ async function confirmWebBooking() {
 function startNewBooking() {
   closeBookingModal();
   portalResetCategory();
+}
+
+// ── 3D Load Visualization ──────────────────────────────────────────────────────
+function openViz3DModal() {
+  fetch('/api/data').then(r => r.json()).then(data => {
+    const trucks = data.trucks || [];
+    if (!trucks.length) { alert('No trucks configured on the server yet.'); return; }
+
+    const totalWeight = items.reduce((s, i) => s + (i.weight + (i.packagingWeight || 0)) * i.qty, 0);
+    const totalVol    = items.reduce((s, i) => s + i.length * i.width * i.height * i.qty, 0);
+    const hasDG       = items.some(i => i.isDG);
+    const hasFragile  = items.some(i => i.isFragile);
+    const semi = trucks.find(t => t.maxWt >= 30000) || trucks[0];
+    const box  = trucks.find(t => t.maxWt <  30000) || trucks[0];
+    let truck = box;
+    if (hasDG || totalWeight > box.maxWt || totalVol > box.length * box.width * box.height * 0.9) truck = semi;
+
+    const html = buildViz3DHTML(items, truck, _wizardCustomers);
+    document.getElementById('viz3d-frame').srcdoc = html;
+    document.getElementById('viz3d-modal').classList.add('open');
+  }).catch(e => alert('Could not load truck data: ' + e.message));
+}
+
+function closeViz3DModal() {
+  document.getElementById('viz3d-modal').classList.remove('open');
+  document.getElementById('viz3d-frame').srcdoc = '';
+}
+
+function viz3dOverlayClick(e) {
+  if (e.target === document.getElementById('viz3d-modal')) closeViz3DModal();
+}
+
+function buildViz3DHTML(items, truck, customers) {
+  const COLORS = [
+    '#3b82f6','#22c55e','#f59e0b','#ef4444','#8b5cf6',
+    '#06b6d4','#ec4899','#84cc16','#f97316','#14b8a6',
+    '#a78bfa','#34d399','#fbbf24','#f87171','#60a5fa',
+  ];
+  const nameColors = {};
+  let ci = 0;
+  items.forEach(i => { if (!nameColors[i.name]) nameColors[i.name] = COLORS[ci++ % COLORS.length]; });
+
+  const hasCustomers = (customers || []).length > 0;
+  const customerInfo = {};
+  if (hasCustomers) {
+    customers.forEach((c, idx) => {
+      customerInfo[String(c.id)] = { name: c.name, color: COLORS[idx % COLORS.length] };
+    });
+  }
+
+  const DATA = JSON.stringify({ items, truck, nameColors, hasCustomers, customerInfo });
+
+  return `<!DOCTYPE html>
+<html>
+<head>
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
+  <style>
+    * { box-sizing: border-box; }
+    body { margin: 0; overflow: hidden; background: #0f172a; font-family: Arial, sans-serif; }
+    canvas { display: block; }
+    #hint  { position:absolute; top:8px; left:0; right:0; text-align:center;
+             color:#64748b; font-size:11px; pointer-events:none; }
+    #stats { position:absolute; bottom:8px; left:10px; right:10px;
+             color:#94a3b8; font-size:11px; background:rgba(15,23,42,0.7);
+             padding:6px 10px; border-radius:8px; pointer-events:none; }
+    #legend{ position:absolute; top:28px; right:8px; max-width:140px;
+             background:rgba(15,23,42,0.85); border-radius:8px; padding:6px 8px;
+             border:1px solid #1e3a5f; }
+    .lrow  { display:flex; align-items:center; gap:5px; margin-bottom:3px; }
+    .ldot  { width:10px; height:10px; border-radius:3px; flex-shrink:0; }
+    .lname { color:#cbd5e1; font-size:9px; white-space:nowrap; overflow:hidden;
+             text-overflow:ellipsis; max-width:110px; }
+  </style>
+</head>
+<body>
+<div id="hint">Drag to rotate · Pinch/scroll to zoom</div>
+<div id="stats">Packing…</div>
+<div id="legend"></div>
+<script src="https://cdn.jsdelivr.net/npm/three@0.134/build/three.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/three@0.134/examples/js/controls/OrbitControls.js"></script>
+<script>
+const DATA = ${DATA};
+const truck = DATA.truck;
+const TL = truck.length, TH = truck.height, TW = truck.width;
+
+function pack(items) {
+  const boxes = [];
+  items.forEach(item => {
+    const qty = Math.max(1, parseInt(item.qty) || 1);
+    for (let q = 0; q < qty; q++) {
+      boxes.push({
+        name:       item.name,
+        customerId: item.customerId || null,
+        il: parseFloat(item.length) || 1,
+        ih: parseFloat(item.height) || 1,
+        iw: parseFloat(item.width)  || 1,
+        stackable: item.stackable !== false,
+        isFragile: item.isFragile || false,
+        isDG:      item.isDG || false,
+      });
+    }
+  });
+
+  boxes.sort((a, b) => {
+    if (!a.stackable && b.stackable) return -1;
+    if (a.stackable && !b.stackable) return  1;
+    if (!a.isFragile && b.isFragile) return -1;
+    if (a.isFragile && !b.isFragile) return  1;
+    return (b.il * b.ih * b.iw) - (a.il * a.ih * a.iw);
+  });
+
+  const placements = [], unplaced = [];
+  let spaces = [{ x:0, y:0, z:0, l:TL, h:TH, w:TW }];
+
+  for (const box of boxes) {
+    const orients = [
+      [box.il, box.ih, box.iw], [box.iw, box.ih, box.il],
+      [box.il, box.iw, box.ih], [box.iw, box.il, box.ih],
+      [box.ih, box.il, box.iw], [box.ih, box.iw, box.il],
+    ];
+    const sorted = spaces.slice().sort((a, b) => {
+      if (box.isFragile) return b.y - a.y || (a.l*a.h*a.w) - (b.l*b.h*b.w);
+      return a.y - b.y || (a.l*a.h*a.w) - (b.l*b.h*b.w);
+    });
+    let placed = false;
+    for (const sp of sorted) {
+      for (const [ol, oh, ow] of orients) {
+        if (ol > sp.l + 0.001 || oh > sp.h + 0.001 || ow > sp.w + 0.001) continue;
+        placements.push({ x:sp.x, y:sp.y, z:sp.z, l:ol, h:oh, w:ow,
+          name: box.name, customerId: box.customerId,
+          stackable: box.stackable, isFragile: box.isFragile, isDG: box.isDG });
+        spaces = spaces.filter(s => s !== sp);
+        const rl = sp.l - ol, rw = sp.w - ow, rh = sp.h - oh;
+        if (rl >= rw) {
+          if (rl > 0.01) spaces.push({ x:sp.x+ol, y:sp.y, z:sp.z, l:rl, h:sp.h, w:sp.w });
+          if (rw > 0.01) spaces.push({ x:sp.x, y:sp.y, z:sp.z+ow, l:ol, h:sp.h, w:rw });
+        } else {
+          if (rw > 0.01) spaces.push({ x:sp.x, y:sp.y, z:sp.z+ow, l:sp.l, h:sp.h, w:rw });
+          if (rl > 0.01) spaces.push({ x:sp.x+ol, y:sp.y, z:sp.z, l:rl, h:oh, w:ow });
+        }
+        if (rh > 0.01 && box.stackable && !box.isFragile) {
+          spaces.push({ x:sp.x, y:sp.y+oh, z:sp.z, l:ol, h:rh, w:ow });
+        }
+        placed = true; break;
+      }
+      if (placed) break;
+    }
+    if (!placed) unplaced.push(box);
+  }
+  return { placements, unplaced };
+}
+
+const { placements, unplaced } = pack(DATA.items);
+
+const scene    = new THREE.Scene();
+scene.background = new THREE.Color(0x0f172a);
+scene.fog = new THREE.FogExp2(0x0f172a, 0.012);
+const camera   = new THREE.PerspectiveCamera(48, window.innerWidth / window.innerHeight, 0.1, 500);
+const renderer = new THREE.WebGLRenderer({ antialias: true });
+renderer.setSize(window.innerWidth, window.innerHeight);
+renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+document.body.appendChild(renderer.domElement);
+const controls = new THREE.OrbitControls(camera, renderer.domElement);
+controls.enableDamping = true; controls.dampingFactor = 0.12;
+controls.minDistance = 2; controls.maxDistance = 200;
+
+scene.add(new THREE.AmbientLight(0xffffff, 0.65));
+const sun = new THREE.DirectionalLight(0xffffff, 0.85);
+sun.position.set(TL*0.8, TH*3, TW*1.5); scene.add(sun);
+const fill = new THREE.DirectionalLight(0x6688cc, 0.3);
+fill.position.set(-TL, TH, -TW); scene.add(fill);
+
+const truckCenter = new THREE.Vector3(TL/2, TH/2, TW/2);
+const wallMat = new THREE.MeshLambertMaterial({ color:0x1e3a5f, opacity:0.12, transparent:true, side:THREE.BackSide });
+const wallMesh = new THREE.Mesh(new THREE.BoxGeometry(TL,TH,TW), wallMat);
+wallMesh.position.copy(truckCenter); scene.add(wallMesh);
+const truckEdges = new THREE.EdgesGeometry(new THREE.BoxGeometry(TL,TH,TW));
+const truckLine  = new THREE.LineSegments(truckEdges, new THREE.LineBasicMaterial({ color:0x3b82f6, opacity:0.7, transparent:true }));
+truckLine.position.copy(truckCenter); scene.add(truckLine);
+const floor = new THREE.Mesh(new THREE.PlaneGeometry(TL,TW), new THREE.MeshLambertMaterial({ color:0x0f2a4a, side:THREE.DoubleSide }));
+floor.rotation.x = -Math.PI/2; floor.position.set(TL/2, 0.001, TW/2); scene.add(floor);
+const grid = new THREE.GridHelper(Math.max(TL,TW)*1.05, 20, 0x1e3a5f, 0x1e3a5f);
+grid.position.set(TL/2, 0.002, TW/2); scene.add(grid);
+
+function hexToRgb(hex) { const n=parseInt(hex.replace('#',''),16); return [(n>>16)&255,(n>>8)&255,n&255]; }
+function makeLabel(text, hexColor, lineTwo) {
+  const CW=512, CH=lineTwo?160:100;
+  const canvas=document.createElement('canvas'); canvas.width=CW; canvas.height=CH;
+  const ctx=canvas.getContext('2d');
+  const [r,g,b]=hexToRgb(hexColor);
+  const dr=Math.max(0,r-60),dg=Math.max(0,g-60),db=Math.max(0,b-60);
+  ctx.fillStyle='rgba('+dr+','+dg+','+db+',0.92)';
+  const rd=12; ctx.beginPath();
+  ctx.moveTo(rd,0); ctx.lineTo(CW-rd,0); ctx.quadraticCurveTo(CW,0,CW,rd);
+  ctx.lineTo(CW,CH-rd); ctx.quadraticCurveTo(CW,CH,CW-rd,CH);
+  ctx.lineTo(rd,CH); ctx.quadraticCurveTo(0,CH,0,CH-rd);
+  ctx.lineTo(0,rd); ctx.quadraticCurveTo(0,0,rd,0); ctx.closePath(); ctx.fill();
+  ctx.fillStyle='rgba('+r+','+g+','+b+',0.6)'; ctx.fillRect(0,0,CW,6);
+  ctx.fillStyle='#ffffff'; ctx.font='bold 34px Arial'; ctx.textAlign='center'; ctx.textBaseline='middle';
+  let t=text; while(t.length>1&&ctx.measureText(t).width>CW-24) t=t.slice(0,-1);
+  if(t!==text) t+='\u2026';
+  ctx.fillText(t, CW/2, lineTwo?52:CH/2);
+  if(lineTwo) {
+    ctx.fillStyle='rgba(255,255,255,0.65)'; ctx.font='24px Arial';
+    let t2=lineTwo; while(t2.length>1&&ctx.measureText(t2).width>CW-24) t2=t2.slice(0,-1);
+    if(t2!==lineTwo) t2+='\u2026';
+    ctx.fillText(t2, CW/2, 108);
+  }
+  const tex=new THREE.CanvasTexture(canvas);
+  const mat=new THREE.SpriteMaterial({ map:tex, transparent:true, depthTest:false, depthWrite:false });
+  const sprite=new THREE.Sprite(mat);
+  const sw=Math.max(Math.min(2.5,0.8),1.0); sprite.scale.set(sw*(CW/CH),sw,1);
+  return sprite;
+}
+
+placements.forEach(p => {
+  const custKey = p.customerId != null ? String(p.customerId) : null;
+  const color = DATA.hasCustomers && custKey && DATA.customerInfo[custKey]
+    ? DATA.customerInfo[custKey].color : (DATA.nameColors[p.name] || '#64748b');
+  const gap=0.04;
+  const geo=new THREE.BoxGeometry(Math.max(p.l-gap,0.05),Math.max(p.h-gap,0.05),Math.max(p.w-gap,0.05));
+  const mat=new THREE.MeshLambertMaterial({ color, opacity:0.80, transparent:true });
+  const mesh=new THREE.Mesh(geo,mat);
+  mesh.position.set(p.x+p.l/2, p.y+p.h/2, p.z+p.w/2); scene.add(mesh);
+  const edgeMat=new THREE.LineBasicMaterial({ color:0xffffff, opacity:0.18, transparent:true });
+  const edges=new THREE.LineSegments(new THREE.EdgesGeometry(geo),edgeMat);
+  edges.position.copy(mesh.position); scene.add(edges);
+  const custName = DATA.hasCustomers && custKey && DATA.customerInfo[custKey] ? DATA.customerInfo[custKey].name : null;
+  const subLabel = custName ? '\uD83D\uDC64 '+custName : p.isDG ? '\u26a0 Dangerous Goods' : p.isFragile ? '\uD83D\uDD14 Handle with care' : null;
+  const sprite=makeLabel(p.name, color, subLabel);
+  const sw=Math.max(p.l*0.9,1.2); const CW=512, CH=subLabel?160:100;
+  sprite.scale.set(sw,sw*(CH/CW),1);
+  sprite.position.set(p.x+p.l/2, p.y+p.h/2, p.z+p.w/2); scene.add(sprite);
+});
+
+const legendEl=document.getElementById('legend');
+if(DATA.hasCustomers) {
+  Object.values(DATA.customerInfo).forEach(function(ci) {
+    const row=document.createElement('div'); row.className='lrow';
+    row.innerHTML='<div class="ldot" style="background:'+ci.color+'"></div><span class="lname">'+ci.name+'</span>';
+    legendEl.appendChild(row);
+  });
+} else {
+  const seen={};
+  placements.forEach(p => { seen[p.name]=DATA.nameColors[p.name]||'#64748b'; });
+  Object.entries(seen).forEach(function([name,color]) {
+    const row=document.createElement('div'); row.className='lrow';
+    row.innerHTML='<div class="ldot" style="background:'+color+'"></div><span class="lname">'+name+'</span>';
+    legendEl.appendChild(row);
+  });
+}
+
+const totalUnits=DATA.items.reduce((s,i)=>s+(parseInt(i.qty)||1),0);
+const placedVol=placements.reduce((s,p)=>s+p.l*p.h*p.w,0);
+const truckVol=TL*TH*TW;
+const utilPct=Math.min(Math.round(placedVol/truckVol*100),100);
+const statsEl=document.getElementById('stats');
+statsEl.innerHTML=truck.name+' &nbsp;|&nbsp; '+placements.length+'/'+totalUnits+' units &nbsp;|&nbsp; '+utilPct+'% volume'+(unplaced.length?' &nbsp;|&nbsp; <span style="color:#fbbf24">\u26a0 '+unplaced.length+' unplaced</span>':'');
+
+const dist=Math.max(TL,TW,TH)*1.9;
+camera.position.set(TL/2+dist*0.55, TH/2+dist*0.45, TW/2+dist*0.75);
+camera.lookAt(truckCenter); controls.target.copy(truckCenter); controls.update();
+
+function animate() { requestAnimationFrame(animate); controls.update(); renderer.render(scene,camera); }
+animate();
+window.addEventListener('resize',()=>{ camera.aspect=window.innerWidth/window.innerHeight; camera.updateProjectionMatrix(); renderer.setSize(window.innerWidth,window.innerHeight); });
+</script>
+</body>
+</html>`;
 }
 
 function renderCustomerList() {

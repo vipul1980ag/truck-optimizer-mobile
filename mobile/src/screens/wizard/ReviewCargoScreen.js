@@ -23,7 +23,8 @@ function suggestTruck(trucks, totalWeight, totalVol, hasDG, hasFragile, category
 }
 
 export default function ReviewCargoScreen({ navigation }) {
-  const { items, updateItem, removeItem, cargoCategory } = useWizard();
+  const { items, updateItem, removeItem, cargoCategory, customers } = useWizard();
+  const customerMap = Object.fromEntries(customers.map(c => [c._id, c]));
   const [expandedId,    setExpandedId]    = useState(null);
   const [editForm,      setEditForm]      = useState({});
   const [suggestion,    setSuggestion]    = useState(null); // {truck, reason}
@@ -110,6 +111,9 @@ export default function ReviewCargoScreen({ navigation }) {
               )}
               {item.isFragile && (
                 <View style={s.fragileBadge}><Text style={s.fragileBadgeTxt}>🔔 Handle with care</Text></View>
+              )}
+              {item.customerId && customerMap[item.customerId] && (
+                <View style={s.customerBadge}><Text style={s.customerBadgeTxt}>👤 {customerMap[item.customerId].name}</Text></View>
               )}
             </View>
             <Text style={s.itemDims}>
@@ -250,6 +254,8 @@ const s = StyleSheet.create({
   dgBadgeTxt:   { fontSize: 8, fontWeight: '800', color: '#9a3412' },
   fragileBadge:    { backgroundColor: '#d1fae5', borderRadius: 4, paddingHorizontal: 5, paddingVertical: 1, borderWidth: 1, borderColor: '#6ee7b7' },
   fragileBadgeTxt: { fontSize: 8, fontWeight: '800', color: '#065f46' },
+  customerBadge:    { backgroundColor: '#eff6ff', borderRadius: 4, paddingHorizontal: 5, paddingVertical: 1, borderWidth: 1, borderColor: '#bfdbfe' },
+  customerBadgeTxt: { fontSize: 8, fontWeight: '800', color: '#1d4ed8' },
 
   iconBtn:    { padding: 6, borderRadius: 8, backgroundColor: C.surface2, borderWidth: 1, borderColor: C.border },
   iconBtnTxt: { fontSize: 14 },

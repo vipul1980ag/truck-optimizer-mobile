@@ -181,7 +181,7 @@ export default function LocationScreen({ navigation }) {
 
         <TouchableOpacity
           style={[s.nextBtn, !canProceed && s.nextBtnDisabled]}
-          onPress={() => canProceed && navigation.navigate('AddCargo')}
+          onPress={() => canProceed && navigation.navigate('Customer')}
           activeOpacity={canProceed ? 0.8 : 1}
         >
           <Text style={s.nextBtnTxt}>

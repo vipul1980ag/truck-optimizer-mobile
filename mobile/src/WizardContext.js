@@ -4,6 +4,7 @@ const WizardContext = createContext(null);
 
 export function WizardProvider({ children }) {
   const [items,          setItems]         = useState([]);
+  const [customers,      setCustomers]     = useState([]);
   const [shippingOption, setOption]        = useState(null); // 'shared' | 'private'
   const [startLocation,  setStartLocation] = useState(null); // {label, lat, lng}
   const [destLocation,   setDestLocation]  = useState(null); // {label, lat, lng}
@@ -19,8 +20,20 @@ export function WizardProvider({ children }) {
   function removeItem(_id) {
     setItems(prev => prev.filter(i => i._id !== _id));
   }
+
+  function addCustomer(customer) {
+    setCustomers(prev => [...prev, { ...customer, _id: Date.now() + Math.random() }]);
+  }
+  function updateCustomer(_id, changes) {
+    setCustomers(prev => prev.map(c => c._id === _id ? { ...c, ...changes } : c));
+  }
+  function removeCustomer(_id) {
+    setCustomers(prev => prev.filter(c => c._id !== _id));
+  }
+
   function resetWizard() {
     setItems([]);
+    setCustomers([]);
     setOption(null);
     setStartLocation(null);
     setDestLocation(null);
@@ -31,6 +44,7 @@ export function WizardProvider({ children }) {
   return (
     <WizardContext.Provider value={{
       items, addItem, updateItem, removeItem,
+      customers, addCustomer, updateCustomer, removeCustomer,
       shippingOption, setShippingOption: setOption,
       startLocation, setStartLocation,
       destLocation,  setDestLocation,
