@@ -100,6 +100,15 @@
           </label>
         </div>
 
+        <!-- Handle with care -->
+        <div class="field stackable-row">
+          <label class="stackable-label">
+            <input type="checkbox" id="p-fragile">
+            <span class="stackable-icon">🔔</span>
+            <span class="stackable-text">Handle with care — fragile item</span>
+          </label>
+        </div>
+
         <!-- DG Declaration -->
         <div class="dg-section">
           <label class="dg-toggle-label">
@@ -236,6 +245,36 @@
         </div>
 
         <button class="btn-bm-next" id="btn-find-routes" onclick="portalFindRoutes()" disabled>Find Routes 🗺️</button>
+      </div>
+    </div>
+
+    <!-- Step 2: Customers (LTL only) -->
+    <div id="bm-step-customer" style="display:none">
+      <div class="bm-head">
+        <div>
+          <div class="bm-title">👤 Customers</div>
+          <div class="bm-sub">Add consignees sharing this truck (optional)</div>
+        </div>
+        <button class="bm-close" onclick="showBookingStep('location')">←</button>
+      </div>
+      <div class="bm-body">
+        <div class="wc-form">
+          <div class="field-row">
+            <div class="field"><label>Name *</label><input type="text" id="wc-name" placeholder="Customer name"></div>
+            <div class="field"><label>Phone</label><input type="tel" id="wc-phone" placeholder="Phone number"></div>
+          </div>
+          <div class="field"><label>Delivery Address</label><input type="text" id="wc-address" placeholder="Delivery address"></div>
+          <div class="field-row">
+            <div class="field"><label>Notes</label><input type="text" id="wc-notes" placeholder="Special instructions"></div>
+            <div class="field"><label>Declared Value ($)</label><input type="number" id="wc-value" placeholder="0.00" min="0"></div>
+          </div>
+          <button class="btn-add" onclick="addWizardCustomer()">＋ Add Customer</button>
+        </div>
+        <div id="wc-list" style="margin-top:12px;"></div>
+        <div style="display:flex;gap:8px;margin-top:16px;">
+          <button class="btn-bm-skip" onclick="proceedFromCustomers()">Skip</button>
+          <button class="btn-bm-next" onclick="proceedFromCustomers()">Next: Find Routes 🗺️</button>
+        </div>
       </div>
     </div>
 
@@ -381,6 +420,17 @@
       <div id="pay-modal-msg"></div>
       <div class="pay-modal-secure">🔒 Secured by PayPal · 256-bit SSL encryption</div>
     </div>
+  </div>
+</div>
+
+<!-- ── 3D Load View Modal ── -->
+<div id="viz3d-modal" class="viz3d-modal-overlay" onclick="viz3dOverlayClick(event)">
+  <div class="viz3d-modal-card">
+    <div class="viz3d-modal-head">
+      <div class="bm-title">🧊 3D Load View</div>
+      <button class="bm-close" onclick="closeViz3DModal()">✕</button>
+    </div>
+    <iframe id="viz3d-frame" style="width:100%;flex:1;border:none;"></iframe>
   </div>
 </div>
 

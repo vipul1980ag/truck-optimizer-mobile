@@ -6,6 +6,7 @@ import { Text, View, TouchableOpacity, ActivityIndicator } from 'react-native';
 
 import AuthScreen        from './src/screens/AuthScreen';
 import LocationScreen    from './src/screens/wizard/LocationScreen';
+import CustomerScreen    from './src/screens/wizard/CustomerScreen';
 import AddCargoScreen    from './src/screens/wizard/AddCargoScreen';
 import ReviewCargoScreen from './src/screens/wizard/ReviewCargoScreen';
 import RouteScreen       from './src/screens/wizard/RouteScreen';
@@ -53,6 +54,11 @@ function AppNavigator() {
             name="Location"
             component={LocationScreen}
             options={{ title: '🚛 New Booking' }}
+          />
+          <WizardStack.Screen
+            name="Customer"
+            component={CustomerScreen}
+            options={{ title: '👤 Customers' }}
           />
           <WizardStack.Screen
             name="AddCargo"

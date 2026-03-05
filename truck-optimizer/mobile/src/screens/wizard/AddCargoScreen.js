@@ -158,10 +158,10 @@ const DG_CLASSES = [
   'Class 9 — Miscellaneous DG',
 ];
 
-const BLANK = { name: '', length: '4', width: '4', height: '4', weight: '500', packagingWeight: '0', qty: '1', stackable: true, isDG: false, dgClass: '', dgCanCombine: true, isFragile: false };
+const BLANK = { name: '', length: '4', width: '4', height: '4', weight: '500', packagingWeight: '0', qty: '1', stackable: true, isDG: false, dgClass: '', dgCanCombine: true, isFragile: false, customerId: null };
 
 export default function AddCargoScreen({ navigation }) {
-  const { items, addItem, updateItem, removeItem, setCargoCategory } = useWizard();
+  const { items, addItem, updateItem, removeItem, setCargoCategory, customers } = useWizard();
 
   const [step,         setStep]         = useState(1);
   const [category,     setCategory]     = useState(null);
@@ -235,6 +235,7 @@ export default function AddCargoScreen({ navigation }) {
       dgClass:         form.isDG ? form.dgClass : '',
       dgCanCombine:    form.isDG ? form.dgCanCombine : true,
       isFragile:       form.isFragile,
+      customerId:      form.customerId || null,
     });
 
     // Save to server catalog if it's a custom (not built-in) item
@@ -375,6 +376,29 @@ export default function AddCargoScreen({ navigation }) {
                           onPress={() => pickItem(item)}
                         >
                           <Text style={[s.chipTxt, form.name === item.name && s.chipTxtActive]}>{item.name}</Text>
+                        </TouchableOpacity>
+                      ))}
+                    </ScrollView>
+                  </>
+                )}
+
+                {customers.length > 0 && (
+                  <>
+                    <Text style={s.lbl}>Assign to Customer</Text>
+                    <ScrollView horizontal showsHorizontalScrollIndicator={false} style={s.chipScroll}>
+                      <TouchableOpacity
+                        style={[s.chip, form.customerId === null && s.chipActive]}
+                        onPress={() => setForm(p => ({ ...p, customerId: null }))}
+                      >
+                        <Text style={[s.chipTxt, form.customerId === null && s.chipTxtActive]}>Unassigned</Text>
+                      </TouchableOpacity>
+                      {customers.map(c => (
+                        <TouchableOpacity
+                          key={String(c._id)}
+                          style={[s.chip, form.customerId === c._id && s.chipActive]}
+                          onPress={() => setForm(p => ({ ...p, customerId: c._id }))}
+                        >
+                          <Text style={[s.chipTxt, form.customerId === c._id && s.chipTxtActive]}>👤 {c.name}</Text>
                         </TouchableOpacity>
                       ))}
                     </ScrollView>
