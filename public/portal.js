@@ -1160,6 +1160,22 @@ floor.rotation.x = -Math.PI/2; floor.position.set(TL/2, 0.001, TW/2); scene.add(
 const grid = new THREE.GridHelper(Math.max(TL,TW)*1.05, 20, 0x1e3a5f, 0x1e3a5f);
 grid.position.set(TL/2, 0.002, TW/2); scene.add(grid);
 
+// Truck dimension annotations (permanent, amber)
+const truckDimGrp = new THREE.Group();
+// Length — along bottom front edge, offset outward in -Z
+dimLine(truckDimGrp,
+  new THREE.Vector3(0, 0, 0), new THREE.Vector3(TL, 0, 0),
+  new THREE.Vector3(0, 0, -1));
+// Width — along bottom right edge, offset outward in +X
+dimLine(truckDimGrp,
+  new THREE.Vector3(TL, 0, 0), new THREE.Vector3(TL, 0, TW),
+  new THREE.Vector3(1, 0, 0));
+// Height — along right-front vertical edge, offset outward in +X -Z
+dimLine(truckDimGrp,
+  new THREE.Vector3(TL, 0, 0), new THREE.Vector3(TL, TH, 0),
+  new THREE.Vector3(1, 0, -1));
+scene.add(truckDimGrp);
+
 function hexToRgb(hex) { const n=parseInt(hex.replace('#',''),16); return [(n>>16)&255,(n>>8)&255,n&255]; }
 function makeLabel(text, hexColor, lineTwo, dimText) {
   // Canvas height depends on how many lines: name / subLabel / dimensions
@@ -1200,6 +1216,58 @@ function makeLabel(text, hexColor, lineTwo, dimText) {
   const sprite=new THREE.Sprite(mat);
   return sprite;
 }
+
+// ── Dimension annotation helpers ─────────────────────────────────────────────
+function makeDimSprite(text, lineLen) {
+  const CW=320, CH=72;
+  const canvas=document.createElement('canvas'); canvas.width=CW; canvas.height=CH;
+  const ctx=canvas.getContext('2d');
+  ctx.fillStyle='rgba(10,18,36,0.82)';
+  const rd=10; ctx.beginPath();
+  ctx.moveTo(rd,0); ctx.lineTo(CW-rd,0); ctx.quadraticCurveTo(CW,0,CW,rd);
+  ctx.lineTo(CW,CH-rd); ctx.quadraticCurveTo(CW,CH,CW-rd,CH);
+  ctx.lineTo(rd,CH); ctx.quadraticCurveTo(0,CH,0,CH-rd);
+  ctx.lineTo(0,rd); ctx.quadraticCurveTo(0,0,rd,0); ctx.closePath(); ctx.fill();
+  ctx.strokeStyle='rgba(251,191,36,0.6)'; ctx.lineWidth=2; ctx.stroke();
+  ctx.fillStyle='#fbbf24'; ctx.font='bold 44px Arial';
+  ctx.textAlign='center'; ctx.textBaseline='middle';
+  ctx.fillText(text, CW/2, CH/2);
+  const t=new THREE.CanvasTexture(canvas);
+  const m=new THREE.SpriteMaterial({map:t,transparent:true,depthTest:false,depthWrite:false});
+  const sp=new THREE.Sprite(m);
+  const w=Math.max(lineLen*0.55, 1.1); sp.scale.set(w, w*(CH/CW), 1);
+  return sp;
+}
+
+function dimLine(grp, from, to, perpDir, color) {
+  const clr = color || 0xfbbf24;
+  const pd  = perpDir.clone().normalize();
+  const OFF = 0.55, TICK = 0.32;
+  const f   = from.clone().add(pd.clone().multiplyScalar(OFF));
+  const t2  = to.clone().add(pd.clone().multiplyScalar(OFF));
+  const lm  = new THREE.LineBasicMaterial({color:clr});
+  const em  = new THREE.LineBasicMaterial({color:clr, opacity:0.35, transparent:true});
+  // main line
+  grp.add(new THREE.Line(new THREE.BufferGeometry().setFromPoints([f,t2]), lm));
+  // extension lines from surface corners to the dim line
+  grp.add(new THREE.Line(new THREE.BufferGeometry().setFromPoints([from.clone(),f.clone()]), em));
+  grp.add(new THREE.Line(new THREE.BufferGeometry().setFromPoints([to.clone(),t2.clone()]), em));
+  // tick marks (perpendicular to dim line, lying in the offset plane)
+  const lineDir = t2.clone().sub(f).normalize();
+  const tickDir = new THREE.Vector3().crossVectors(lineDir, pd).normalize().multiplyScalar(TICK);
+  [f,t2].forEach(pt => {
+    grp.add(new THREE.Line(
+      new THREE.BufferGeometry().setFromPoints([pt.clone().sub(tickDir), pt.clone().add(tickDir)]), lm
+    ));
+  });
+  // measurement label at midpoint, pushed a little further out
+  const mid = f.clone().add(t2).multiplyScalar(0.5).add(pd.clone().multiplyScalar(0.35));
+  const dist = parseFloat(from.distanceTo(to).toFixed(1));
+  const sp = makeDimSprite(dist + ' ft', dist);
+  sp.position.copy(mid);
+  grp.add(sp);
+}
+// ─────────────────────────────────────────────────────────────────────────────
 
 const boxObjects = [];
 placements.forEach(p => {
@@ -1280,6 +1348,38 @@ const objStart  = new THREE.Vector3();
 let selected    = null;
 let isDragging  = false;
 
+// ── Box dimension annotations (shown on select, hidden on deselect) ──────────
+let boxDimGrp = null;
+function showBoxDims(obj) {
+  if (boxDimGrp) { scene.remove(boxDimGrp); boxDimGrp = null; }
+  const p = obj.placement;
+  // Use current mesh position so dims follow if box was moved
+  const mx = obj.mesh.position.x - p.l/2;
+  const my = obj.mesh.position.y - p.h/2;
+  const mz = obj.mesh.position.z - p.w/2;
+  boxDimGrp = new THREE.Group();
+  // Length — bottom front edge, offset -Z (cyan to distinguish from truck)
+  dimLine(boxDimGrp,
+    new THREE.Vector3(mx,      my, mz),
+    new THREE.Vector3(mx+p.l,  my, mz),
+    new THREE.Vector3(0, 0, -1), 0x22d3ee);
+  // Width — bottom right edge, offset +X
+  dimLine(boxDimGrp,
+    new THREE.Vector3(mx+p.l, my,    mz),
+    new THREE.Vector3(mx+p.l, my,    mz+p.w),
+    new THREE.Vector3(1, 0, 0), 0x22d3ee);
+  // Height — right front vertical edge, offset +X -Z
+  dimLine(boxDimGrp,
+    new THREE.Vector3(mx+p.l, my,    mz),
+    new THREE.Vector3(mx+p.l, my+p.h, mz),
+    new THREE.Vector3(1, 0, -1), 0x22d3ee);
+  scene.add(boxDimGrp);
+}
+function hideBoxDims() {
+  if (boxDimGrp) { scene.remove(boxDimGrp); boxDimGrp = null; }
+}
+// ─────────────────────────────────────────────────────────────────────────────
+
 function deselect() {
   if (selected) {
     selected.mat.emissive.set(0x000000);
@@ -1287,6 +1387,7 @@ function deselect() {
     selected.edges.material.opacity = 0.18;
     selected = null;
   }
+  hideBoxDims();
   document.getElementById('hint').style.display = '';
   document.getElementById('info').style.display = 'none';
   controls.enabled = true;
@@ -1298,6 +1399,7 @@ function selectObj(obj) {
   obj.mat.emissive = new THREE.Color(0x334466);
   obj.mat.opacity = 1.0;
   obj.edges.material.opacity = 0.6;
+  showBoxDims(obj);
   document.getElementById('hint').style.display = 'none';
   document.getElementById('info').style.display = 'flex';
   const p2=obj.placement;
