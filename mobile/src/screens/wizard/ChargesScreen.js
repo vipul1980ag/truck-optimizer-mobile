@@ -79,11 +79,12 @@ export default function ChargesScreen({ navigation }) {
         nextIds: { ...fresh.nextIds, item: nextId },
       });
 
-      // C5: Save booking record
+      // C5: Save booking record; check for route-overlap consolidation opportunities
       const inferredTruck = selectedTruck || truck;
+      let consolidationMatches = [];
       if (inferredTruck?.id) {
         try {
-          await api.createBooking({
+          const res = await api.createBooking({
             truckId:       inferredTruck.id,
             shippingOption,
             route: {
@@ -102,10 +103,24 @@ export default function ChargesScreen({ navigation }) {
             totalWeight,
             totalVol,
           });
+          consolidationMatches = res?.consolidationMatches || [];
         } catch (_) { /* non-critical — booking save failure should not block confirm */ }
       }
 
       navigation.navigate('Confirm', { totalItems, totalWeight, estimate, hasDG, dgCount: dgItems.length, dgSurcharge: Math.round(dgSurcharge), distanceKm: distance_km, tollCost: toll_cost, manualToll, additionalCharge });
+
+      // Notify about overlapping routes after navigation settles
+      if (consolidationMatches.length) {
+        const m = consolidationMatches[0];
+        const route = m.booking.route ? `${m.booking.route.fromLabel || ''} → ${m.booking.route.toLabel || ''}` : 'overlapping route';
+        setTimeout(() => {
+          Alert.alert(
+            '🔁 Route Overlap Detected',
+            `${m.truck.name}${m.truck.licensePlate ? ` (${m.truck.licensePlate})` : ''} is on a similar route (${route}) with ${Math.round(m.remainingPct)}% capacity available.\n\nConsider consolidating your next shipment to reduce cost.`,
+            [{ text: 'Got it' }]
+          );
+        }, 600);
+      }
     } catch (e) {
       Alert.alert('Error', 'Could not save booking: ' + e.message);
     } finally {
