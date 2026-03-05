@@ -1123,8 +1123,7 @@ const { placements, unplaced } = pack(DATA.items);
 
 const scene    = new THREE.Scene();
 scene.background = new THREE.Color(0x0f172a);
-scene.fog = new THREE.FogExp2(0x0f172a, 0.012);
-const camera   = new THREE.PerspectiveCamera(48, window.innerWidth / window.innerHeight, 0.1, 500);
+const camera   = new THREE.PerspectiveCamera(38, window.innerWidth / window.innerHeight, 0.1, 1000);
 const renderer = new THREE.WebGLRenderer({ antialias: true });
 renderer.setSize(window.innerWidth, window.innerHeight);
 renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
@@ -1226,8 +1225,16 @@ const utilPct=Math.min(Math.round(placedVol/truckVol*100),100);
 const statsEl=document.getElementById('stats');
 statsEl.innerHTML=truck.name+' &nbsp;|&nbsp; '+placements.length+'/'+totalUnits+' units &nbsp;|&nbsp; '+utilPct+'% volume'+(unplaced.length?' &nbsp;|&nbsp; <span style="color:#fbbf24">\u26a0 '+unplaced.length+' unplaced</span>':'');
 
-const dist=Math.max(TL,TW,TH)*1.4;
-camera.position.set(TL/2+dist*0.55, TH/2+dist*0.55, TW/2+dist*0.85);
+// Position camera so truck bounding sphere fills exactly 70% of viewport
+const bsRadius  = Math.sqrt(TL*TL + TH*TH + TW*TW) / 2;
+const fovRad    = 38 * Math.PI / 180;
+const camDist   = bsRadius / (Math.tan(fovRad / 2) * 0.70);
+const dn        = Math.sqrt(0.55*0.55 + 0.55*0.55 + 0.85*0.85); // ≈ 1.152
+camera.position.set(
+  truckCenter.x + camDist * 0.55 / dn,
+  truckCenter.y + camDist * 0.55 / dn,
+  truckCenter.z + camDist * 0.85 / dn
+);
 camera.lookAt(truckCenter); controls.target.copy(truckCenter); controls.update();
 
 function animate() { requestAnimationFrame(animate); controls.update(); renderer.render(scene,camera); }
