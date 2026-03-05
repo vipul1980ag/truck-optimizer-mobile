@@ -654,5 +654,94 @@ app.delete('/api/bookings/:id', (req, res) => {
   res.json({ ok: true });
 });
 
+// ── Excel / CSV Bulk Import ───────────────────────────────────────────────────
+
+app.post('/api/import/trucks', (req, res) => {
+  const rows = req.body?.rows;
+  if (!Array.isArray(rows)) return res.status(400).json({ error: 'rows array required' });
+  const store = readStore();
+  let imported = 0;
+  for (const r of rows) {
+    if (!r.name) continue;
+    store.trucks.push({
+      id:           store.nextIds.truck++,
+      name:         r.name,
+      length:       r.length    || 0,
+      width:        r.width     || 0,
+      height:       r.height    || 0,
+      maxWt:        r.maxWt     || 0,
+      baseRate:     r.baseRate  || 0,
+      ratePerMi:    r.ratePerMi || 0,
+      licensePlate: r.licensePlate || '',
+    });
+    imported++;
+  }
+  writeStore(store);
+  res.json({ ok: true, imported });
+});
+
+app.post('/api/import/items', (req, res) => {
+  const rows = req.body?.rows;
+  if (!Array.isArray(rows)) return res.status(400).json({ error: 'rows array required' });
+  const store = readStore();
+  let imported = 0;
+  for (const r of rows) {
+    if (!r.name) continue;
+    store.items.push({
+      id:        store.nextIds.item++,
+      name:      r.name,
+      length:    r.length    || 0,
+      width:     r.width     || 0,
+      height:    r.height    || 0,
+      weight:    r.weight    || 0,
+      qty:       r.qty       || 1,
+      rotate:    true,
+      stackable: r.stackable !== false,
+      isDG:      r.isDG      || false,
+      dgClass:   '',
+      customerId: null,
+    });
+    imported++;
+  }
+  writeStore(store);
+  res.json({ ok: true, imported });
+});
+
+app.post('/api/import/carriers', (req, res) => {
+  const rows = req.body?.rows;
+  if (!Array.isArray(rows)) return res.status(400).json({ error: 'rows array required' });
+  const store = readStore();
+  let imported = 0;
+  // Group truck rows by carrier name, merging into existing carriers if name matches
+  const groups = {};
+  for (const r of rows) {
+    if (!r.carrierName || !r.name) continue;
+    if (!groups[r.carrierName]) groups[r.carrierName] = [];
+    groups[r.carrierName].push(r);
+  }
+  for (const [cname, trucks] of Object.entries(groups)) {
+    let carrier = store.carriers.find(c => c.name.toLowerCase() === cname.toLowerCase());
+    if (!carrier) {
+      carrier = { id: store.nextIds.carrier++, name: cname, trucks: [] };
+      store.carriers.push(carrier);
+    }
+    for (const t of trucks) {
+      carrier.trucks.push({
+        tid:       store.nextIds.carrierTruck++,
+        name:      t.name,
+        length:    t.length    || 0,
+        width:     t.width     || 0,
+        height:    t.height    || 0,
+        maxWt:     t.maxWt     || 0,
+        baseRate:  t.baseRate  || 0,
+        ratePerMi: t.ratePerMi || 0,
+      });
+      imported++;
+    }
+  }
+  writeStore(store);
+  res.json({ ok: true, imported });
+});
+
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => console.log(`Truck Optimizer → http://localhost:${PORT}`));

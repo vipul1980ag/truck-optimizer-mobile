@@ -1174,3 +1174,77 @@ body {
   padding: 4px 12px; font-size: 11px; font-weight: 700; color: var(--text2); cursor: pointer;
 }
 .btn-cancel-booking:hover { background: #fef2f2; color: var(--danger); border-color: var(--danger); }
+
+/* ── Excel Import ────────────────────────────────────────────────────────────── */
+.import-section {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 18px;
+  margin-bottom: 16px;
+}
+.import-section-head {
+  display: flex; align-items: center; justify-content: space-between; margin-bottom: 4px;
+}
+.import-section-title { font-size: 14px; font-weight: 900; color: var(--text); }
+.import-section-sub   { font-size: 11px; color: var(--text2); margin: 0 0 12px; line-height: 1.6; }
+
+.btn-dl-template {
+  background: none; border: 1px solid var(--border); border-radius: 6px;
+  padding: 4px 12px; font-size: 11px; font-weight: 700; color: var(--text2); cursor: pointer;
+  white-space: nowrap;
+}
+.btn-dl-template:hover { background: var(--bg); border-color: var(--primary); color: var(--primary); }
+
+.import-drop {
+  border: 2px dashed var(--border); border-radius: 10px;
+  padding: 28px 20px; text-align: center; cursor: pointer;
+  transition: border-color 0.2s, background 0.2s;
+}
+.import-drop:hover, .import-drop-hover {
+  border-color: var(--primary); background: #eff6ff;
+}
+.import-drop-icon { font-size: 28px; margin-bottom: 6px; }
+.import-drop-txt  { font-size: 13px; font-weight: 700; color: var(--text2); }
+
+.import-preview { margin-top: 14px; }
+.import-preview-head {
+  display: flex; align-items: center; justify-content: space-between;
+  margin-bottom: 10px;
+}
+.import-count { font-size: 13px; font-weight: 700; }
+
+.btn-import-confirm {
+  background: var(--primary); color: #fff; border: none; border-radius: 7px;
+  padding: 6px 16px; font-size: 12px; font-weight: 800; cursor: pointer;
+}
+.btn-import-confirm:hover   { opacity: 0.88; }
+.btn-import-confirm:disabled { opacity: 0.5; cursor: not-allowed; }
+
+.btn-import-cancel {
+  background: none; border: 1px solid var(--border); border-radius: 7px;
+  padding: 6px 12px; font-size: 12px; font-weight: 700; color: var(--text2); cursor: pointer;
+}
+.btn-import-cancel:hover { background: var(--bg); }
+
+.import-table-wrap {
+  overflow-x: auto; border: 1px solid var(--border); border-radius: 8px;
+}
+.import-table {
+  width: 100%; border-collapse: collapse; font-size: 12px;
+}
+.import-table thead tr { background: var(--bg); }
+.import-table th {
+  text-align: left; padding: 7px 10px; font-size: 10px; font-weight: 800;
+  text-transform: uppercase; letter-spacing: 0.4px; color: var(--text2);
+  border-bottom: 1px solid var(--border); white-space: nowrap;
+}
+.import-table td {
+  padding: 6px 10px; border-bottom: 1px solid var(--border); color: var(--text);
+  white-space: nowrap;
+}
+.import-table tbody tr:last-child td { border-bottom: none; }
+.import-table tbody tr:hover { background: var(--bg); }
+.import-more-row {
+  text-align: center; color: var(--text2); font-style: italic; padding: 8px;
+}
