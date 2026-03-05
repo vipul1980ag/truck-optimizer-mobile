@@ -19,11 +19,42 @@ function pointToPolylineDist(lat, lng, coords) {
   return Math.min(...coords.map(([ln, la]) => haversineKm(lat, lng, la, ln)));
 }
 
-function routeOverlaps(route, fromLat, fromLng, toLat, toLng) {
-  const coords = route.geometry?.coordinates;
-  if (!coords?.length) return false;
-  return pointToPolylineDist(fromLat, fromLng, coords) < 80
-      && pointToPolylineDist(toLat,   toLng,   coords) < 80;
+// Distance from point to a straight-line segment (in km), used for super-route detection
+function pointToSegment(lat, lng, aLat, aLng, bLat, bLng) {
+  const dx = bLat - aLat, dy = bLng - aLng;
+  if (dx === 0 && dy === 0) return haversineKm(lat, lng, aLat, aLng);
+  const t = Math.max(0, Math.min(1, ((lat - aLat) * dx + (lng - aLng) * dy) / (dx * dx + dy * dy)));
+  return haversineKm(lat, lng, aLat + t * dx, aLng + t * dy);
+}
+
+// Bidirectional overlap — returns true when either route is a sub-route of the other.
+// Case 1 (new is shorter / same): both new endpoints lie near the existing route's polyline.
+// Case 2 (existing is shorter): both existing endpoints lie near the new route's polyline
+//          (or its straight-line corridor when no polyline is available).
+// newGeomCoords: GeoJSON [[lng,lat], …] for the new route if available.
+function routeOverlaps(route, fromLat, fromLng, toLat, toLng, newGeomCoords) {
+  const existCoords = route.geometry?.coordinates;
+
+  // Case 1: new endpoints near existing polyline
+  if (existCoords?.length) {
+    if (pointToPolylineDist(fromLat, fromLng, existCoords) < 80
+     && pointToPolylineDist(toLat,   toLng,   existCoords) < 80) return true;
+  }
+
+  // Case 2: existing endpoints near new route (existing is a sub-leg of the new route)
+  if (route.fromLat != null && route.toLat != null) {
+    if (newGeomCoords?.length) {
+      // Use the actual new-route polyline for accuracy
+      if (pointToPolylineDist(route.fromLat, route.fromLng, newGeomCoords) < 80
+       && pointToPolylineDist(route.toLat,  route.toLng,  newGeomCoords) < 80) return true;
+    } else {
+      // Straight-line approximation when no polyline is provided
+      if (pointToSegment(route.fromLat, route.fromLng, fromLat, fromLng, toLat, toLng) < 80
+       && pointToSegment(route.toLat,  route.toLng,  fromLat, fromLng, toLat, toLng) < 80) return true;
+    }
+  }
+
+  return false;
 }
 
 const { optimize }      = require('./engine/optimizer');
@@ -560,7 +591,7 @@ app.post('/api/bookings/available-trucks', (req, res) => {
     if (remainingWeight < neededWeight) continue;
     if (remainingVol    < neededVol)    continue;
     if (remainingPct    < 5)            continue;
-    if (!routeOverlaps(booking.route || {}, fromLat, fromLng, toLat, toLng)) continue;
+    if (!routeOverlaps(booking.route || {}, fromLat, fromLng, toLat, toLng, null)) continue;
 
     matches.push({ booking, truck, remainingWeight, remainingVol, remainingPct });
   }
@@ -577,7 +608,26 @@ app.post('/api/bookings', (req, res) => {
   };
   store.bookings.push(b);
   writeStore(store);
-  res.json({ ok: true, booking: b });
+
+  // After saving, find all OTHER active bookings whose routes overlap this one.
+  // This covers both cases: new route is shorter OR longer than the existing route.
+  const consolidationMatches = [];
+  if (b.route?.fromLat != null && b.route?.toLat != null) {
+    for (const other of store.bookings) {
+      if (other.id === b.id || other.status !== 'active' || !other.route) continue;
+      const truck = (store.trucks || []).find(t => t.id === other.truckId);
+      if (!truck) continue;
+      const truckVol     = truck.length * truck.width * truck.height;
+      const remainingVol = truckVol - (other.totalVol || 0);
+      const remainingPct = truckVol > 0 ? (remainingVol / truckVol) * 100 : 0;
+      if (remainingPct < 5) continue;
+      if (routeOverlaps(other.route, b.route.fromLat, b.route.fromLng, b.route.toLat, b.route.toLng, b.route.geometry?.coordinates)) {
+        consolidationMatches.push({ booking: other, truck, remainingPct: Math.round(remainingPct) });
+      }
+    }
+  }
+
+  res.json({ ok: true, booking: b, consolidationMatches });
 });
 
 app.get('/api/bookings', (req, res) => {

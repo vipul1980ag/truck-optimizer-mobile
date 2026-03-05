@@ -586,6 +586,7 @@ function openBookingModal() {
   _wizardCustomers = [];
   _wizardTruck = null;
   _wizardConsolidateTo = null;
+  const cb = document.getElementById('bm-consolidation-banner'); if (cb) { cb.style.display = 'none'; cb.innerHTML = ''; }
   document.querySelectorAll('.ship-opt').forEach(el => el.classList.remove('selected'));
   // Reset location inputs
   const si = document.getElementById('bm-start-input'); if (si) si.value = '';
@@ -1029,6 +1030,7 @@ async function confirmWebBooking() {
 
     // B7: Save booking to bookings API
     const truckId = (_wizardTruck || truck)?.id || (fresh.trucks?.[0]?.id);
+    let consolidationMatches = [];
     if (truckId) {
       const bookingPayload = {
         truckId,
@@ -1050,11 +1052,14 @@ async function confirmWebBooking() {
         totalVol:    totalVol    || 0,
         ...((_wizardConsolidateTo != null) ? { parentBookingId: _wizardConsolidateTo } : {}),
       };
-      await fetch('/api/bookings', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(bookingPayload),
-      });
+      try {
+        const bRes = await fetch('/api/bookings', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(bookingPayload),
+        }).then(r => r.json());
+        consolidationMatches = bRes.consolidationMatches || [];
+      } catch (_) {}
       // Refresh bookings panel if open
       const adminPanel = document.getElementById('admin-panel');
       if (adminPanel && adminPanel.style.display !== 'none') renderBookings();
@@ -1071,6 +1076,28 @@ async function confirmWebBooking() {
         ${toll_cost > 0 ? `<div class="bcg-row"><span>🚦 Tolls</span><span style="color:#7c3aed;font-weight:700;">$${toll_cost.toFixed(2)}</span></div>` : ''}
         ${hasDG ? `<div class="bcg-row"><span>DG note</span><span style="color:#c2410c;">⚠ DG-certified truck required</span></div>` : ''}
       </div>`;
+
+    // Show consolidation matches banner if any overlapping routes were detected
+    if (consolidationMatches.length) {
+      const matchItems = consolidationMatches.map(m => {
+        const plate = m.truck.licensePlate ? ` · ${esc(m.truck.licensePlate)}` : '';
+        const route = m.booking.route ? `${esc(m.booking.route.fromLabel || '')} → ${esc(m.booking.route.toLabel || '')}` : '';
+        return `<li style="margin-bottom:4px;">🚛 <strong>${esc(m.truck.name)}${plate}</strong> — ${Math.round(m.remainingPct)}% capacity free · <span style="font-size:11px;color:var(--text2);">${route}</span></li>`;
+      }).join('');
+      const consolidationBannerEl = document.getElementById('bm-consolidation-banner');
+      if (consolidationBannerEl) {
+        consolidationBannerEl.innerHTML = `
+          <div class="consolidation-card" style="margin-bottom:14px;">
+            <div class="consolidation-header">🔁 Route overlap detected — consolidation opportunity</div>
+            <div class="consolidation-body">
+              <p style="font-size:12px;color:var(--text2);margin:0 0 8px;">The following active bookings share a similar route with this shipment:</p>
+              <ul style="margin:0;padding-left:16px;font-size:13px;">${matchItems}</ul>
+              <p style="font-size:11px;color:var(--text2);margin:8px 0 0;">Consider scheduling these shipments together to reduce cost.</p>
+            </div>
+          </div>`;
+        consolidationBannerEl.style.display = 'block';
+      }
+    }
 
     showBookingStep('confirm');
   } catch (e) {
