@@ -11,6 +11,7 @@ export default function ChargesScreen({ navigation }) {
   const { items, shippingOption, selectedRoute, selectedTruck,
           startLocation, destLocation, customers } = useWizard();
   const [truck,             setTruck]             = useState(null);
+  const [allRates,          setAllRates]          = useState([]);
   const [loading,           setLoading]           = useState(true);
   const [saving,            setSaving]            = useState(false);
   const [manualTollText,    setManualTollText]    = useState('');
@@ -18,7 +19,10 @@ export default function ChargesScreen({ navigation }) {
 
   useEffect(() => {
     api.getData()
-      .then(d => setTruck(selectedTruck || (d.trucks || [])[0] || null))
+      .then(d => {
+        setTruck(selectedTruck || (d.trucks || [])[0] || null);
+        setAllRates(d.rates || []);
+      })
       .catch(() => setTruck(null))
       .finally(() => setLoading(false));
   }, [selectedTruck]);
@@ -38,11 +42,26 @@ export default function ChargesScreen({ navigation }) {
   const manualToll       = parseFloat(manualTollText)    || 0;
   const additionalCharge = parseFloat(additionalText)    || 0;
 
+  function findRate(rateList, city, carrierId, truckRef) {
+    const score = r =>
+      (r.city      ? (r.city === city                   ? 4 : -99) : 0) +
+      (r.carrierId != null ? (r.carrierId === carrierId ? 2 : -99) : 0) +
+      (r.truckRef  != null ? (r.truckRef  === truckRef  ? 1 : -99) : 0);
+    const matches = (rateList || []).filter(r => score(r) >= 0);
+    if (!matches.length) return null;
+    return matches.reduce((best, r) => score(r) > score(best) ? r : best, matches[0]);
+  }
+
   // Cost estimate
   let truckVol = 0, fullCost = 0, baseCost = 0, dgSurcharge = 0, estimate = 0, pct = 0;
+  let rateMatch = null;
   if (truck) {
     truckVol  = truck.length * truck.width * truck.height;
-    fullCost  = truck.baseRate + truck.ratePerMi * distance_miles;
+    const originCity = startLocation?.label?.split(',')[0]?.trim() || '';
+    rateMatch = findRate(allRates, originCity, null, truck.id);
+    fullCost  = rateMatch
+      ? rateMatch.ratePerKm * distance_km
+      : truck.baseRate + truck.ratePerMi * distance_miles;
     pct       = Math.min(totalVol / truckVol, 1);
     baseCost  = shippingOption === 'shared'
       ? Math.max(fullCost * pct, fullCost * 0.25)
@@ -185,14 +204,25 @@ export default function ChargesScreen({ navigation }) {
         {truck ? (
           <View style={s.card}>
             <Text style={s.cardHead}>💰 Estimated Charges</Text>
-            <Text style={s.disclaimer}>Based on 100-mile service estimate using {truck.name} rates</Text>
+            <Text style={s.disclaimer}>Based on actual route distance using {truck.name} rates{rateMatch ? ' (rate override)' : ''}</Text>
+            {!rateMatch && (
+              <View style={s.row}>
+                <Text style={s.rowLbl}>Base rate</Text>
+                <Text style={s.rowVal}>${truck.baseRate.toLocaleString()}</Text>
+              </View>
+            )}
             <View style={s.row}>
-              <Text style={s.rowLbl}>Base rate</Text>
-              <Text style={s.rowVal}>${truck.baseRate.toLocaleString()}</Text>
-            </View>
-            <View style={s.row}>
-              <Text style={s.rowLbl}>Per-mile ({distance_miles.toFixed(0)} mi)</Text>
-              <Text style={s.rowVal}>${(truck.ratePerMi * distance_miles).toLocaleString(undefined, { maximumFractionDigits: 0 })}</Text>
+              {rateMatch ? (
+                <>
+                  <Text style={s.rowLbl}>Per-km ({distance_km.toFixed(0)} km) — rate override</Text>
+                  <Text style={s.rowVal}>${(rateMatch.ratePerKm * distance_km).toLocaleString(undefined, { maximumFractionDigits: 0 })}</Text>
+                </>
+              ) : (
+                <>
+                  <Text style={s.rowLbl}>Per-mile ({distance_miles.toFixed(0)} mi)</Text>
+                  <Text style={s.rowVal}>${(truck.ratePerMi * distance_miles).toLocaleString(undefined, { maximumFractionDigits: 0 })}</Text>
+                </>
+              )}
             </View>
             {shippingOption === 'shared' && (
               <View style={s.row}>

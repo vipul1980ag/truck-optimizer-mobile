@@ -1,0 +1,240 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Mobile Auth Screen Preview</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    font-family: -apple-system, 'Segoe UI', system-ui, sans-serif;
+    background: #1e293b;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding: 40px 20px;
+    gap: 40px;
+  }
+  h2 {
+    color: #94a3b8;
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 1.2px;
+    text-transform: uppercase;
+    margin-bottom: -30px;
+  }
+
+  /* Phone shell */
+  .phone {
+    width: 320px;
+    border-radius: 40px;
+    overflow: hidden;
+    box-shadow: 0 30px 80px rgba(0,0,0,0.6), inset 0 0 0 1.5px rgba(255,255,255,0.1);
+    background: #0c1f40;
+    border: 2px solid #334155;
+  }
+  .phone-notch {
+    background: #0c1f40;
+    height: 28px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+  .notch-bar {
+    width: 80px; height: 10px;
+    background: #1e293b;
+    border-radius: 20px;
+  }
+  .phone-screen {
+    background: #0c1f40;
+    min-height: 580px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: 20px 20px 32px;
+    gap: 0;
+  }
+
+  /* App header */
+  .app-header {
+    text-align: center;
+    margin-bottom: 24px;
+  }
+  .app-logo    { font-size: 44px; display: block; margin-bottom: 8px; line-height: 1; }
+  .app-name    { font-size: 20px; font-weight: 900; color: #f1f5f9; letter-spacing: -0.5px; }
+  .app-tagline { font-size: 12px; color: #64748b; margin-top: 4px; }
+
+  /* Card */
+  .card {
+    background: #ffffff;
+    border-radius: 20px;
+    padding: 22px;
+    width: 100%;
+    box-shadow: 0 8px 30px rgba(0,0,0,0.3);
+  }
+  .card-title { font-size: 19px; font-weight: 900; color: #0f172a; margin-bottom: 3px; }
+  .card-sub   { font-size: 12px; color: #64748b; margin-bottom: 18px; }
+
+  /* Choose row */
+  .choose-row { display: flex; gap: 10px; }
+  .choose-btn {
+    flex: 1; display: flex; flex-direction: column; align-items: center; gap: 5px;
+    padding: 16px 8px; border-radius: 14px; border: 1.5px solid #e2e8f0;
+    background: #f8fafc; cursor: pointer;
+  }
+  .choose-btn:hover { border-color: #2563eb; background: #eff6ff; }
+  .choose-icon  { font-size: 24px; }
+  .choose-label { font-size: 13px; font-weight: 800; color: #0f172a; }
+  .choose-sub   { font-size: 10px; color: #64748b; }
+
+  /* Form */
+  .view-head { display: flex; justify-content: space-between; align-items: center; margin-bottom: 14px; }
+  .back-btn  { font-size: 12px; color: #2563eb; font-weight: 700; cursor: pointer; }
+
+  .lbl {
+    font-size: 10px; font-weight: 700; color: #64748b;
+    text-transform: uppercase; letter-spacing: 0.4px;
+    margin-top: 10px; margin-bottom: 3px; display: block;
+  }
+  .lbl:first-of-type { margin-top: 0; }
+  .inp {
+    width: 100%; padding: 9px 11px; border-radius: 9px;
+    border: 1.5px solid #e2e8f0; font-size: 13px; color: #0f172a;
+    background: #fff; display: block;
+  }
+  .inp:focus { outline: none; border-color: #2563eb; }
+  .inp::placeholder { color: #94a3b8; }
+  .textarea { height: 60px; resize: none; padding-top: 8px; font-family: inherit; }
+
+  .submit-btn {
+    margin-top: 14px; background: linear-gradient(135deg, #2563eb, #1d4ed8);
+    border: none; border-radius: 10px; padding: 12px;
+    color: #fff; font-size: 14px; font-weight: 800; width: 100%; cursor: pointer;
+  }
+  .switch-txt {
+    text-align: center; margin-top: 12px; font-size: 12px; color: #64748b;
+  }
+  .switch-link { color: #2563eb; font-weight: 700; }
+
+  /* Phone home indicator */
+  .home-bar {
+    height: 28px; background: #0c1f40;
+    display: flex; align-items: center; justify-content: center;
+  }
+  .home-indicator {
+    width: 100px; height: 4px; background: #334155; border-radius: 4px;
+  }
+
+  .screens-row {
+    display: flex; gap: 32px; flex-wrap: wrap; justify-content: center;
+    align-items: flex-start;
+  }
+  .screen-label {
+    text-align: center; color: #64748b; font-size: 11px; font-weight: 700;
+    letter-spacing: 0.8px; text-transform: uppercase; margin-top: 12px;
+  }
+</style>
+</head>
+<body>
+
+<h2>Mobile Auth Screen — All 3 Views</h2>
+
+<div class="screens-row">
+
+  <!-- ── View 1: Choose ── -->
+  <div>
+    <div class="phone">
+      <div class="phone-notch"><div class="notch-bar"></div></div>
+      <div class="phone-screen">
+        <div class="app-header">
+          <span class="app-logo">🚛</span>
+          <div class="app-name">Load Optimizer</div>
+          <div class="app-tagline">Truck cargo management</div>
+        </div>
+        <div class="card">
+          <div class="card-title">👋 Welcome</div>
+          <div class="card-sub">Sign in or create a new account</div>
+          <div class="choose-row">
+            <div class="choose-btn">
+              <span class="choose-icon">🔑</span>
+              <span class="choose-label">Login</span>
+              <span class="choose-sub">Existing account</span>
+            </div>
+            <div class="choose-btn">
+              <span class="choose-icon">✨</span>
+              <span class="choose-label">Register</span>
+              <span class="choose-sub">New user</span>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="home-bar"><div class="home-indicator"></div></div>
+    </div>
+    <div class="screen-label">Welcome</div>
+  </div>
+
+  <!-- ── View 2: Login ── -->
+  <div>
+    <div class="phone">
+      <div class="phone-notch"><div class="notch-bar"></div></div>
+      <div class="phone-screen">
+        <div class="app-header">
+          <span class="app-logo">🚛</span>
+          <div class="app-name">Load Optimizer</div>
+          <div class="app-tagline">Truck cargo management</div>
+        </div>
+        <div class="card">
+          <div class="view-head">
+            <div class="card-title">🔑 Login</div>
+            <span class="back-btn">← Back</span>
+          </div>
+          <label class="lbl">Email</label>
+          <input class="inp" type="email" placeholder="you@example.com" readonly>
+          <label class="lbl">Password</label>
+          <input class="inp" type="password" placeholder="••••••••" readonly>
+          <button class="submit-btn">Sign In</button>
+          <div class="switch-txt">No account? <span class="switch-link">Create one →</span></div>
+        </div>
+      </div>
+      <div class="home-bar"><div class="home-indicator"></div></div>
+    </div>
+    <div class="screen-label">Login</div>
+  </div>
+
+  <!-- ── View 3: Register ── -->
+  <div>
+    <div class="phone">
+      <div class="phone-notch"><div class="notch-bar"></div></div>
+      <div class="phone-screen" style="justify-content:flex-start; padding-top:24px;">
+        <div class="app-header">
+          <span class="app-logo">🚛</span>
+          <div class="app-name">Load Optimizer</div>
+          <div class="app-tagline">Truck cargo management</div>
+        </div>
+        <div class="card">
+          <div class="view-head">
+            <div class="card-title">✨ Create Account</div>
+            <span class="back-btn">← Back</span>
+          </div>
+          <label class="lbl">Email</label>
+          <input class="inp" type="email" placeholder="you@example.com" readonly>
+          <label class="lbl">Password</label>
+          <input class="inp" type="password" placeholder="Min 6 characters" readonly>
+          <label class="lbl">Phone Number</label>
+          <input class="inp" type="tel" placeholder="+1 555 000 0000" readonly>
+          <label class="lbl">Address</label>
+          <textarea class="inp textarea" placeholder="123 Main St, City, State, ZIP" readonly></textarea>
+          <button class="submit-btn">Create Account</button>
+          <div class="switch-txt">Have an account? <span class="switch-link">Sign in →</span></div>
+        </div>
+      </div>
+      <div class="home-bar"><div class="home-indicator"></div></div>
+    </div>
+    <div class="screen-label">Register</div>
+  </div>
+
+</div>
+
+</body>
+</html>
