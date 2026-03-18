@@ -1,0 +1,24 @@
+services:
+  - type: web
+    name: truck-optimizer
+    runtime: node
+    plan: free
+    buildCommand: npm install
+    startCommand: npm start
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: DATA_PATH
+        value: /data
+      - key: ANTHROPIC_API_KEY
+        sync: false        # Set this manually in Render Dashboard → Environment
+      - key: PAYPAL_CLIENT_ID
+        sync: false        # Set in Render Dashboard → Environment
+      - key: PAYPAL_CLIENT_SECRET
+        sync: false        # Set in Render Dashboard → Environment
+      - key: PAYPAL_ENV
+        value: live
+    disk:
+      name: truck-optimizer-data
+      mountPath: /data
+      sizeGB: 1

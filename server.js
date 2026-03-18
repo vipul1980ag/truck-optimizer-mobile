@@ -94,7 +94,7 @@ app.get('/advanced',(req, res) => res.sendFile(path.join(__dirname, 'public', 'i
 
 app.use(express.static(path.join(__dirname, 'public'), { etag: false, lastModified: false, setHeaders: res => res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate') }));
 
-const DATA_DIR   = path.join(__dirname, 'data');
+const DATA_DIR   = process.env.DATA_PATH || path.join(__dirname, 'data');
 const STORE_PATH = path.join(DATA_DIR, 'store.json');
 
 // ── Seed data (used on first run before any save) ──────────────────────────
