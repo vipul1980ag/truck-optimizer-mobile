@@ -33,7 +33,7 @@
       "WebSearch",
       "WebFetch(domain:www.maptrip.de)",
       "WebFetch(domain:api.maptrip.de)",
-      "Bash(export:*11)"
+      "Bash(export:11*)"
     ]
   }
 }
