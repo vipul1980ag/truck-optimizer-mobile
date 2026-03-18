@@ -1,6 +1,6 @@
 services:
   - type: web
-    name: truck-optimizer
+    name: truck-capacity-optimizer
     runtime: node
     plan: free
     buildCommand: npm install
@@ -19,6 +19,6 @@ services:
       - key: PAYPAL_ENV
         value: live
     disk:
-      name: truck-optimizer-data
+      name: truck-capacity-optimizer-data
       mountPath: /data
       sizeGB: 1
