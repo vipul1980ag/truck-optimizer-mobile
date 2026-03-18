@@ -293,8 +293,7 @@ function applyAuthState(loggedIn) {
   document.getElementById('cargo-lock').style.display     = loggedIn ? 'none' : '';
   document.getElementById('cargo-card').style.opacity     = loggedIn ? '1' : '0.35';
   document.getElementById('cargo-card').style.pointerEvents = loggedIn ? '' : 'none';
-  const adminBtn = document.getElementById('nav-admin-btn');
-  if (adminBtn) adminBtn.style.display = loggedIn ? 'inline-block' : 'none';
+  // Admin button is always visible — not tied to customer login state
   if (loggedIn && _authUser) {
     document.getElementById('nav-user-email').textContent = _authUser.email;
   }
@@ -375,7 +374,8 @@ let trucks    = [];
 let carriers  = [];
 let customers = [];
 let items     = [];
-let nextIds   = { truck: 1, carrier: 1, carrierTruck: 1, customer: 1, item: 1 };
+let rates     = [];
+let nextIds   = { truck: 1, carrier: 1, carrierTruck: 1, customer: 1, item: 1, rate: 1 };
 
 // ── Boot ──────────────────────────────────────────────────────────────────────
 async function init() {
@@ -394,6 +394,7 @@ function applyPayload(data) {
   carriers  = data.carriers  || [];
   customers = data.customers || [];
   items     = data.items     || [];
+  rates     = data.rates     || [];
   nextIds   = data.nextIds   || nextIds;
 }
 
@@ -402,7 +403,7 @@ async function saveToServer() {
   const payload = {
     version: 1,
     savedAt: new Date().toISOString(),
-    trucks, carriers, customers, items, nextIds,
+    trucks, carriers, customers, items, rates, nextIds,
   };
   try {
     const res = await fetch('/api/data', {
@@ -897,7 +898,11 @@ async function showChargesStep() {
     }
 
     const truckVol    = truck.length * truck.width * truck.height;
-    const fullCost    = truck.baseRate + truck.ratePerMi * distance_miles;
+    const originCity  = _wizardStart?.label?.split(',')[0]?.trim() || '';
+    const rateMatch   = findRate(data.rates || [], originCity, null, truck.id);
+    const fullCost    = rateMatch
+      ? rateMatch.ratePerKm * distance_km
+      : truck.baseRate + truck.ratePerMi * distance_miles;
     const pct         = Math.min(totalVol / truckVol, 1);
     const baseCost    = _wizardShipping === 'shared'
       ? Math.max(fullCost * pct, fullCost * 0.25)
@@ -990,8 +995,11 @@ async function showChargesStep() {
       </div>
       <div class="charges-card">
         <div class="charges-section-lbl">💰 Estimated Charges</div>
-        <div class="charges-row"><span>Base rate</span><span>$${truck.baseRate.toLocaleString()}</span></div>
-        <div class="charges-row"><span>Per-mile (${distance_miles.toFixed(0)} mi)</span><span>$${(truck.ratePerMi * distance_miles).toLocaleString(undefined, {maximumFractionDigits:0})}</span></div>
+        ${rateMatch ? '' : `<div class="charges-row"><span>Base rate</span><span>$${truck.baseRate.toLocaleString()}</span></div>`}
+        ${rateMatch
+          ? `<div class="charges-row"><span>Per-km (${distance_km.toFixed(0)} km) — rate override</span><span>$${(rateMatch.ratePerKm * distance_km).toLocaleString(undefined, {maximumFractionDigits:0})}</span></div>`
+          : `<div class="charges-row"><span>Per-mile (${distance_miles.toFixed(0)} mi)</span><span>$${(truck.ratePerMi * distance_miles).toLocaleString(undefined, {maximumFractionDigits:0})}</span></div>`
+        }
         ${sharedRow}
         ${joinRow}
         ${dgRow}
@@ -1710,8 +1718,12 @@ function renderFleetList() {
 function toggleAdminPanel() {
   const p = document.getElementById('admin-panel');
   if (!p) return;
-  p.style.display = p.style.display === 'none' ? 'block' : 'none';
-  if (p.style.display === 'block') renderBookings();
+  p.style.display = p.style.display === 'none' ? 'flex' : 'none';
+  if (p.style.display === 'flex') renderBookings();
+}
+
+function adminPanelBackdropClick(e) {
+  if (e.target === document.getElementById('admin-panel')) toggleAdminPanel();
 }
 
 function showAdminTab(tab) {
@@ -1722,6 +1734,7 @@ function showAdminTab(tab) {
   const btns = document.querySelectorAll('.admin-tab-btn');
   btns.forEach(b => { if (b.textContent.toLowerCase().includes(tab.slice(0, 4))) b.classList.add('active'); });
   if (tab === 'bookings') renderBookings();
+  if (tab === 'rates') renderRates();
 }
 
 function openTruckForm(truckId) {
@@ -1784,6 +1797,180 @@ async function deleteTruck(id) {
   trucks = trucks.filter(t => t.id !== id);
   await saveToServer();
   renderFleetList();
+}
+
+// ── Rates CRUD ────────────────────────────────────────────────────────────────
+
+function findRate(rateList, city, carrierId, truckRef) {
+  const score = r =>
+    (r.city      ? (r.city === city                            ? 4 : -99) : 0) +
+    (r.carrierId != null ? (r.carrierId === carrierId          ? 2 : -99) : 0) +
+    (r.truckRef  != null ? (r.truckRef  === truckRef           ? 1 : -99) : 0);
+  const matches = (rateList || []).filter(r => score(r) >= 0);
+  if (!matches.length) return null;
+  return matches.reduce((best, r) => score(r) > score(best) ? r : best, matches[0]);
+}
+
+function renderRates() {
+  // Populate carrier dropdown
+  const carrierSel = document.getElementById('rf-carrier');
+  if (carrierSel) {
+    // Preserve existing value
+    const cur = carrierSel.value;
+    carrierSel.innerHTML = '<option value="">— Any carrier (incl. own fleet) —</option><option value="own">Own Fleet</option>';
+    carriers.forEach(c => {
+      const opt = document.createElement('option');
+      opt.value = c.id;
+      opt.textContent = c.name;
+      carrierSel.appendChild(opt);
+    });
+    carrierSel.value = cur;
+  }
+  populateRateTruckDropdown(document.getElementById('rf-carrier')?.value || '');
+
+  const list = document.getElementById('p-rates-list');
+  if (!list) return;
+  if (!rates.length) {
+    list.innerHTML = '<p style="font-size:12px;color:var(--text2);">No rates configured. Add one above.</p>';
+    return;
+  }
+  const rows = rates.map(r => {
+    const carrierName = r.carrierId === null
+      ? (r.truckRef != null ? 'Own Fleet' : 'Any carrier')
+      : (carriers.find(c => c.id === r.carrierId)?.name || `Carrier #${r.carrierId}`);
+    let truckName = 'Any truck';
+    if (r.truckRef != null) {
+      if (r.carrierId === null) {
+        truckName = trucks.find(t => t.id === r.truckRef)?.name || `Truck #${r.truckRef}`;
+      } else {
+        const carr = carriers.find(c => c.id === r.carrierId);
+        truckName = carr?.trucks?.find(t => t.tid === r.truckRef)?.name || `Truck #${r.truckRef}`;
+      }
+    }
+    return `<div class="ctx-row">
+      <div style="flex:1;min-width:0;">
+        <div class="ctx-name">${esc(r.city || 'Any city')}</div>
+        <div class="ctx-meta">${esc(carrierName)} · ${esc(truckName)}</div>
+        <div class="ctx-meta">$${r.ratePerKm}/km</div>
+      </div>
+      <div style="display:flex;gap:4px;flex-shrink:0;">
+        <button class="btn-fleet-edit" onclick="openRateForm(${r.id})">✏</button>
+        <button class="btn-fleet-del"  onclick="deleteRate(${r.id})">🗑</button>
+      </div>
+    </div>`;
+  });
+  list.innerHTML = '<div class="ctx-list">' + rows.join('') + '</div>';
+}
+
+function populateRateTruckDropdown(carrierVal) {
+  const sel = document.getElementById('rf-truck');
+  if (!sel) return;
+  sel.innerHTML = '<option value="">— Any truck —</option>';
+  if (carrierVal === 'own') {
+    trucks.forEach(t => {
+      const opt = document.createElement('option');
+      opt.value = t.id;
+      opt.textContent = t.name;
+      sel.appendChild(opt);
+    });
+  } else if (carrierVal) {
+    const carr = carriers.find(c => c.id === Number(carrierVal));
+    (carr?.trucks || []).forEach(t => {
+      const opt = document.createElement('option');
+      opt.value = t.tid;
+      opt.textContent = t.name;
+      sel.appendChild(opt);
+    });
+  }
+}
+
+function onRateCarrierChange() {
+  populateRateTruckDropdown(document.getElementById('rf-carrier').value);
+}
+
+function openRateForm(rateId) {
+  const r = rates.find(x => x.id === rateId);
+  if (!r) return;
+
+  // Show tab first — renderRates() rebuilds the carrier dropdown, so set values after
+  showAdminTab('rates');
+
+  document.getElementById('rf-form-title').textContent = '✏ Edit Rate';
+  document.getElementById('rf-city').value        = r.city || '';
+  document.getElementById('rf-rate-per-km').value = r.ratePerKm;
+  document.getElementById('rf-edit-id').value     = rateId;
+  document.getElementById('rf-cancel-btn').style.display = 'inline-block';
+
+  // Set carrier dropdown then repopulate trucks based on it
+  const carrierSel = document.getElementById('rf-carrier');
+  if (r.carrierId === null && r.truckRef != null) carrierSel.value = 'own';
+  else if (r.carrierId != null) carrierSel.value = r.carrierId;
+  else carrierSel.value = '';
+  populateRateTruckDropdown(carrierSel.value);
+
+  // Set truck dropdown after options are populated
+  const truckSel = document.getElementById('rf-truck');
+  truckSel.value = r.truckRef != null ? r.truckRef : '';
+}
+
+function closeRateForm() {
+  document.getElementById('rf-form-title').textContent = '＋ Add Rate';
+  document.getElementById('rf-city').value        = '';
+  document.getElementById('rf-carrier').value     = '';
+  document.getElementById('rf-rate-per-km').value = '2.50';
+  document.getElementById('rf-edit-id').value     = '';
+  document.getElementById('rf-cancel-btn').style.display = 'none';
+  populateRateTruckDropdown('');
+}
+
+async function saveRate() {
+  const city       = document.getElementById('rf-city').value.trim();
+  const carrierVal = document.getElementById('rf-carrier').value;
+  const truckVal   = document.getElementById('rf-truck').value;
+  const ratePerKm  = parseFloat(document.getElementById('rf-rate-per-km').value);
+  const editId     = document.getElementById('rf-edit-id').value;
+
+  if (isNaN(ratePerKm) || ratePerKm <= 0) {
+    alert('Please enter a valid rate per km.');
+    return;
+  }
+
+  const carrierId = carrierVal === '' ? null : (carrierVal === 'own' ? null : Number(carrierVal));
+  const truckRef  = truckVal === '' ? null : Number(truckVal);
+  // For own-fleet trucks, carrierId stays null but truckRef points to truck.id
+  // For carrier trucks, carrierId is set and truckRef is the tid
+
+  // Dedup check
+  const dupId = rates.find(r =>
+    (r.city || '') === city &&
+    r.carrierId === carrierId &&
+    r.truckRef  === truckRef &&
+    r.id !== Number(editId || -1)
+  )?.id;
+
+  if (dupId != null) {
+    if (!confirm('A rate with the same city + carrier + truck already exists. Replace it?')) return;
+    rates = rates.filter(r => r.id !== dupId);
+  }
+
+  if (editId) {
+    const existing = rates.find(r => r.id === Number(editId));
+    if (existing) Object.assign(existing, { city: city || null, carrierId, truckRef, ratePerKm });
+  } else {
+    if (!nextIds.rate) nextIds.rate = 1;
+    rates.push({ id: nextIds.rate++, city: city || null, carrierId, truckRef, ratePerKm });
+  }
+
+  await saveToServer();
+  closeRateForm();
+  renderRates();
+}
+
+async function deleteRate(id) {
+  if (!confirm('Delete this rate?')) return;
+  rates = rates.filter(r => r.id !== id);
+  await saveToServer();
+  renderRates();
 }
 
 // ── Bookings ──────────────────────────────────────────────────────────────────
@@ -2253,9 +2440,21 @@ const IMPORT_SCHEMAS = {
     validate: r => r.carrierName && r.name,
     display:  r => [r.carrierName, r.name, r.length, r.width, r.height, r.maxWt.toLocaleString(), '$' + r.baseRate, '$' + r.ratePerMi + '/mi'],
   },
+  rates: {
+    headers: ['City', 'Carrier', 'Truck', 'Rate per km ($/km)'],
+    example:  ['Chicago', 'Any', '', 2.50],
+    map: r => ({
+      city:       String(r['City'] || '').trim(),
+      carrier:    String(r['Carrier'] || '').trim(),
+      truck:      String(r['Truck'] || '').trim(),
+      ratePerKm:  parseFloat(r['Rate per km ($/km)']) || 0,
+    }),
+    validate: r => r.ratePerKm > 0,
+    display:  r => [r.city || '(any city)', r.carrier || 'Any', r.truck || '(any truck)', '$' + r.ratePerKm + '/km'],
+  },
 };
 
-const _importData = { trucks: [], items: [], carriers: [] };
+const _importData = { trucks: [], items: [], carriers: [], rates: [] };
 
 function importDragOver(e) { e.preventDefault(); e.currentTarget.classList.add('import-drop-hover'); }
 function importDrop(e, type) {
@@ -2340,7 +2539,8 @@ async function confirmImport(type) {
     const fresh = await fetch('/api/data').then(r => r.json());
     if (type === 'trucks')   { trucks = fresh.trucks || [];   renderFleetList(); }
     if (type === 'items')    { /* items shown in cargo panel */               }
-    if (type === 'carriers') { renderCarrierList(fresh.carriers || []);       }
+    if (type === 'carriers') { carriers = fresh.carriers || []; renderFleetList(); }
+    if (type === 'rates')    { rates = fresh.rates || [];    renderRates();   }
     // Update stats
     document.getElementById('s-trucks').textContent    = (fresh.trucks    || []).length;
     document.getElementById('s-carriers').textContent  = (fresh.carriers  || []).length;
@@ -2362,6 +2562,143 @@ function downloadTemplate(type) {
   ws['!cols'] = schema.headers.map(h => ({ wch: Math.max(h.length + 4, 14) }));
   XLSX.utils.book_append_sheet(wb, ws, type.charAt(0).toUpperCase() + type.slice(1));
   XLSX.writeFile(wb, `import-template-${type}.xlsx`);
+}
+
+// ── AI Assistant ─────────────────────────────────────────────────────────────
+const _aiHistory = [];
+
+function toggleAIChat() {
+  const panel = document.getElementById('ai-chat-panel');
+  if (!panel) return;
+  panel.style.display = panel.style.display === 'none' ? 'flex' : 'none';
+  if (panel.style.display === 'flex') {
+    document.getElementById('ai-chat-input')?.focus();
+  }
+}
+
+function aiAppendMessage(role, text) {
+  const msgs = document.getElementById('ai-chat-messages');
+  if (!msgs) return;
+  const div = document.createElement('div');
+  div.className = 'ai-msg ' + (role === 'user' ? 'ai-msg-user' : 'ai-msg-bot');
+  div.textContent = text;
+  msgs.appendChild(div);
+  msgs.scrollTop = msgs.scrollHeight;
+  return div;
+}
+
+async function sendAIMessage() {
+  const input = document.getElementById('ai-chat-input');
+  const sendBtn = document.querySelector('.ai-chat-send');
+  const text = input?.value.trim();
+  if (!text) return;
+
+  input.value = '';
+  aiAppendMessage('user', text);
+  _aiHistory.push({ role: 'user', content: text });
+
+  // Show thinking indicator
+  const msgs = document.getElementById('ai-chat-messages');
+  const thinking = document.createElement('div');
+  thinking.className = 'ai-msg ai-msg-thinking';
+  thinking.textContent = 'AI is thinking…';
+  msgs.appendChild(thinking);
+  msgs.scrollTop = msgs.scrollHeight;
+  if (sendBtn) sendBtn.disabled = true;
+
+  try {
+    const res = await fetch('/api/ai/chat', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ messages: _aiHistory }),
+    });
+    const data = await res.json();
+    thinking.remove();
+
+    if (!res.ok) throw new Error(data.error || 'AI error');
+
+    const reply = data.reply;
+    _aiHistory.push({ role: 'assistant', content: reply });
+
+    // Check if AI returned cargo data to auto-add
+    const cargoMatch = reply.match(/<cargo_data>([\s\S]*?)<\/cargo_data>/);
+    const cleanReply = reply.replace(/<cargo_data>[\s\S]*?<\/cargo_data>/g, '').trim();
+    aiAppendMessage('assistant', cleanReply);
+
+    if (cargoMatch) {
+      try {
+        const cargo = JSON.parse(cargoMatch[1]);
+        // Fill the custom item form
+        portalEnterCustomItem();
+        if (cargo.name)   document.getElementById('p-name').value   = cargo.name;
+        if (cargo.length) document.getElementById('p-length').value = cargo.length;
+        if (cargo.width)  document.getElementById('p-width').value  = cargo.width;
+        if (cargo.height) document.getElementById('p-height').value = cargo.height;
+        if (cargo.weight) document.getElementById('p-weight').value = cargo.weight;
+        if (cargo.qty)    document.getElementById('p-qty').value    = cargo.qty;
+        aiAppendMessage('assistant', '✅ I\'ve filled in the cargo form for you — review and click "+ Add" to add it.');
+      } catch (_) {}
+    }
+  } catch (err) {
+    thinking.remove();
+    aiAppendMessage('assistant', '⚠ ' + (err.message || 'Could not reach AI service. Make sure ANTHROPIC_API_KEY is set.'));
+  } finally {
+    if (sendBtn) sendBtn.disabled = false;
+    input?.focus();
+  }
+}
+
+async function getAIAdvice() {
+  const btn = document.querySelector('.ai-advise-btn');
+  if (btn) { btn.textContent = '⏳ …'; btn.disabled = true; }
+
+  // Ensure chat panel is open
+  const panel = document.getElementById('ai-chat-panel');
+  if (panel) panel.style.display = 'flex';
+
+  try {
+    const res = await fetch('/api/ai/advise', { method: 'POST' });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error || 'AI error');
+    aiAppendMessage('assistant', '💡 Load Optimization Tips:\n\n' + data.advice);
+  } catch (err) {
+    aiAppendMessage('assistant', '⚠ Could not get advice: ' + err.message);
+  } finally {
+    if (btn) { btn.textContent = '💡 Advise'; btn.disabled = false; }
+    const msgs = document.getElementById('ai-chat-messages');
+    if (msgs) msgs.scrollTop = msgs.scrollHeight;
+  }
+}
+
+async function aiAutoFill() {
+  const desc = prompt('Describe your cargo item (e.g. "10 steel pallets, 500kg each, 120×80×100cm"):');
+  if (!desc) return;
+  try {
+    const res = await fetch('/api/ai/parse-cargo', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ description: desc }),
+    });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error || 'Parse error');
+    portalEnterCustomItem();
+    if (data.name)   document.getElementById('p-name').value   = data.name;
+    if (data.length) document.getElementById('p-length').value = data.length;
+    if (data.width)  document.getElementById('p-width').value  = data.width;
+    if (data.height) document.getElementById('p-height').value = data.height;
+    if (data.weight) document.getElementById('p-weight').value = data.weight;
+    if (data.qty)    document.getElementById('p-qty').value    = data.qty;
+    if (data.stackable === false) {
+      const cb = document.getElementById('p-stackable');
+      if (cb) cb.checked = false;
+    }
+    if (data.isDG) {
+      const dg = document.getElementById('p-is-dg');
+      if (dg) dg.checked = true;
+    }
+  } catch (err) {
+    alert('AI Auto-Fill error: ' + err.message);
+  }
 }
 
 // ── Start ─────────────────────────────────────────────────────────────────────

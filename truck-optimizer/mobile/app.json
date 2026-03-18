@@ -13,7 +13,16 @@
     },
     "ios": {
       "supportsTablet": true,
-      "bundleIdentifier": "com.truckoptimizer.mobile"
+      "bundleIdentifier": "com.truckoptimizer.mobile",
+      "buildNumber": "1",
+      "infoPlist": {
+        "NSLocationWhenInUseUsageDescription": "Used to show your current location on the route map.",
+        "NSCameraUsageDescription": "Used to scan barcodes or capture images for cargo items.",
+        "ITSAppUsesNonExemptEncryption": false
+      },
+      "config": {
+        "usesNonExemptEncryption": false
+      }
     },
     "android": {
       "adaptiveIcon": {

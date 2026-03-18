@@ -1,0 +1,39 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(start:*)",
+      "Bash(cd /c/Users/vipul/truck-optimizer && npm install 2>&1)",
+      "Bash(mkdir -p /c/Users/vipul/tmp && cd /c/Users/vipul/truck-optimizer/mobile && EXPO_TOKEN=1BzsHJ-jUUjCWzwYOdWVVpER831iv2XP0EoZZ_4F TEMP=/c/Users/vipul/tmp TMP=/c/Users/vipul/tmp eas build --platform android --profile preview --non-interactive 2>&1)",
+      "Bash(cd /c/Users/vipul/truck-optimizer/mobile && EXPO_TOKEN=1BzsHJ-jUUjCWzwYOdWVVpER831iv2XP0EoZZ_4F eas build --platform android --profile preview --non-interactive 2>&1)",
+      "Bash(EXPO_TOKEN=LhKoH9m0wX_HhXoMetxHa8luV3Mc3xh4d8pouR4J npx eas:*)",
+      "Bash(__NEW_LINE_67035b9e05cdc3f1__ echo:*)",
+      "Bash(__NEW_LINE_e4acd918b075e861__ echo:*)",
+      "Bash(EXPO_TOKEN=LhKoH9m0wX_HhXoMetxHa8luV3Mc3xh4d8pouR4J npx eas-cli:*)",
+      "Bash(curl:*)",
+      "Bash(CI=1 npx expo:*)",
+      "Bash(__NEW_LINE_bb1696ad5f6e30ac__ node:*)",
+      "Bash(echo \"ANDROID_HOME: $ANDROID_HOME\")",
+      "Bash(echo \"JAVA_HOME: $JAVA_HOME\")",
+      "Bash(java -version)",
+      "Bash(choco:*)",
+      "Bash(winget search:*)",
+      "Bash(export:*)",
+      "Bash(git:*)",
+      "Bash(npm:*)",
+      "Bash(JAVA_HOME=\"/c/Program Files/Microsoft/jdk-17.0.18.8-hotspot\" ANDROID_HOME=\"/c/Users/vipul/android-sdk\" \"/c/Users/vipul/android-sdk/cmdline-tools/latest/bin/sdkmanager.bat\" platform-tools:*)",
+      "Bash(JAVA_HOME=\"/c/Program Files/Microsoft/jdk-17.0.18.8-hotspot\" ANDROID_HOME=\"/c/Users/vipul/android-sdk\" ./android/gradlew.bat:*)",
+      "Bash(\"/c/Users/vipul/android-sdk/build-tools/35.0.0/aapt2.exe\" dump:*)",
+      "Bash(/c/Users/vipul/android-sdk/platform-tools/adb.exe logcat:*)",
+      "Bash(/c/Users/vipul/android-sdk/platform-tools/adb.exe install:*)",
+      "Bash(python3:*)",
+      "Bash(node:*)",
+      "Bash(npm install:*)",
+      "Bash(npx eas-cli:*)",
+      "Bash(/c/Users/vipul/android-sdk/platform-tools/adb.exe devices:*)",
+      "WebSearch",
+      "WebFetch(domain:www.maptrip.de)",
+      "WebFetch(domain:api.maptrip.de)",
+      "Bash(export:*11)"
+    ]
+  }
+}

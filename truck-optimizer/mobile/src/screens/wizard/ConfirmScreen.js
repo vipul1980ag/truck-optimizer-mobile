@@ -10,7 +10,7 @@ export default function ConfirmScreen({ navigation, route }) {
 
   function startNew() {
     resetWizard();
-    navigation.reset({ index: 0, routes: [{ name: 'Location' }] });
+    navigation.reset({ index: 0, routes: [{ name: 'Tabs' }] });
   }
 
   return (

@@ -1,9 +1,10 @@
 'use strict';
 
-const express  = require('express');
-const fs       = require('fs');
-const path     = require('path');
-const crypto   = require('crypto');
+const express    = require('express');
+const fs         = require('fs');
+const path       = require('path');
+const crypto     = require('crypto');
+const Anthropic  = require('@anthropic-ai/sdk');
 
 // ── Route-overlap helpers ────────────────────────────────────────────────────
 function haversineKm(lat1, lng1, lat2, lng2) {
@@ -87,10 +88,11 @@ async function getPayPalToken() {
 }
 
 // Portal (simplified dashboard) at root; full optimizer at /advanced
-app.get('/',        (req, res) => res.sendFile(path.join(__dirname, 'public', 'portal.html')));
-app.get('/advanced',(req, res) => res.sendFile(path.join(__dirname, 'public', 'index.html')));
+const NO_CACHE = { headers: { 'Cache-Control': 'no-cache, no-store, must-revalidate', 'Pragma': 'no-cache', 'Expires': '0' } };
+app.get('/',        (req, res) => res.sendFile(path.join(__dirname, 'public', 'portal.html'), NO_CACHE));
+app.get('/advanced',(req, res) => res.sendFile(path.join(__dirname, 'public', 'index.html'),  NO_CACHE));
 
-app.use(express.static(path.join(__dirname, 'public')));
+app.use(express.static(path.join(__dirname, 'public'), { etag: false, lastModified: false, setHeaders: res => res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate') }));
 
 const DATA_DIR   = path.join(__dirname, 'data');
 const STORE_PATH = path.join(DATA_DIR, 'store.json');
@@ -128,7 +130,8 @@ const SEED = {
   users:        [],
   catalogItems: [],
   bookings:     [],
-  nextIds: { truck: 3, carrier: 3, carrierTruck: 5, customer: 4, item: 7, color: 3, user: 1, booking: 1 },
+  rates:        [],
+  nextIds: { truck: 3, carrier: 3, carrierTruck: 5, customer: 4, item: 7, color: 3, user: 1, booking: 1, rate: 1 },
 };
 
 // ── Persistence helpers ────────────────────────────────────────────────────
@@ -138,6 +141,8 @@ function readStore() {
       const store = JSON.parse(fs.readFileSync(STORE_PATH, 'utf8'));
       if (!store.bookings) store.bookings = [];
       if (!store.nextIds.booking) store.nextIds.booking = 1;
+      if (!store.rates) store.rates = [];
+      if (!store.nextIds.rate) store.nextIds.rate = 1;
       return store;
     }
   } catch (_) {}
@@ -741,6 +746,151 @@ app.post('/api/import/carriers', (req, res) => {
   }
   writeStore(store);
   res.json({ ok: true, imported });
+});
+
+app.post('/api/import/rates', (req, res) => {
+  const rows = req.body?.rows;
+  if (!Array.isArray(rows)) return res.status(400).json({ error: 'rows array required' });
+  const store = readStore();
+  if (!store.rates) store.rates = [];
+  if (!store.nextIds.rate) store.nextIds.rate = 1;
+  let imported = 0;
+  for (const r of rows) {
+    if (!r.ratePerKm || r.ratePerKm <= 0) continue;
+    // Resolve carrierId from carrier name string
+    let carrierId = null;
+    const carrierStr = (r.carrier || '').toLowerCase().trim();
+    if (carrierStr && carrierStr !== 'any') {
+      if (carrierStr === 'own fleet' || carrierStr === 'own') {
+        carrierId = null; // own fleet stored as null, same as UI
+      } else {
+        const match = (store.carriers || []).find(c => c.name.toLowerCase() === carrierStr);
+        carrierId = match ? match.id : null;
+      }
+    }
+    // Resolve truckRef from truck name string
+    let truckRef = null;
+    const truckStr = (r.truck || '').trim();
+    if (truckStr) {
+      if (carrierId === null) {
+        const match = (store.trucks || []).find(t => t.name.toLowerCase() === truckStr.toLowerCase());
+        truckRef = match ? match.id : null;
+      } else if (carrierId != null) {
+        const carrier = (store.carriers || []).find(c => c.id === carrierId);
+        const match = (carrier?.trucks || []).find(t => t.name.toLowerCase() === truckStr.toLowerCase());
+        truckRef = match ? match.tid : null;
+      }
+    }
+    store.rates.push({
+      id:         store.nextIds.rate++,
+      city:       r.city || null,
+      carrierId:  carrierId,
+      truckRef:   truckRef,
+      ratePerKm:  r.ratePerKm,
+    });
+    imported++;
+  }
+  writeStore(store);
+  res.json({ ok: true, imported });
+});
+
+// ── AI endpoints ─────────────────────────────────────────────────────────────
+const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
+
+// AI chat assistant — conversational helper for cargo booking
+app.post('/api/ai/chat', async (req, res) => {
+  const { messages } = req.body;
+  if (!Array.isArray(messages) || !messages.length) {
+    return res.status(400).json({ error: 'messages array required' });
+  }
+  try {
+    const store = readStore();
+    const systemPrompt = `You are an AI assistant for a truck load optimizer platform.
+Help customers book shipments, estimate costs, and understand their options.
+
+Current fleet summary:
+- Own trucks: ${store.trucks.map(t => `${t.name} (${t.length}×${t.width}×${t.height} ft, max ${t.maxWt} lbs)`).join(', ')}
+- Carrier partners: ${store.carriers.map(c => c.name).join(', ')}
+
+When users describe cargo, extract: name, dimensions (length×width×height in ft), weight (lbs), quantity.
+Respond in a friendly, concise manner. If the user wants to add cargo, return structured JSON in this format at the end of your message:
+<cargo_data>{"name":"...","length":0,"width":0,"height":0,"weight":0,"qty":1}</cargo_data>
+
+For load optimization questions, analyze the cargo list and suggest the best truck.
+For pricing, use approximate $2-4 per mile as a general estimate.`;
+
+    const response = await anthropic.messages.create({
+      model: 'claude-sonnet-4-6',
+      max_tokens: 1024,
+      system: systemPrompt,
+      messages: messages,
+    });
+    res.json({ reply: response.content[0].text });
+  } catch (err) {
+    console.error('AI chat error:', err.message);
+    res.status(500).json({ error: 'AI service unavailable. Check ANTHROPIC_API_KEY.' });
+  }
+});
+
+// AI cargo parser — parse a plain-language description into cargo fields
+app.post('/api/ai/parse-cargo', async (req, res) => {
+  const { description } = req.body;
+  if (!description) return res.status(400).json({ error: 'description required' });
+  try {
+    const response = await anthropic.messages.create({
+      model: 'claude-haiku-4-5-20251001',
+      max_tokens: 256,
+      messages: [{
+        role: 'user',
+        content: `Parse this cargo description into JSON with fields: name (string), length (ft), width (ft), height (ft), weight (lbs), qty (integer), stackable (boolean), isDG (boolean — is it dangerous goods?).
+Use standard sizes if exact dimensions not given (e.g. euro pallet = 3.9×3.1 ft, standard pallet = 4×4 ft).
+Return ONLY valid JSON, no explanation.
+
+Description: "${description}"`,
+      }],
+    });
+    const text = response.content[0].text.trim();
+    // Extract JSON even if wrapped in code block
+    const match = text.match(/\{[\s\S]*\}/);
+    if (!match) return res.status(422).json({ error: 'Could not parse description' });
+    const parsed = JSON.parse(match[0]);
+    res.json(parsed);
+  } catch (err) {
+    console.error('AI parse error:', err.message);
+    res.status(500).json({ error: 'AI service unavailable' });
+  }
+});
+
+// AI load advisor — analyze current items and suggest optimal truck + tips
+app.post('/api/ai/advise', async (req, res) => {
+  const store = readStore();
+  try {
+    const totalVol = store.items.reduce((s, it) => s + it.length * it.width * it.height * (it.qty || 1), 0);
+    const totalWt  = store.items.reduce((s, it) => s + it.weight * (it.qty || 1), 0);
+    const itemList = store.items.map(it => `${it.qty}× ${it.name} (${it.length}×${it.width}×${it.height} ft, ${it.weight} lbs each)`).join('\n');
+    const truckList = store.trucks.map(t => `${t.name}: ${t.length}×${t.width}×${t.height} ft, max ${t.maxWt} lbs, $${t.baseRate} base + $${t.ratePerMi}/mi`).join('\n');
+
+    const response = await anthropic.messages.create({
+      model: 'claude-haiku-4-5-20251001',
+      max_tokens: 512,
+      messages: [{
+        role: 'user',
+        content: `You are a load optimization expert. Analyze this shipment and give 3-5 concise bullet-point tips.
+
+CARGO (total ${totalVol.toFixed(0)} cu ft, ${totalWt.toLocaleString()} lbs):
+${itemList || 'No items yet'}
+
+AVAILABLE TRUCKS:
+${truckList}
+
+Give specific recommendations: best truck match, stacking order, fragile item placement, weight distribution. Be brief and practical.`,
+      }],
+    });
+    res.json({ advice: response.content[0].text });
+  } catch (err) {
+    console.error('AI advise error:', err.message);
+    res.status(500).json({ error: 'AI service unavailable' });
+  }
 });
 
 const PORT = process.env.PORT || 3000;

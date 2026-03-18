@@ -17,7 +17,7 @@
     <span class="nav-title">Load Optimizer</span>
   </div>
   <div class="nav-right">
-    <button id="nav-admin-btn" class="nav-auth-btn" onclick="toggleAdminPanel()" style="display:none">⚙ Admin</button>
+    <button id="nav-admin-btn" class="nav-auth-btn" onclick="toggleAdminPanel()">⚙ Admin</button>
     <a href="/advanced" class="nav-link" target="_blank">⚙ Advanced</a>
     <button id="nav-login-btn" class="nav-auth-btn" onclick="openAuthModal()">Login</button>
     <div id="nav-user" style="display:none" class="nav-user-row">
@@ -76,6 +76,7 @@
         <div class="custom-item-hint">
           Item not in the list?
           <button class="custom-item-btn" onclick="portalEnterCustomItem()">✏ Enter custom item</button>
+          <button class="custom-item-btn ai-autofill-btn" onclick="aiAutoFill()" title="Describe your item and AI will fill the fields">🤖 AI Auto-Fill</button>
         </div>
         <div class="field" style="margin-bottom:10px">
           <label>Item Name <small style="font-weight:400;color:var(--text2);text-transform:none">(editable)</small></label>
@@ -187,7 +188,7 @@
 </div>
 
 <!-- ── Admin Panel ── -->
-<div id="admin-panel" class="admin-panel" style="display:none">
+<div id="admin-panel" class="admin-panel" style="display:none" onclick="adminPanelBackdropClick(event)">
   <div class="admin-panel-inner">
     <div class="admin-header">
       <div class="admin-title">⚙ Admin Panel</div>
@@ -197,12 +198,14 @@
         <span class="admin-stat"><span id="s-customers">0</span> Customers</span>
         <span class="admin-stat"><span id="s-units">0</span> Items</span>
       </div>
+      <button class="bm-close" onclick="toggleAdminPanel()" title="Close">✕</button>
     </div>
     <div class="admin-tabs">
       <button class="admin-tab-btn active" onclick="showAdminTab('fleet')">🚛 Fleet</button>
       <button class="admin-tab-btn" onclick="showAdminTab('customers')">👥 Customers</button>
       <button class="admin-tab-btn" onclick="showAdminTab('bookings')">📋 Bookings</button>
       <button class="admin-tab-btn" onclick="showAdminTab('import')">📥 Import</button>
+      <button class="admin-tab-btn" onclick="showAdminTab('rates')">💲 Rates</button>
     </div>
 
     <!-- Fleet Tab -->
@@ -321,7 +324,66 @@
         </div>
       </div>
 
+      <!-- ── Rate Overrides ── -->
+      <div class="import-section">
+        <div class="import-section-head">
+          <span class="import-section-title">💲 Rate Overrides</span>
+          <button class="btn-dl-template" onclick="downloadTemplate('rates')">⬇ Template</button>
+        </div>
+        <p class="import-section-sub">Columns: <em>City (optional) · Carrier (optional — "Any", "Own Fleet", or carrier name) · Truck (optional — truck name or blank) · Rate per km ($/km)</em></p>
+        <div class="import-drop" id="import-drop-rates" onclick="document.getElementById('import-file-rates').click()" ondragover="importDragOver(event)" ondrop="importDrop(event,'rates')">
+          <div class="import-drop-icon">📂</div>
+          <div class="import-drop-txt">Click to browse or drag &amp; drop an Excel / CSV file</div>
+          <input type="file" id="import-file-rates" accept=".xlsx,.xls,.csv" style="display:none" onchange="handleImportFile('rates',this)">
+        </div>
+        <div id="import-preview-rates" class="import-preview" style="display:none">
+          <div class="import-preview-head">
+            <span id="import-count-rates" class="import-count"></span>
+            <div style="display:flex;gap:8px;">
+              <button class="btn-import-confirm" onclick="confirmImport('rates')">✓ Import</button>
+              <button class="btn-import-cancel" onclick="cancelImport('rates')">✕ Clear</button>
+            </div>
+          </div>
+          <div class="import-table-wrap"><table id="import-table-rates" class="import-table"></table></div>
+        </div>
+      </div>
+
     </div><!-- /tab-import -->
+
+    <!-- Rates Tab -->
+    <div id="tab-rates" class="admin-tab-pane" style="display:none">
+      <div class="admin-form-card">
+        <div class="admin-form-title" id="rf-form-title">＋ Add Rate</div>
+        <div class="form-row">
+          <label>Origin City <small style="font-weight:400;color:var(--text2)">(optional — blank = any city)</small></label>
+          <input type="text" id="rf-city" placeholder="e.g. Chicago">
+        </div>
+        <div class="form-row">
+          <label>Carrier <small style="font-weight:400;color:var(--text2)">(optional — blank = any carrier)</small></label>
+          <select id="rf-carrier" onchange="onRateCarrierChange()">
+            <option value="">— Any carrier (incl. own fleet) —</option>
+            <option value="own">Own Fleet</option>
+          </select>
+        </div>
+        <div class="form-row">
+          <label>Truck <small style="font-weight:400;color:var(--text2)">(optional — blank = any truck)</small></label>
+          <select id="rf-truck">
+            <option value="">— Any truck —</option>
+          </select>
+        </div>
+        <div class="form-row">
+          <label>Rate per km ($/km)</label>
+          <input type="number" id="rf-rate-per-km" value="2.50" step="0.01" min="0">
+        </div>
+        <input type="hidden" id="rf-edit-id" value="">
+        <div style="display:flex;gap:8px;margin-top:12px;">
+          <button class="btn-save-truck" onclick="saveRate()">Save Rate</button>
+          <button class="btn-cancel-truck" id="rf-cancel-btn" onclick="closeRateForm()" style="display:none">Cancel</button>
+        </div>
+      </div>
+      <div id="p-rates-list" class="admin-list"></div>
+    </div><!-- /tab-rates -->
+
   </div>
 </div>
 
@@ -576,6 +638,31 @@
       <button class="bm-close" onclick="closeViz3DModal()">✕</button>
     </div>
     <iframe id="viz3d-frame" style="width:100%;flex:1;border:none;"></iframe>
+  </div>
+</div>
+
+<!-- ── AI Chat Widget ── -->
+<div id="ai-chat-btn" class="ai-fab" onclick="toggleAIChat()" title="AI Assistant">
+  <span class="ai-fab-icon">🤖</span>
+  <span class="ai-fab-label">AI Assistant</span>
+</div>
+
+<div id="ai-chat-panel" class="ai-chat-panel" style="display:none">
+  <div class="ai-chat-head">
+    <div class="ai-chat-title">🤖 AI Load Assistant</div>
+    <div style="display:flex;gap:6px;align-items:center">
+      <button class="ai-advise-btn" onclick="getAIAdvice()" title="Get load optimization tips">💡 Advise</button>
+      <button class="ai-chat-close" onclick="toggleAIChat()">✕</button>
+    </div>
+  </div>
+  <div id="ai-chat-messages" class="ai-chat-messages">
+    <div class="ai-msg ai-msg-bot">
+      Hi! I'm your AI load assistant. Describe cargo in plain language (e.g. "5 euro pallets, 800kg each") and I'll fill in the details. Or ask me anything about your shipment!
+    </div>
+  </div>
+  <div class="ai-chat-input-row">
+    <input id="ai-chat-input" class="ai-chat-input" type="text" placeholder="Describe cargo or ask a question…" onkeydown="if(event.key==='Enter')sendAIMessage()">
+    <button class="ai-chat-send" onclick="sendAIMessage()">Send</button>
   </div>
 </div>
 

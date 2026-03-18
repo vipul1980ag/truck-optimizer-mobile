@@ -2,8 +2,8 @@
 //  STATE
 // ═══════════════════════════════════════════════════
 let useMetric = false;
-let trucks = [], items = [], customers = [], carriers = [];
-let nextTruckId = 1, nextItemId = 1, nextCustomerId = 1, nextCarrierId = 1, nextCarrierTruckId = 1;
+let trucks = [], items = [], customers = [], carriers = [], rates = [];
+let nextTruckId = 1, nextItemId = 1, nextCustomerId = 1, nextCarrierId = 1, nextCarrierTruckId = 1, nextRateId = 1;
 let colorIdx = 0;
 const CUST_COLORS = ['#3b82f6','#ef4444','#22c55e','#f59e0b','#8b5cf6','#06b6d4','#f97316','#ec4899','#14b8a6','#a855f7','#84cc16','#0ea5e9','#d946ef','#fb923c','#34d399'];
 const CORRIDOR_THRESHOLD = 200; // used only in renderRouteAnalysis for display label
@@ -33,10 +33,11 @@ const distUnit = () => useMetric ? 'km' : 'mi';
 //  TABS
 // ═══════════════════════════════════════════════════
 function showTab(name) {
-  ['trucks','carriers','customers','items'].forEach(t => {
+  ['trucks','carriers','customers','items','rates'].forEach(t => {
     document.getElementById('tab-' + t).classList.toggle('active', t === name);
     document.getElementById('tab-btn-' + t).classList.toggle('active', t === name);
   });
+  if (name === 'rates') populateRateDropdowns();
 }
 
 // ═══════════════════════════════════════════════════
@@ -136,6 +137,50 @@ async function addItem() {
   renderSidebar(); await saveToServer();
 }
 async function removeItem(id) { items = items.filter(i => i.id !== id); renderSidebar(); await saveToServer(); }
+
+// ═══════════════════════════════════════════════════
+//  RATES
+// ═══════════════════════════════════════════════════
+function populateRateDropdowns() {
+  const carrierSel = document.getElementById('r-carrier');
+  if (!carrierSel) return;
+  const cur = carrierSel.value;
+  carrierSel.innerHTML = '<option value="">— Any carrier (incl. own fleet) —</option><option value="own">Own Fleet</option>';
+  carriers.forEach(c => {
+    const opt = document.createElement('option');
+    opt.value = c.id; opt.textContent = c.name;
+    carrierSel.appendChild(opt);
+  });
+  carrierSel.value = cur;
+  updateRateTruckDropdown();
+}
+
+function updateRateTruckDropdown() {
+  const carrierVal = document.getElementById('r-carrier')?.value || '';
+  const sel = document.getElementById('r-truck');
+  if (!sel) return;
+  sel.innerHTML = '<option value="">— Any truck —</option>';
+  if (carrierVal === 'own') {
+    trucks.forEach(t => { const o = document.createElement('option'); o.value = t.id; o.textContent = t.name; sel.appendChild(o); });
+  } else if (carrierVal) {
+    const carr = carriers.find(c => String(c.id) === carrierVal);
+    (carr?.trucks || []).forEach(t => { const o = document.createElement('option'); o.value = t.tid; o.textContent = t.name; sel.appendChild(o); });
+  }
+}
+
+async function addRate() {
+  const ratePerKm = parseFloat(document.getElementById('r-rate-per-km')?.value);
+  if (isNaN(ratePerKm) || ratePerKm <= 0) { alert('Please enter a valid rate per km.'); return; }
+  const city       = (document.getElementById('r-city')?.value || '').trim() || null;
+  const carrierRaw = document.getElementById('r-carrier')?.value || '';
+  const truckRaw   = document.getElementById('r-truck')?.value   || '';
+  const carrierId  = carrierRaw === '' ? null : (carrierRaw === 'own' ? 'own' : Number(carrierRaw));
+  const truckRef   = truckRaw  === '' ? null : Number(truckRaw);
+  rates.push({ id: nextRateId++, city, carrierId, truckRef, ratePerKm });
+  renderSidebar(); await saveToServer();
+}
+
+async function removeRate(id) { rates = rates.filter(r => r.id !== id); renderSidebar(); await saveToServer(); }
 
 // ═══════════════════════════════════════════════════
 //  SIDEBAR RENDER
@@ -273,6 +318,37 @@ function renderSidebar() {
   sel.innerHTML = '<option value="">— Unassigned —</option>' +
     customers.map(c => `<option value="${c.id}">${esc(c.name)} (Stop #${c.stop}${c.zone?' · '+c.zone:''})</option>`).join('');
   sel.value = prev;
+
+  // Rates
+  const rl = document.getElementById('rate-list');
+  if (rl) {
+    rl.innerHTML = rates.length === 0
+      ? '<div class="no-items">No rate overrides yet.</div>'
+      : rates.map(r => {
+          const carrierName = r.carrierId == null ? 'Any carrier'
+            : r.carrierId === 'own' ? 'Own Fleet'
+            : carriers.find(c => c.id === r.carrierId)?.name || `Carrier #${r.carrierId}`;
+          let truckName = 'Any truck';
+          if (r.truckRef != null) {
+            if (r.carrierId === 'own' || r.carrierId == null) {
+              truckName = trucks.find(t => t.id === r.truckRef)?.name || `Truck #${r.truckRef}`;
+            } else {
+              const carr = carriers.find(c => c.id === r.carrierId);
+              truckName = carr?.trucks?.find(t => t.tid === r.truckRef)?.name || `Truck #${r.truckRef}`;
+            }
+          }
+          return `<div class="entity-card">
+            <div class="entity-header">
+              <div>
+                <div class="entity-name">💲 ${esc(r.city || 'Any city')}</div>
+                <div class="entity-dims">${esc(carrierName)} · ${esc(truckName)}</div>
+                <div class="entity-dims">$${r.ratePerKm}/km</div>
+              </div>
+              <button class="btn btn-danger btn-sm" onclick="removeRate(${r.id})">✕</button>
+            </div>
+          </div>`;
+        }).join('');
+  }
 
   const totalItems = items.reduce((s, i) => s + i.qty, 0);
   document.getElementById('opt-counts').textContent =
@@ -845,8 +921,8 @@ async function saveToServer() {
     const payload = {
       version: 1,
       savedAt: new Date().toISOString(),
-      trucks, carriers, customers, items,
-      nextIds: { truck: nextTruckId, carrier: nextCarrierId, carrierTruck: nextCarrierTruckId, customer: nextCustomerId, item: nextItemId, color: colorIdx }
+      trucks, carriers, customers, items, rates,
+      nextIds: { truck: nextTruckId, carrier: nextCarrierId, carrierTruck: nextCarrierTruckId, customer: nextCustomerId, item: nextItemId, rate: nextRateId, color: colorIdx }
     };
     const res = await fetch('/api/data', {
       method: 'PUT',
@@ -869,12 +945,14 @@ function applyPayload(data) {
   carriers  = data.carriers  || [];
   customers = data.customers || [];
   items     = data.items     || [];
+  rates     = data.rates     || [];
   if (data.nextIds) {
     nextTruckId         = data.nextIds.truck        || 1;
     nextCarrierId       = data.nextIds.carrier      || 1;
     nextCarrierTruckId  = data.nextIds.carrierTruck || 1;
     nextCustomerId      = data.nextIds.customer     || 1;
     nextItemId          = data.nextIds.item         || 1;
+    nextRateId          = data.nextIds.rate         || 1;
     colorIdx            = data.nextIds.color        || 0;
   }
   return true;
@@ -884,8 +962,8 @@ function exportJSON() {
   const payload = {
     version: 1,
     savedAt: new Date().toISOString(),
-    trucks, carriers, customers, items,
-    nextIds: { truck: nextTruckId, carrier: nextCarrierId, carrierTruck: nextCarrierTruckId, customer: nextCustomerId, item: nextItemId, color: colorIdx }
+    trucks, carriers, customers, items, rates,
+    nextIds: { truck: nextTruckId, carrier: nextCarrierId, carrierTruck: nextCarrierTruckId, customer: nextCustomerId, item: nextItemId, rate: nextRateId, color: colorIdx }
   };
   const blob = new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json' });
   const url  = URL.createObjectURL(blob);

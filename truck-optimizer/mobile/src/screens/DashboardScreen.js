@@ -69,7 +69,7 @@ export default function DashboardScreen() {
           <Text style={s.heroBadgeTxt}>LIVE DATA</Text>
         </View>
         <Text style={s.heroTitle}>🚛 Load Optimizer</Text>
-        <Text style={s.heroSub}>Pull to refresh  ·  Tap Optimize tab to run load plan</Text>
+        <Text style={s.heroSub}>Pull to refresh  ·  Tap New tab to create a booking</Text>
       </View>
 
       {/* Stats */}
