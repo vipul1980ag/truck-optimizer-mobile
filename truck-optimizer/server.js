@@ -892,7 +892,7 @@ If you cannot identify any items (e.g. the image is blurry or not cargo-related)
     res.json(Array.isArray(parsed) ? parsed : []);
   } catch (err) {
     console.error('AI scan error:', err.message);
-    res.status(500).json({ error: 'AI service unavailable' });
+    res.status(500).json({ error: 'AI service unavailable', detail: err.message });
   }
 });
 
