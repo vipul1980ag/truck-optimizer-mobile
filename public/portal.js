@@ -2701,5 +2701,160 @@ async function aiAutoFill() {
   }
 }
 
+// ── Photo Item Scanner ────────────────────────────────────────────────────────
+let _scanResults = [];
+
+function openPhotoScan() {
+  // Reset modal state
+  _scanResults = [];
+  document.getElementById('scan-preview-wrap').style.display = 'none';
+  document.getElementById('scan-loading').style.display      = 'none';
+  document.getElementById('scan-no-results').style.display   = 'none';
+  document.getElementById('scan-results').style.display      = 'none';
+  document.getElementById('scan-footer').style.display       = 'none';
+  document.getElementById('scan-modal').classList.add('open');
+
+  // Reset and trigger file input
+  const input = document.getElementById('scan-file-input');
+  input.value = '';
+  input.click();
+}
+
+function closeScanModal() {
+  document.getElementById('scan-modal').classList.remove('open');
+}
+
+function scanOverlayClick(e) {
+  if (e.target === document.getElementById('scan-modal')) closeScanModal();
+}
+
+async function handlePhotoFile(input) {
+  const file = input.files?.[0];
+  if (!file) return;
+
+  // Show preview
+  const reader = new FileReader();
+  reader.onload = async (e) => {
+    const dataUrl = e.target.result;
+    document.getElementById('scan-preview-img').src = dataUrl;
+    document.getElementById('scan-preview-wrap').style.display = 'block';
+
+    // Show loading
+    document.getElementById('scan-loading').style.display    = 'flex';
+    document.getElementById('scan-no-results').style.display = 'none';
+    document.getElementById('scan-results').style.display    = 'none';
+    document.getElementById('scan-footer').style.display     = 'none';
+
+    try {
+      // Extract base64 content (strip data URL prefix)
+      const base64 = dataUrl.split(',')[1];
+      const mediaType = file.type || 'image/jpeg';
+
+      const res = await fetch('/api/ai/scan-items', {
+        method:  'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body:    JSON.stringify({ imageBase64: base64, mediaType }),
+      });
+      const items = await res.json();
+      if (!res.ok) throw new Error(items.error || 'Scan failed');
+
+      document.getElementById('scan-loading').style.display = 'none';
+
+      if (!Array.isArray(items) || !items.length) {
+        document.getElementById('scan-no-results').style.display = 'flex';
+        document.getElementById('scan-footer').style.display     = 'flex';
+        return;
+      }
+
+      _scanResults = items;
+      renderScanResults(items);
+    } catch (err) {
+      document.getElementById('scan-loading').style.display = 'none';
+      document.getElementById('scan-no-results').style.display = 'flex';
+      document.getElementById('scan-footer').style.display     = 'flex';
+      console.error('Scan error:', err);
+    }
+  };
+  reader.readAsDataURL(file);
+}
+
+function renderScanResults(items) {
+  const countLabel = document.getElementById('scan-count-label');
+  countLabel.textContent = `${items.length} item${items.length !== 1 ? 's' : ''} detected`;
+
+  const list = document.getElementById('scan-items-list');
+  list.innerHTML = items.map((it, i) => `
+    <div class="scan-item-card" id="scan-item-${i}">
+      <label class="scan-item-check-wrap">
+        <input type="checkbox" class="scan-item-cb" data-idx="${i}" checked onchange="scanUpdateAddBtn()">
+      </label>
+      <div class="scan-item-body">
+        <div class="scan-item-name">${escHtml(it.name)}</div>
+        <div class="scan-item-dims">
+          ${it.length}×${it.width}×${it.height} ft &nbsp;·&nbsp; ${it.weight} lbs
+          ${it.qty > 1 ? `&nbsp;·&nbsp; Qty: ${it.qty}` : ''}
+          ${it.stackable ? '' : '&nbsp;·&nbsp; <span class="scan-tag">No stack</span>'}
+          ${it.isFragile ? '&nbsp;·&nbsp; <span class="scan-tag scan-tag-warn">Fragile</span>' : ''}
+        </div>
+        ${it.packagingNote ? `<div class="scan-item-pkg">📦 ${escHtml(it.packagingNote)}</div>` : ''}
+      </div>
+    </div>
+  `).join('');
+
+  document.getElementById('scan-results').style.display = 'block';
+  document.getElementById('scan-footer').style.display  = 'flex';
+  document.getElementById('scan-select-all').checked    = true;
+  scanUpdateAddBtn();
+}
+
+function scanToggleAll(checked) {
+  document.querySelectorAll('.scan-item-cb').forEach(cb => cb.checked = checked);
+  scanUpdateAddBtn();
+}
+
+function scanUpdateAddBtn() {
+  const selected = document.querySelectorAll('.scan-item-cb:checked').length;
+  const btn = document.getElementById('scan-add-btn');
+  btn.textContent = selected
+    ? `＋ Add ${selected} Item${selected !== 1 ? 's' : ''}`
+    : '＋ Add Selected Items';
+  btn.disabled = selected === 0;
+}
+
+function addScannedItems() {
+  const checked = document.querySelectorAll('.scan-item-cb:checked');
+  if (!checked.length) return;
+
+  checked.forEach(cb => {
+    const it = _scanResults[parseInt(cb.dataset.idx, 10)];
+    if (!it) return;
+    items.push({
+      id:              nextIds.item++,
+      name:            it.name,
+      length:          it.length,
+      width:           it.width,
+      height:          it.height,
+      weight:          it.weight,
+      packagingWeight: 0,
+      qty:             it.qty || 1,
+      rotate:          true,
+      stackable:       it.stackable !== false,
+      isFragile:       !!it.isFragile,
+      customerId:      null,
+      isDG:            false,
+      dgClass:         '',
+      dgCanCombine:    true,
+    });
+  });
+
+  closeScanModal();
+  saveToServer();
+  renderAll();
+}
+
+function escHtml(str) {
+  return String(str).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+
 // ── Start ─────────────────────────────────────────────────────────────────────
 init();

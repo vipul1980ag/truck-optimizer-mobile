@@ -78,7 +78,7 @@ export default function ShipOptionScreen({ navigation }) {
 
         <TouchableOpacity
           style={[s.nextBtn, !shippingOption && s.nextBtnDisabled]}
-          onPress={() => shippingOption && navigation.navigate('Location')}
+          onPress={() => shippingOption && navigation.navigate('Route')}
           activeOpacity={shippingOption ? 0.8 : 1}
         >
           <Text style={s.nextBtnTxt}>Next: Enter Route →</Text>

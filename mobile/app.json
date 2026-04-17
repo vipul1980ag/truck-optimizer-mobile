@@ -2,7 +2,7 @@
   "expo": {
     "name": "Truck Capacity Optimizer",
     "slug": "truck-optimizer-mobile",
-    "version": "1.0.0",
+    "version": "1.0.1",
     "orientation": "portrait",
     "userInterfaceStyle": "light",
     "icon": "./assets/icon.png",
@@ -17,7 +17,8 @@
       "buildNumber": "1",
       "infoPlist": {
         "NSLocationWhenInUseUsageDescription": "Used to show your current location on the route map.",
-        "NSCameraUsageDescription": "Used to scan barcodes or capture images for cargo items.",
+        "NSCameraUsageDescription": "Used to scan and identify cargo items from a photo.",
+        "NSPhotoLibraryUsageDescription": "Used to select photos for AI cargo item recognition.",
         "ITSAppUsesNonExemptEncryption": false
       },
       "config": {
@@ -31,7 +32,15 @@
       },
       "package": "com.truckoptimizer.mobile"
     },
-    "plugins": [],
+    "plugins": [
+      [
+        "expo-image-picker",
+        {
+          "photosPermission": "Used to select photos for AI cargo item recognition.",
+          "cameraPermission": "Used to scan and identify cargo items from a photo."
+        }
+      ]
+    ],
     "newArchEnabled": false,
     "extra": {
       "eas": {

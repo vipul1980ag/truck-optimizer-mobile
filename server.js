@@ -805,30 +805,94 @@ app.post('/api/ai/chat', async (req, res) => {
   }
   try {
     const store = readStore();
-    const systemPrompt = `You are an AI assistant for a truck load optimizer platform.
-Help customers book shipments, estimate costs, and understand their options.
 
-Current fleet summary:
-- Own trucks: ${store.trucks.map(t => `${t.name} (${t.length}×${t.width}×${t.height} ft, max ${t.maxWt} lbs)`).join(', ')}
-- Carrier partners: ${store.carriers.map(c => c.name).join(', ')}
+    // Static instructions cached; dynamic fleet data appended after
+    const systemBlocks = [
+      {
+        type: 'text',
+        text: `You are an AI assistant for a truck load optimizer platform.
+Help customers book shipments, estimate costs, and understand their options.
 
 When users describe cargo, extract: name, dimensions (length×width×height in ft), weight (lbs), quantity.
 Respond in a friendly, concise manner. If the user wants to add cargo, return structured JSON in this format at the end of your message:
 <cargo_data>{"name":"...","length":0,"width":0,"height":0,"weight":0,"qty":1}</cargo_data>
 
 For load optimization questions, analyze the cargo list and suggest the best truck.
-For pricing, use approximate $2-4 per mile as a general estimate.`;
+For pricing, use approximate $2-4 per mile as a general estimate.`,
+        cache_control: { type: 'ephemeral' },
+      },
+      {
+        type: 'text',
+        text: `Current fleet summary:
+- Own trucks: ${store.trucks.map(t => `${t.name} (${t.length}×${t.width}×${t.height} ft, max ${t.maxWt} lbs)`).join(', ')}
+- Carrier partners: ${store.carriers.map(c => c.name).join(', ')}`,
+      },
+    ];
 
-    const response = await anthropic.messages.create({
-      model: 'claude-sonnet-4-6',
+    const stream = anthropic.messages.stream({
+      model: 'claude-opus-4-6',
       max_tokens: 1024,
-      system: systemPrompt,
-      messages: messages,
+      thinking: { type: 'adaptive' },
+      system: systemBlocks,
+      messages,
     });
-    res.json({ reply: response.content[0].text });
+
+    const response = await stream.finalMessage();
+    const textBlock = response.content.find(b => b.type === 'text');
+    res.json({ reply: textBlock?.text ?? '' });
   } catch (err) {
     console.error('AI chat error:', err.message);
     res.status(500).json({ error: 'AI service unavailable. Check ANTHROPIC_API_KEY.' });
+  }
+});
+
+// AI photo scanner — identify items from an image and estimate dimensions + packaging
+app.post('/api/ai/scan-items', async (req, res) => {
+  const { imageBase64, mediaType = 'image/jpeg' } = req.body || {};
+  if (!imageBase64) return res.status(400).json({ error: 'imageBase64 required' });
+  try {
+    const stream = anthropic.messages.stream({
+      model: 'claude-opus-4-6',
+      max_tokens: 2048,
+      messages: [{
+        role: 'user',
+        content: [
+          {
+            type: 'image',
+            source: { type: 'base64', media_type: mediaType, data: imageBase64 },
+          },
+          {
+            type: 'text',
+            text: `You are a professional freight estimator. Analyze this photo and identify every distinct item visible.
+
+For each item, estimate:
+- name: common name for the item
+- length, width, height: dimensions in feet INCLUDING typical packaging/crating (add ~3-6 inches per side for cardboard/pallet/foam)
+- weight: estimated weight in lbs INCLUDING packaging
+- qty: count of identical items visible
+- stackable: true if safe to stack other items on top
+- isFragile: true if requires careful handling
+- packagingNote: brief note about packaging (e.g. "standard carton", "pallet-wrapped", "crated")
+
+Return ONLY a JSON array — no explanation, no markdown. Example:
+[{"name":"3-seat sofa","length":7.5,"width":3.5,"height":3.2,"weight":220,"qty":1,"stackable":false,"isFragile":false,"packagingNote":"moving blanket wrap"},{"name":"coffee table","length":4.2,"width":2.2,"height":1.8,"weight":60,"qty":1,"stackable":true,"isFragile":false,"packagingNote":"cardboard corners"}]
+
+If you cannot identify any items (e.g. the image is blurry or not cargo-related), return an empty array: []`,
+          },
+        ],
+      }],
+    });
+
+    const response = await stream.finalMessage();
+    const textBlock = response.content.find(b => b.type === 'text');
+    const text = (textBlock?.text || '').trim();
+    const match = text.match(/\[[\s\S]*\]/);
+    if (!match) return res.json([]);
+    const parsed = JSON.parse(match[0]);
+    res.json(Array.isArray(parsed) ? parsed : []);
+  } catch (err) {
+    console.error('AI scan error:', err.message);
+    res.status(500).json({ error: 'AI service unavailable' });
   }
 });
 
@@ -838,7 +902,7 @@ app.post('/api/ai/parse-cargo', async (req, res) => {
   if (!description) return res.status(400).json({ error: 'description required' });
   try {
     const response = await anthropic.messages.create({
-      model: 'claude-haiku-4-5-20251001',
+      model: 'claude-haiku-4-5',
       max_tokens: 256,
       messages: [{
         role: 'user',
@@ -871,7 +935,7 @@ app.post('/api/ai/advise', async (req, res) => {
     const truckList = store.trucks.map(t => `${t.name}: ${t.length}×${t.width}×${t.height} ft, max ${t.maxWt} lbs, $${t.baseRate} base + $${t.ratePerMi}/mi`).join('\n');
 
     const response = await anthropic.messages.create({
-      model: 'claude-haiku-4-5-20251001',
+      model: 'claude-haiku-4-5',
       max_tokens: 512,
       messages: [{
         role: 'user',
