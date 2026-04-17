@@ -2,8 +2,10 @@ import React, { useState, useEffect } from 'react';
 import {
   View, Text, StyleSheet, ScrollView, TextInput,
   TouchableOpacity, Alert, KeyboardAvoidingView, Platform, Switch,
+  Modal, ActivityIndicator, Image,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import * as ImagePicker from 'expo-image-picker';
 import { useWizard } from '../../WizardContext';
 import { C } from '../../theme';
 const API_BASE = process.env.EXPO_PUBLIC_API_URL || 'https://truck-capacity-optimizer.onrender.com';
@@ -171,6 +173,13 @@ export default function AddCargoScreen({ navigation }) {
   const [editForm,     setEditForm]     = useState({});
   const [serverCatalog, setServerCatalog] = useState([]);
 
+  // Photo scan state
+  const [scanVisible,  setScanVisible]  = useState(false);
+  const [scanLoading,  setScanLoading]  = useState(false);
+  const [scanResults,  setScanResults]  = useState([]);
+  const [scanSelected, setScanSelected] = useState([]);
+  const [scanImageUri, setScanImageUri] = useState(null);
+
   useEffect(() => {
     fetch(`${API_BASE}/api/catalog`)
       .then(r => r.json())
@@ -205,6 +214,96 @@ export default function AddCargoScreen({ navigation }) {
       packagingWeight: '0',
       qty:             '1',
     }));
+  }
+
+  async function handleScanPhoto() {
+    // Ask for camera permission
+    const { status } = await ImagePicker.requestCameraPermissionsAsync();
+    if (status !== 'granted') {
+      Alert.alert('Permission Required', 'Camera access is needed to scan items.');
+      return;
+    }
+    Alert.alert('Add Photo', 'Choose source', [
+      { text: 'Camera', onPress: () => launchScan(ImagePicker.launchCameraAsync) },
+      { text: 'Photo Library', onPress: () => launchScan(ImagePicker.launchImageLibraryAsync) },
+      { text: 'Cancel', style: 'cancel' },
+    ]);
+  }
+
+  async function launchScan(launcher) {
+    const result = await launcher({
+      mediaTypes: ImagePicker.MediaTypeOptions.Images,
+      base64: true,
+      quality: 0.4,      // lower quality = smaller base64 payload
+      exif: false,
+    });
+    if (result.canceled || !result.assets?.[0]) return;
+
+    const asset = result.assets[0];
+    if (!asset.base64) {
+      Alert.alert('Scan Error', 'Could not read image data. Please try again.');
+      return;
+    }
+
+    setScanImageUri(asset.uri);
+    setScanResults([]);
+    setScanSelected([]);
+    setScanLoading(true);
+    setScanVisible(true);
+
+    try {
+      const res = await fetch(`${API_BASE}/api/ai/scan-items`, {
+        method:  'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body:    JSON.stringify({ imageBase64: asset.base64, mediaType: asset.mimeType || 'image/jpeg' }),
+      });
+
+      // Guard against non-JSON responses (e.g. server timeout HTML page)
+      const contentType = res.headers.get('content-type') || '';
+      if (!contentType.includes('application/json')) {
+        throw new Error('Server error — please try again.');
+      }
+
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Scan failed');
+      const items = Array.isArray(data) ? data : [];
+      setScanResults(items);
+      setScanSelected(items.map((_, i) => i));
+    } catch (err) {
+      Alert.alert('Scan Error', err.message || 'Could not analyse photo.');
+      setScanVisible(false);
+    } finally {
+      setScanLoading(false);
+    }
+  }
+
+  function toggleScanItem(idx) {
+    setScanSelected(prev =>
+      prev.includes(idx) ? prev.filter(i => i !== idx) : [...prev, idx]
+    );
+  }
+
+  function addScannedItems() {
+    scanSelected.forEach(idx => {
+      const it = scanResults[idx];
+      if (!it) return;
+      addItem({
+        name:            it.name,
+        length:          it.length,
+        width:           it.width,
+        height:          it.height,
+        weight:          it.weight,
+        packagingWeight: 0,
+        qty:             it.qty || 1,
+        stackable:       it.stackable !== false,
+        isDG:            false,
+        dgClass:         '',
+        dgCanCombine:    true,
+        isFragile:       !!it.isFragile,
+        customerId:      null,
+      });
+    });
+    setScanVisible(false);
   }
 
   function handleAdd() {
@@ -336,6 +435,12 @@ export default function AddCargoScreen({ navigation }) {
                   <Text style={s.catIcon}>🏭</Text>
                   <Text style={s.catLabel}>Industrial</Text>
                   <Text style={s.catSub}>Pallets · machinery · equipment</Text>
+                </TouchableOpacity>
+
+                <TouchableOpacity style={[s.catScanBtn, { marginTop: 8 }]} onPress={handleScanPhoto}>
+                  <Text style={s.catIcon}>📷</Text>
+                  <Text style={s.catLabel}>Scan Photo</Text>
+                  <Text style={s.catSub}>AI identifies items &amp; sizes</Text>
                 </TouchableOpacity>
               </>
             )}
@@ -679,6 +784,104 @@ export default function AddCargoScreen({ navigation }) {
           </View>
         )}
 
+        {/* ── Photo Scan Modal ── */}
+        <Modal visible={scanVisible} animationType="slide" transparent onRequestClose={() => setScanVisible(false)}>
+          <View style={s.scanOverlay}>
+            <View style={s.scanCard}>
+
+              {/* Header */}
+              <View style={s.scanHead}>
+                <Text style={s.scanHeadTxt}>📷 AI Scan Results</Text>
+                <TouchableOpacity onPress={() => setScanVisible(false)}>
+                  <Text style={s.scanClose}>✕</Text>
+                </TouchableOpacity>
+              </View>
+
+              {/* Preview image */}
+              {scanImageUri && (
+                <Image source={{ uri: scanImageUri }} style={s.scanPreview} resizeMode="cover" />
+              )}
+
+              {/* Loading */}
+              {scanLoading && (
+                <View style={s.scanLoading}>
+                  <ActivityIndicator size="large" color={C.primary} />
+                  <Text style={s.scanLoadingTxt}>Analysing photo…</Text>
+                </View>
+              )}
+
+              {/* No results */}
+              {!scanLoading && scanResults.length === 0 && (
+                <View style={s.scanEmpty}>
+                  <Text style={s.scanEmptyIcon}>🤔</Text>
+                  <Text style={s.scanEmptyTxt}>No items recognised.{'\n'}Try a clearer photo or add manually.</Text>
+                </View>
+              )}
+
+              {/* Results list */}
+              {!scanLoading && scanResults.length > 0 && (
+                <ScrollView style={s.scanList} contentContainerStyle={{ paddingBottom: 8 }}>
+                  <View style={s.scanListHead}>
+                    <Text style={s.scanListHeadTxt}>{scanResults.length} item{scanResults.length !== 1 ? 's' : ''} found — tap to deselect</Text>
+                    <TouchableOpacity onPress={() => setScanSelected(scanSelected.length === scanResults.length ? [] : scanResults.map((_, i) => i))}>
+                      <Text style={s.scanToggleAll}>
+                        {scanSelected.length === scanResults.length ? 'Deselect all' : 'Select all'}
+                      </Text>
+                    </TouchableOpacity>
+                  </View>
+                  {scanResults.map((item, idx) => {
+                    const sel = scanSelected.includes(idx);
+                    return (
+                      <TouchableOpacity
+                        key={idx}
+                        style={[s.scanItem, sel && s.scanItemSel]}
+                        onPress={() => toggleScanItem(idx)}
+                        activeOpacity={0.8}
+                      >
+                        <View style={s.scanItemLeft}>
+                          <Text style={s.scanItemName}>{item.name}</Text>
+                          <Text style={s.scanItemDims}>
+                            {item.length}×{item.width}×{item.height} ft · {item.weight} lbs
+                            {item.qty > 1 ? ` · qty ${item.qty}` : ''}
+                          </Text>
+                          <View style={{ flexDirection: 'row', gap: 4, flexWrap: 'wrap', marginTop: 3 }}>
+                            {item.isFragile && (
+                              <View style={s.scanTagWarn}><Text style={s.scanTagTxt}>🔔 Fragile</Text></View>
+                            )}
+                            {item.packaging && (
+                              <View style={s.scanTag}><Text style={s.scanTagTxt}>📦 {item.packaging}</Text></View>
+                            )}
+                          </View>
+                        </View>
+                        <Text style={s.scanCheckmark}>{sel ? '☑' : '☐'}</Text>
+                      </TouchableOpacity>
+                    );
+                  })}
+                </ScrollView>
+              )}
+
+              {/* Footer */}
+              {!scanLoading && (
+                <View style={s.scanFoot}>
+                  <TouchableOpacity style={s.scanRetakeBtn} onPress={() => { setScanVisible(false); handleScanPhoto(); }}>
+                    <Text style={s.scanRetakeTxt}>Retake</Text>
+                  </TouchableOpacity>
+                  {scanResults.length > 0 && (
+                    <TouchableOpacity
+                      style={[s.scanAddBtn, scanSelected.length === 0 && s.scanAddBtnDisabled]}
+                      onPress={addScannedItems}
+                      disabled={scanSelected.length === 0}
+                    >
+                      <Text style={s.scanAddTxt}>Add {scanSelected.length} item{scanSelected.length !== 1 ? 's' : ''} →</Text>
+                    </TouchableOpacity>
+                  )}
+                </View>
+              )}
+
+            </View>
+          </View>
+        </Modal>
+
       </KeyboardAvoidingView>
     </SafeAreaView>
   );
@@ -698,10 +901,11 @@ const s = StyleSheet.create({
   colHead: { fontSize: 13, fontWeight: '900', color: C.text, marginBottom: 10, letterSpacing: -0.2 },
 
   // Category buttons (stacked vertically in left col)
-  catBtn:   { alignItems: 'center', paddingVertical: 14, borderRadius: 12, borderWidth: 1.5, borderColor: C.border, backgroundColor: C.surface },
-  catIcon:  { fontSize: 24 },
-  catLabel: { fontSize: 12, fontWeight: '800', color: C.text, marginTop: 3 },
-  catSub:   { fontSize: 9, color: C.text2, textAlign: 'center', marginTop: 2 },
+  catBtn:     { alignItems: 'center', paddingVertical: 14, borderRadius: 12, borderWidth: 1.5, borderColor: C.border, backgroundColor: C.surface },
+  catScanBtn: { alignItems: 'center', paddingVertical: 14, borderRadius: 12, borderWidth: 1.5, borderColor: '#a78bfa', backgroundColor: '#f5f3ff' },
+  catIcon:    { fontSize: 24 },
+  catLabel:   { fontSize: 12, fontWeight: '800', color: C.text, marginTop: 3 },
+  catSub:     { fontSize: 9, color: C.text2, textAlign: 'center', marginTop: 2 },
 
   stepHead:  { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 6 },
   stepTitle: { fontSize: 11, fontWeight: '800', color: C.text },
@@ -782,4 +986,36 @@ const s = StyleSheet.create({
   bottomBar:  { padding: 10, paddingHorizontal: 12, backgroundColor: C.surface, borderTopWidth: 1, borderTopColor: C.border },
   proceedBtn: { backgroundColor: C.primary, borderRadius: 10, paddingVertical: 12, alignItems: 'center' },
   proceedTxt: { color: '#fff', fontSize: 13, fontWeight: '800' },
+
+  // Photo scan modal
+  scanOverlay:    { flex: 1, backgroundColor: 'rgba(0,0,0,0.6)', justifyContent: 'flex-end' },
+  scanCard:       { backgroundColor: '#fff', borderTopLeftRadius: 20, borderTopRightRadius: 20, maxHeight: '90%' },
+  scanHead:       { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', padding: 16, borderBottomWidth: 1, borderBottomColor: '#e2e8f0' },
+  scanHeadTxt:    { fontSize: 16, fontWeight: '900', color: '#1e293b' },
+  scanClose:      { fontSize: 18, color: '#94a3b8', padding: 4 },
+  scanPreview:    { width: '100%', height: 160 },
+  scanLoading:    { alignItems: 'center', paddingVertical: 30 },
+  scanLoadingTxt: { marginTop: 10, fontSize: 14, color: '#64748b' },
+  scanEmpty:      { alignItems: 'center', paddingVertical: 30 },
+  scanEmptyIcon:  { fontSize: 36, marginBottom: 8 },
+  scanEmptyTxt:   { fontSize: 13, color: '#64748b', textAlign: 'center', lineHeight: 20 },
+  scanList:       { maxHeight: 300 },
+  scanListHead:   { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 14, paddingVertical: 8 },
+  scanListHeadTxt:{ fontSize: 12, color: '#64748b', fontWeight: '600' },
+  scanToggleAll:  { fontSize: 12, color: '#2563eb', fontWeight: '700' },
+  scanItem:       { flexDirection: 'row', alignItems: 'center', marginHorizontal: 12, marginBottom: 6, padding: 10, borderRadius: 10, borderWidth: 1.5, borderColor: '#e2e8f0', backgroundColor: '#f8fafc' },
+  scanItemSel:    { borderColor: '#2563eb', backgroundColor: '#eff6ff' },
+  scanItemLeft:   { flex: 1 },
+  scanItemName:   { fontSize: 13, fontWeight: '800', color: '#1e293b' },
+  scanItemDims:   { fontSize: 11, color: '#64748b', marginTop: 2 },
+  scanCheckmark:  { fontSize: 20, color: '#2563eb', marginLeft: 8 },
+  scanTag:        { backgroundColor: '#e0f2fe', borderRadius: 4, paddingHorizontal: 6, paddingVertical: 1 },
+  scanTagWarn:    { backgroundColor: '#fef9c3', borderRadius: 4, paddingHorizontal: 6, paddingVertical: 1 },
+  scanTagTxt:     { fontSize: 9, fontWeight: '700', color: '#475569' },
+  scanFoot:       { flexDirection: 'row', gap: 10, padding: 14, borderTopWidth: 1, borderTopColor: '#e2e8f0' },
+  scanRetakeBtn:  { flex: 1, paddingVertical: 12, borderRadius: 10, borderWidth: 1.5, borderColor: '#cbd5e1', alignItems: 'center' },
+  scanRetakeTxt:  { fontSize: 14, fontWeight: '700', color: '#475569' },
+  scanAddBtn:     { flex: 2, paddingVertical: 12, borderRadius: 10, backgroundColor: '#2563eb', alignItems: 'center' },
+  scanAddBtnDisabled: { backgroundColor: '#cbd5e1' },
+  scanAddTxt:     { fontSize: 14, fontWeight: '800', color: '#fff' },
 });

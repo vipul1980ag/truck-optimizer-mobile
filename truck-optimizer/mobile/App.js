@@ -2,7 +2,7 @@ import React from 'react';
 import { NavigationContainer } from '@react-navigation/native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
-import { SafeAreaProvider } from 'react-native-safe-area-context';
+import { SafeAreaProvider, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Text, View, TouchableOpacity, ActivityIndicator } from 'react-native';
 
 import AuthScreen            from './src/screens/AuthScreen';
@@ -18,6 +18,7 @@ import ReviewCargoScreen     from './src/screens/wizard/ReviewCargoScreen';
 import RouteScreen           from './src/screens/wizard/RouteScreen';
 import ChargesScreen         from './src/screens/wizard/ChargesScreen';
 import ConfirmScreen         from './src/screens/wizard/ConfirmScreen';
+import ShipOptionScreen      from './src/screens/wizard/ShipOptionScreen';
 import Viz3DScreen           from './src/screens/wizard/Viz3DScreen';
 
 import { AuthProvider, useAuth } from './src/AuthContext';
@@ -64,6 +65,7 @@ const ICON = { Home: '🏠', Bookings: '📋', New: '🚛', Admin: '⚙️', Cus
 
 /* ── 4 real tabs + 1 intercepted "New Booking" tab ─────────────── */
 function MainTabs() {
+  const insets = useSafeAreaInsets();
   return (
     <Tab.Navigator
       screenOptions={({ route }) => ({
@@ -79,9 +81,9 @@ function MainTabs() {
           backgroundColor: '#0c1f40',
           borderTopColor:  '#1e3a5f',
           borderTopWidth:  1,
-          paddingBottom:   8,
+          paddingBottom:   Math.max(insets.bottom, 8),
           paddingTop:      6,
-          height:          72,
+          height:          60 + Math.max(insets.bottom, 8),
         },
         tabBarLabelStyle: { fontSize: 11, fontWeight: '700' },
         ...HEADER,
@@ -150,6 +152,8 @@ function AppNavigator() {
               options={{ title: '📦 Add Cargo' }} />
             <RootStack.Screen name="ReviewCargo" component={ReviewCargoScreen}
               options={{ title: '📋 Review Cargo' }} />
+            <RootStack.Screen name="ShipOption"  component={ShipOptionScreen}
+              options={{ title: '🚚 Shipping Option' }} />
             <RootStack.Screen name="Route"       component={RouteScreen}
               options={{ title: '🗺️ Select Route' }} />
             <RootStack.Screen name="Charges"     component={ChargesScreen}

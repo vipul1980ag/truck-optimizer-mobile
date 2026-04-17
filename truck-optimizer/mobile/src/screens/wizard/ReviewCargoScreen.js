@@ -306,7 +306,7 @@ export default function ReviewCargoScreen({ navigation }) {
         <TouchableOpacity style={s.viz3dBtn} onPress={() => navigation.navigate('Viz3D')}>
           <Text style={s.viz3dTxt}>🧊 3D Load</Text>
         </TouchableOpacity>
-        <TouchableOpacity style={s.confirmBtn} onPress={() => navigation.navigate('Route')}>
+        <TouchableOpacity style={s.confirmBtn} onPress={() => navigation.navigate('ShipOption')}>
           <Text style={s.confirmTxt}>Confirm →</Text>
         </TouchableOpacity>
       </View>
