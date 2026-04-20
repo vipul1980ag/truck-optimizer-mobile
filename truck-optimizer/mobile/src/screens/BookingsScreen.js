@@ -4,12 +4,14 @@ import {
   RefreshControl, ActivityIndicator, Alert,
 } from 'react-native';
 import { api } from '../api';
-import { C } from '../theme';
+import { C, shadow } from '../theme';
 import { useFocusEffect } from '@react-navigation/native';
 
-const STATUS_COLOR = { active: '#16a34a', completed: '#2563eb', cancelled: '#dc2626' };
-const STATUS_BG    = { active: '#dcfce7', completed: '#dbeafe', cancelled: '#fee2e2' };
-const STATUS_LABEL = { active: 'Active',  completed: 'Completed', cancelled: 'Cancelled' };
+const STATUS = {
+  active:    { color: '#16a34a', bg: '#f0fdf4', border: '#86efac', label: 'Active',    dot: '#4ade80' },
+  completed: { color: '#2563eb', bg: '#eff6ff', border: '#93c5fd', label: 'Completed', dot: '#60a5fa' },
+  cancelled: { color: '#dc2626', bg: '#fef2f2', border: '#fca5a5', label: 'Cancelled', dot: '#f87171' },
+};
 
 export default function BookingsScreen() {
   const [bookings,   setBookings]   = useState([]);
@@ -49,7 +51,12 @@ export default function BookingsScreen() {
   };
 
   if (loading) {
-    return <View style={s.center}><ActivityIndicator size="large" color={C.primary} /></View>;
+    return (
+      <View style={s.center}>
+        <ActivityIndicator size="large" color={C.primary} />
+        <Text style={s.loadingTxt}>Loading bookings…</Text>
+      </View>
+    );
   }
 
   const renderItem = ({ item }) => {
@@ -57,11 +64,15 @@ export default function BookingsScreen() {
     const truckVol = truck ? truck.length * truck.width * truck.height : 0;
     const loadPct  = truckVol > 0 ? Math.min((item.totalVol || 0) / truckVol, 1) : 0;
     const wtPct    = truck ? Math.min((item.totalWeight || 0) / truck.maxWt, 1) : 0;
-    const status   = item.status || 'active';
-    const date     = item.createdAt ? new Date(item.createdAt).toLocaleDateString() : '';
+    const statusKey = item.status || 'active';
+    const st        = STATUS[statusKey] || STATUS.active;
+    const date      = item.createdAt ? new Date(item.createdAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : '';
 
     return (
       <View style={s.card}>
+        {/* Colored top accent bar */}
+        <View style={[s.cardAccent, { backgroundColor: st.color }]} />
+
         {/* Header */}
         <View style={s.cardHead}>
           <View style={{ flex: 1 }}>
@@ -71,23 +82,35 @@ export default function BookingsScreen() {
             </Text>
             <Text style={s.cardDate}>{date}</Text>
           </View>
-          <View style={[s.statusBadge, { backgroundColor: STATUS_BG[status] }]}>
-            <Text style={[s.statusTxt, { color: STATUS_COLOR[status] }]}>
-              {STATUS_LABEL[status] || status}
-            </Text>
+          <View style={[s.statusBadge, { backgroundColor: st.bg, borderColor: st.border }]}>
+            <View style={[s.statusDot, { backgroundColor: st.dot }]} />
+            <Text style={[s.statusTxt, { color: st.color }]}>{st.label}</Text>
           </View>
         </View>
 
         {/* Route */}
         {item.route && (
           <View style={s.routeRow}>
-            <Text style={s.routeFrom} numberOfLines={1}>{item.route.fromLabel || '—'}</Text>
-            <Text style={s.routeArrow}>→</Text>
-            <Text style={s.routeTo} numberOfLines={1}>{item.route.toLabel || '—'}</Text>
+            <View style={s.routeEndpoint}>
+              <View style={[s.routeDotFrom, { backgroundColor: C.primary }]} />
+              <Text style={s.routeLabel} numberOfLines={1}>{item.route.fromLabel || '—'}</Text>
+            </View>
+            <View style={s.routeLine}>
+              <View style={s.routeLineDash} />
+              <Text style={s.routeArrow}>→</Text>
+            </View>
+            <View style={[s.routeEndpoint, { alignItems: 'flex-end' }]}>
+              <View style={[s.routeDotFrom, { backgroundColor: C.success }]} />
+              <Text style={[s.routeLabel, { textAlign: 'right' }]} numberOfLines={1}>{item.route.toLabel || '—'}</Text>
+            </View>
           </View>
         )}
         {item.route?.distance_km > 0 && (
-          <Text style={s.routeDist}>{item.route.distance_km.toFixed(0)} km  ·  {item.shippingOption === 'shared' ? 'LTL' : 'FTL'}</Text>
+          <View style={s.routeMeta}>
+            <Text style={s.routeMetaTxt}>
+              📍 {item.route.distance_km.toFixed(0)} km  ·  {item.shippingOption === 'shared' ? 'LTL — Shared' : 'FTL — Full Load'}
+            </Text>
+          </View>
         )}
 
         {/* Load bars */}
@@ -96,22 +119,34 @@ export default function BookingsScreen() {
             <View style={s.loadRow}>
               <Text style={s.loadLbl}>Volume</Text>
               <View style={s.barWrap}>
-                <View style={[s.bar, { width: `${Math.round(loadPct * 100)}%`, backgroundColor: loadPct > 0.85 ? C.danger : C.primary }]} />
+                <View style={[
+                  s.bar,
+                  { width: `${Math.round(loadPct * 100)}%` },
+                  { backgroundColor: loadPct > 0.85 ? C.danger : C.primary },
+                ]} />
               </View>
-              <Text style={s.loadPct}>{Math.round(loadPct * 100)}%</Text>
+              <Text style={[s.loadPct, { color: loadPct > 0.85 ? C.danger : C.text2 }]}>
+                {Math.round(loadPct * 100)}%
+              </Text>
             </View>
             <View style={s.loadRow}>
               <Text style={s.loadLbl}>Weight</Text>
               <View style={s.barWrap}>
-                <View style={[s.bar, { width: `${Math.round(wtPct * 100)}%`, backgroundColor: wtPct > 0.85 ? C.danger : C.success }]} />
+                <View style={[
+                  s.bar,
+                  { width: `${Math.round(wtPct * 100)}%` },
+                  { backgroundColor: wtPct > 0.85 ? C.danger : C.success },
+                ]} />
               </View>
-              <Text style={s.loadPct}>{Math.round(wtPct * 100)}%</Text>
+              <Text style={[s.loadPct, { color: wtPct > 0.85 ? C.danger : C.text2 }]}>
+                {Math.round(wtPct * 100)}%
+              </Text>
             </View>
           </View>
         )}
 
-        {/* Footer */}
-        {status === 'active' && (
+        {/* Cancel */}
+        {statusKey === 'active' && (
           <TouchableOpacity style={s.cancelBtn} onPress={() => cancelBooking(item.id)}>
             <Text style={s.cancelTxt}>Cancel Booking</Text>
           </TouchableOpacity>
@@ -127,10 +162,12 @@ export default function BookingsScreen() {
       keyExtractor={b => String(b.id)}
       renderItem={renderItem}
       contentContainerStyle={s.list}
-      refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={C.primary} />}
+      refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={C.primaryL} />}
       ListEmptyComponent={
         <View style={s.empty}>
-          <Text style={s.emptyIcon}>📋</Text>
+          <View style={s.emptyIconWrap}>
+            <Text style={s.emptyIcon}>📋</Text>
+          </View>
           <Text style={s.emptyTitle}>No bookings yet</Text>
           <Text style={s.emptyHint}>Confirmed bookings will appear here.</Text>
         </View>
@@ -141,39 +178,76 @@ export default function BookingsScreen() {
 
 const s = StyleSheet.create({
   bg:     { flex: 1, backgroundColor: C.bg },
-  list:   { padding: 14, paddingBottom: 24 },
-  center: { flex: 1, justifyContent: 'center', alignItems: 'center' },
+  list:   { padding: 14, paddingBottom: 28 },
+  center: { flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: C.bg },
 
+  loadingTxt: { marginTop: 14, fontSize: 13, color: C.text2, fontWeight: '600' },
+
+  /* Card */
   card: {
-    backgroundColor: C.surface, borderRadius: 14, borderWidth: 1, borderColor: C.border,
-    marginBottom: 12, overflow: 'hidden',
-    shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.07, shadowRadius: 6, elevation: 2,
+    backgroundColor: C.surface, borderRadius: 18, borderWidth: 1, borderColor: C.border,
+    marginBottom: 14, overflow: 'hidden',
+    ...shadow.sm,
   },
-  cardHead:  { flexDirection: 'row', alignItems: 'flex-start', padding: 14, paddingBottom: 10 },
-  truckName: { fontSize: 14, fontWeight: '900', color: C.text, marginBottom: 2 },
-  cardDate:  { fontSize: 11, color: C.text2 },
+  cardAccent: { height: 4 },
+  cardHead:   { flexDirection: 'row', alignItems: 'flex-start', padding: 16, paddingBottom: 10 },
+  truckName:  { fontSize: 15, fontWeight: '900', color: C.text, marginBottom: 3 },
+  cardDate:   { fontSize: 11, color: C.text2, fontWeight: '600' },
 
-  statusBadge: { borderRadius: 20, paddingHorizontal: 10, paddingVertical: 4, marginLeft: 8 },
-  statusTxt:   { fontSize: 11, fontWeight: '800' },
+  statusBadge: {
+    flexDirection: 'row', alignItems: 'center', gap: 5,
+    borderRadius: 20, paddingHorizontal: 10, paddingVertical: 5,
+    borderWidth: 1, marginLeft: 10,
+  },
+  statusDot: { width: 6, height: 6, borderRadius: 3 },
+  statusTxt: { fontSize: 11, fontWeight: '800' },
 
-  routeRow:  { flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: 14, marginBottom: 2 },
-  routeFrom: { fontSize: 12, fontWeight: '700', color: C.text, flex: 1 },
-  routeArrow:{ fontSize: 12, color: C.text2 },
-  routeTo:   { fontSize: 12, fontWeight: '700', color: C.text, flex: 1, textAlign: 'right' },
-  routeDist: { fontSize: 11, color: C.text2, paddingHorizontal: 14, marginBottom: 10 },
+  /* Route */
+  routeRow: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 16, marginBottom: 6, gap: 8 },
+  routeEndpoint: { flex: 1 },
+  routeDotFrom:  { width: 8, height: 8, borderRadius: 4, marginBottom: 4 },
+  routeLabel:    { fontSize: 12, fontWeight: '700', color: C.text },
+  routeLine:     { alignItems: 'center', justifyContent: 'center', paddingHorizontal: 4 },
+  routeLineDash: { height: 1, width: 20, backgroundColor: C.border },
+  routeArrow:    { fontSize: 11, color: C.text3, marginTop: 2 },
+  routeMeta:     { paddingHorizontal: 16, marginBottom: 10 },
+  routeMetaTxt:  { fontSize: 11, color: C.text2, fontWeight: '600' },
 
-  loadSection: { paddingHorizontal: 14, paddingBottom: 10, gap: 6 },
-  loadRow:     { flexDirection: 'row', alignItems: 'center', gap: 8 },
-  loadLbl:     { fontSize: 10, fontWeight: '700', color: C.text2, width: 46, textTransform: 'uppercase' },
-  barWrap:     { flex: 1, height: 6, backgroundColor: C.border, borderRadius: 3, overflow: 'hidden' },
-  bar:         { height: '100%', borderRadius: 3 },
-  loadPct:     { fontSize: 10, fontWeight: '800', color: C.text2, width: 28, textAlign: 'right' },
+  /* Load bars */
+  loadSection: {
+    paddingHorizontal: 16, paddingBottom: 12, gap: 8,
+    borderTopWidth: 1, borderTopColor: C.borderLight, paddingTop: 10,
+  },
+  loadRow:  { flexDirection: 'row', alignItems: 'center', gap: 10 },
+  loadLbl:  {
+    fontSize: 10, fontWeight: '800', color: C.text3,
+    width: 48, textTransform: 'uppercase', letterSpacing: 0.3,
+  },
+  barWrap: {
+    flex: 1, height: 7, backgroundColor: C.surface3,
+    borderRadius: 4, overflow: 'hidden',
+  },
+  bar:     { height: '100%', borderRadius: 4 },
+  loadPct: { fontSize: 10, fontWeight: '800', width: 30, textAlign: 'right' },
 
-  cancelBtn:  { margin: 12, marginTop: 4, borderWidth: 1, borderColor: '#fecaca', borderRadius: 8, paddingVertical: 8, alignItems: 'center' },
-  cancelTxt:  { fontSize: 12, fontWeight: '700', color: C.danger },
+  /* Cancel */
+  cancelBtn: {
+    margin: 14, marginTop: 4,
+    borderWidth: 1, borderColor: '#fca5a5', borderRadius: 10,
+    paddingVertical: 10, alignItems: 'center',
+    backgroundColor: '#fff5f5',
+  },
+  cancelTxt: { fontSize: 12, fontWeight: '800', color: C.danger },
 
-  empty:      { alignItems: 'center', paddingVertical: 60 },
-  emptyIcon:  { fontSize: 48, marginBottom: 14 },
-  emptyTitle: { fontSize: 15, fontWeight: '800', color: C.text, marginBottom: 6 },
+  /* Empty */
+  empty:       { alignItems: 'center', paddingVertical: 72 },
+  emptyIconWrap: {
+    width: 80, height: 80, borderRadius: 40,
+    backgroundColor: C.surface, borderWidth: 1, borderColor: C.border,
+    alignItems: 'center', justifyContent: 'center', marginBottom: 16,
+    ...shadow.sm,
+  },
+  emptyIcon:  { fontSize: 36 },
+  emptyTitle: { fontSize: 16, fontWeight: '900', color: C.text, marginBottom: 6 },
   emptyHint:  { fontSize: 12, color: C.text2 },
 });

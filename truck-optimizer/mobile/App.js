@@ -3,7 +3,7 @@ import { NavigationContainer } from '@react-navigation/native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { SafeAreaProvider, useSafeAreaInsets } from 'react-native-safe-area-context';
-import { Text, View, TouchableOpacity, ActivityIndicator } from 'react-native';
+import { Text, View, TouchableOpacity, ActivityIndicator, StyleSheet } from 'react-native';
 
 import AuthScreen            from './src/screens/AuthScreen';
 import DashboardScreen       from './src/screens/DashboardScreen';
@@ -29,22 +29,21 @@ const CustStack = createNativeStackNavigator();
 const Tab       = createBottomTabNavigator();
 
 const HEADER = {
-  headerStyle:      { backgroundColor: '#0c1f40' },
-  headerTintColor:  '#f1f5f9',
-  headerTitleStyle: { fontWeight: '900', fontSize: 17, letterSpacing: -0.3 },
+  headerStyle:         { backgroundColor: '#0c1f40' },
+  headerTintColor:     '#f1f5f9',
+  headerTitleStyle:    { fontWeight: '900', fontSize: 17, letterSpacing: -0.3 },
   headerShadowVisible: false,
 };
 
 function SignOutBtn() {
   const { logout } = useAuth();
   return (
-    <TouchableOpacity onPress={logout} style={{ marginRight: 16 }}>
-      <Text style={{ color: '#94a3b8', fontSize: 12, fontWeight: '700' }}>Sign Out</Text>
+    <TouchableOpacity onPress={logout} style={ls.signOutBtn}>
+      <Text style={ls.signOutTxt}>Sign Out</Text>
     </TouchableOpacity>
   );
 }
 
-/* Customers needs its own stack so Pay Now works */
 function CustomersStack() {
   return (
     <CustStack.Navigator screenOptions={{ ...HEADER, headerRight: () => <SignOutBtn /> }}>
@@ -56,49 +55,57 @@ function CustomersStack() {
   );
 }
 
-/* Placeholder — New Booking tab press is intercepted before showing this */
 function NewBookingPlaceholder() {
-  return <View style={{ flex: 1, backgroundColor: '#eef2f7' }} />;
+  return <View style={{ flex: 1, backgroundColor: '#f0f4f8' }} />;
 }
 
-const ICON = { Home: '🏠', Bookings: '📋', New: '🚛', Admin: '⚙️', Customers: '👥' };
+const TAB_CONFIG = {
+  Home:      { icon: '🏠', label: 'Home' },
+  Bookings:  { icon: '📋', label: 'Bookings' },
+  New:       { icon: '🚛', label: 'New' },
+  Admin:     { icon: '⚙️', label: 'Fleet' },
+  Customers: { icon: '👥', label: 'Clients' },
+};
 
-/* ── 4 real tabs + 1 intercepted "New Booking" tab ─────────────── */
 function MainTabs() {
   const insets = useSafeAreaInsets();
   return (
     <Tab.Navigator
       screenOptions={({ route }) => ({
-        tabBarIcon: ({ focused }) => (
-          <Text style={{ fontSize: 22, opacity: focused ? 1 : 0.7 }}>
-            {ICON[route.name]}
-          </Text>
-        ),
+        tabBarIcon: ({ focused }) => {
+          const cfg = TAB_CONFIG[route.name];
+          return (
+            <View style={[ls.tabIconWrap, focused && ls.tabIconWrapActive]}>
+              <Text style={[ls.tabIcon, { opacity: focused ? 1 : 0.65 }]}>
+                {cfg?.icon}
+              </Text>
+            </View>
+          );
+        },
         tabBarActiveTintColor:   '#60a5fa',
-        tabBarInactiveTintColor: '#94a3b8',
+        tabBarInactiveTintColor: '#64748b',
         tabBarHideOnKeyboard:    true,
         tabBarStyle: {
           backgroundColor: '#0c1f40',
-          borderTopColor:  '#1e3a5f',
+          borderTopColor:  'rgba(255,255,255,0.07)',
           borderTopWidth:  1,
           paddingBottom:   Math.max(insets.bottom, 8),
-          paddingTop:      6,
-          height:          60 + Math.max(insets.bottom, 8),
+          paddingTop:      8,
+          height:          64 + Math.max(insets.bottom, 8),
         },
-        tabBarLabelStyle: { fontSize: 11, fontWeight: '700' },
+        tabBarLabelStyle: { fontSize: 10, fontWeight: '700', letterSpacing: 0.2, marginTop: 2 },
         ...HEADER,
         headerRight: () => <SignOutBtn />,
       })}
     >
       <Tab.Screen name="Home"      component={DashboardScreen}
-        options={{ title: '🚛 Dashboard', tabBarLabel: 'Home' }} />
+        options={{ title: '🚛 Dashboard', tabBarLabel: TAB_CONFIG.Home.label }} />
 
       <Tab.Screen name="Bookings"  component={BookingsScreen}
-        options={{ title: '📋 Bookings' }} />
+        options={{ title: '📋 Bookings', tabBarLabel: TAB_CONFIG.Bookings.label }} />
 
-      {/* Intercept press → push wizard onto root stack */}
       <Tab.Screen name="New"       component={NewBookingPlaceholder}
-        options={{ tabBarLabel: 'New Booking' }}
+        options={{ tabBarLabel: TAB_CONFIG.New.label }}
         listeners={({ navigation }) => ({
           tabPress: (e) => {
             e.preventDefault();
@@ -108,23 +115,28 @@ function MainTabs() {
       />
 
       <Tab.Screen name="Admin"     component={AdminScreen}
-        options={{ title: '⚙️ Fleet & Carriers', tabBarLabel: 'Admin' }} />
+        options={{ title: '⚙️ Fleet & Carriers', tabBarLabel: TAB_CONFIG.Admin.label }} />
 
       <Tab.Screen name="Customers" component={CustomersStack}
-        options={{ tabBarLabel: 'Customers', headerShown: false }} />
+        options={{ tabBarLabel: TAB_CONFIG.Customers.label, headerShown: false }} />
     </Tab.Navigator>
   );
 }
 
-/* ── Root: Tabs + wizard screens as siblings ────────────────────── */
 function AppNavigator() {
   const { user, loading } = useAuth();
 
   if (loading) {
     return (
-      <View style={{ flex: 1, backgroundColor: '#0c1f40', alignItems: 'center', justifyContent: 'center' }}>
-        <Text style={{ fontSize: 40, marginBottom: 16 }}>🚛</Text>
-        <ActivityIndicator color="#60a5fa" size="large" />
+      <View style={ls.splash}>
+        <View style={ls.splashCircle1} pointerEvents="none" />
+        <View style={ls.splashCircle2} pointerEvents="none" />
+        <View style={ls.splashLogoWrap}>
+          <Text style={{ fontSize: 46 }}>🚛</Text>
+        </View>
+        <Text style={ls.splashTitle}>Load Optimizer</Text>
+        <Text style={ls.splashSub}>Intelligent Cargo Management</Text>
+        <ActivityIndicator color="#60a5fa" size="large" style={{ marginTop: 36 }} />
       </View>
     );
   }
@@ -135,11 +147,8 @@ function AppNavigator() {
     <WizardProvider>
       <NavigationContainer>
         <RootStack.Navigator screenOptions={{ headerShown: false }}>
-
-          {/* Tabs — always visible unless wizard is open */}
           <RootStack.Screen name="Tabs" component={MainTabs} />
 
-          {/* Wizard — slides on top of tabs */}
           <RootStack.Group screenOptions={{
             headerShown: true, ...HEADER,
             headerRight: () => <SignOutBtn />,
@@ -147,7 +156,7 @@ function AppNavigator() {
             <RootStack.Screen name="Location"    component={LocationScreen}
               options={{ title: '🚛 New Booking' }} />
             <RootStack.Screen name="Customer"    component={CustomerScreen}
-              options={{ title: '👤 Customers' }} />
+              options={{ title: '👤 Select Customer' }} />
             <RootStack.Screen name="AddCargo"    component={AddCargoScreen}
               options={{ title: '📦 Add Cargo' }} />
             <RootStack.Screen name="ReviewCargo" component={ReviewCargoScreen}
@@ -163,7 +172,6 @@ function AppNavigator() {
             <RootStack.Screen name="Viz3D"       component={Viz3DScreen}
               options={{ title: '🧊 3D Load View' }} />
           </RootStack.Group>
-
         </RootStack.Navigator>
       </NavigationContainer>
     </WizardProvider>
@@ -179,3 +187,43 @@ export default function App() {
     </SafeAreaProvider>
   );
 }
+
+const ls = StyleSheet.create({
+  /* Splash / Loading */
+  splash: {
+    flex: 1, backgroundColor: '#0c1f40',
+    alignItems: 'center', justifyContent: 'center',
+    overflow: 'hidden',
+  },
+  splashCircle1: {
+    position: 'absolute', width: 340, height: 340, borderRadius: 170,
+    backgroundColor: 'rgba(37,99,235,0.13)', top: -110, right: -90,
+  },
+  splashCircle2: {
+    position: 'absolute', width: 240, height: 240, borderRadius: 120,
+    backgroundColor: 'rgba(124,58,237,0.09)', bottom: 60, left: -90,
+  },
+  splashLogoWrap: {
+    width: 92, height: 92, borderRadius: 46,
+    backgroundColor: 'rgba(37,99,235,0.22)',
+    borderWidth: 1.5, borderColor: 'rgba(96,165,250,0.38)',
+    alignItems: 'center', justifyContent: 'center', marginBottom: 20,
+    shadowColor: '#3b82f6', shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3, shadowRadius: 12,
+  },
+  splashTitle: { fontSize: 28, fontWeight: '900', color: '#f1f5f9', letterSpacing: -0.8, marginBottom: 6 },
+  splashSub:   { fontSize: 13, color: '#64748b', letterSpacing: 0.4 },
+
+  /* Sign out button */
+  signOutBtn: {
+    marginRight: 14, backgroundColor: 'rgba(255,255,255,0.08)',
+    paddingHorizontal: 12, paddingVertical: 6, borderRadius: 8,
+    borderWidth: 1, borderColor: 'rgba(255,255,255,0.1)',
+  },
+  signOutTxt: { color: '#94a3b8', fontSize: 12, fontWeight: '700' },
+
+  /* Tab bar icons */
+  tabIconWrap:       { alignItems: 'center', justifyContent: 'center' },
+  tabIconWrapActive: {},
+  tabIcon:           { fontSize: 22 },
+});
