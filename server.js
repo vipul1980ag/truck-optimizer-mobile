@@ -957,5 +957,5 @@ Give specific recommendations: best truck match, stacking order, fragile item pl
   }
 });
 
-const PORT = process.env.PORT || 3000;
+const PORT = process.env.PORT || 8081;
 app.listen(PORT, () => console.log(`Truck Optimizer → http://localhost:${PORT}`));
