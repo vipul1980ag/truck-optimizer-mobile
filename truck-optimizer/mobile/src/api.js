@@ -1,7 +1,7 @@
 // In development: set BASE_URL to your computer's local IP (e.g. http://192.168.1.x:3000)
 // In production:  EXPO_PUBLIC_API_URL is injected automatically via eas.json env vars
 export const BASE_URL =
-  process.env.EXPO_PUBLIC_API_URL || 'https://truck-capacity-optimizer.onrender.com';
+  process.env.EXPO_PUBLIC_API_URL || 'https://toc.dnw-ai.com';
 
 async function request(method, path, body, token) {
   const opts = {
