@@ -3,260 +3,730 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Truck Load Optimizer</title>
-<link rel="stylesheet" href="style.css">
-<script>
-/* Run before body renders to avoid flash */
-(function(){
-  if(localStorage.getItem('theme')==='light') document.documentElement.classList.add('light');
-})();
-</script>
+<title>Truck Load Optimizer — Customer Portal</title>
+<link rel="stylesheet" href="portal.css">
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
+<script src="https://cdn.sheetjs.com/xlsx-0.20.3/package/dist/xlsx.full.min.js"></script>
 </head>
 <body>
 
-<div class="header">
-  <span class="header-icon">🚛</span>
-  <div>
-    <h1>Truck Load Optimizer</h1>
-    <div class="sub">Multi-carrier · multi-customer · route cost intelligence · 3D bin packing</div>
+<!-- ── Navigation ── -->
+<nav class="nav">
+  <div class="nav-left">
+    <span class="nav-icon">🚛</span>
+    <span class="nav-title">Load Optimizer</span>
   </div>
-  <label class="unit-toggle">
-    <input type="checkbox" id="metricToggle" onchange="toggleUnits()"> Metric (m / kg)
-  </label>
-  <button class="btn-theme" id="theme-btn" onclick="toggleTheme()" title="Toggle light / dark mode"></button>
-  <button class="btn-print" onclick="printReport()" title="Export to PDF via browser print dialog">🖨 Print / PDF</button>
-</div>
-
-<!-- Shown only when printing -->
-<div class="print-only" id="print-header" style="padding:8px 0 12px; border-bottom:2px solid #e2e8f0; margin-bottom:14px;">
-  <div style="font-size:10pt;color:#64748b;margin-top:3px" id="print-meta"></div>
-</div>
-
-<div class="layout">
-  <!-- ══ SIDEBAR ══ -->
-  <div class="sidebar">
-    <div class="tabs">
-      <button class="tab-btn active" id="tab-btn-trucks"    onclick="showTab('trucks')">🚛 Fleet</button>
-      <button class="tab-btn"        id="tab-btn-carriers"  onclick="showTab('carriers')">🏢 Carriers</button>
-      <button class="tab-btn"        id="tab-btn-customers" onclick="showTab('customers')">👥 Customers</button>
-      <button class="tab-btn"        id="tab-btn-items"     onclick="showTab('items')">📦 Items</button>
-      <button class="tab-btn"        id="tab-btn-rates"     onclick="showTab('rates')">💲 Rates</button>
+  <div class="nav-right">
+    <button id="nav-admin-btn" class="nav-auth-btn" onclick="toggleAdminPanel()">⚙ Admin</button>
+    <a href="/advanced" class="nav-link" target="_blank">⚙ Advanced</a>
+    <button id="nav-login-btn" class="nav-auth-btn" onclick="openAuthModal()">Login</button>
+    <div id="nav-user" style="display:none" class="nav-user-row">
+      <span id="nav-user-email" class="nav-user-email"></span>
+      <button class="nav-logout-btn" onclick="doLogout()">Sign Out</button>
     </div>
+  </div>
+</nav>
 
-    <!-- ── FLEET TAB ── -->
-    <div class="tab-panel active" id="tab-trucks">
-      <div class="add-form">
-        <div class="add-form-title">+ Add Own-Fleet Truck</div>
-        <div class="form-grid">
-          <div class="form-group full"><label>Name</label>
-            <input type="text" id="t-name" value="Semi Truck 1"></div>
-          <div class="form-group"><label id="lbl-tl">Length (ft)</label>
-            <input type="number" id="t-length" value="53" min="0.5" step="0.5"></div>
-          <div class="form-group"><label id="lbl-tw">Width (ft)</label>
-            <input type="number" id="t-width" value="8.5" min="0.5" step="0.5"></div>
-          <div class="form-group"><label id="lbl-th">Height (ft)</label>
-            <input type="number" id="t-height" value="9" min="0.5" step="0.5"></div>
-          <div class="form-group"><label id="lbl-tmw">Max Weight (lbs)</label>
-            <input type="number" id="t-maxwt" value="44000" min="1"></div>
-          <div class="form-group"><label>Base Rate ($)</label>
-            <input type="number" id="t-baserate" value="600" min="0" step="10" placeholder="$ per trip"></div>
-          <div class="form-group"><label>Rate / Mile ($)</label>
-            <input type="number" id="t-rpermile" value="3.50" min="0" step="0.05" placeholder="$ / mile"></div>
+<!-- ── Two-column portal ── -->
+<div class="portal-two-col">
+
+  <!-- Lock overlay — spans both columns -->
+  <div id="cargo-lock" class="cargo-lock">
+    <div class="cargo-lock-icon">🔒</div>
+    <div class="cargo-lock-title">Sign in to add cargo items</div>
+    <div class="cargo-lock-sub">Create a free account or log in to get started</div>
+    <button class="cargo-lock-btn" onclick="openAuthModal()">Login / Register</button>
+  </div>
+
+  <!-- LEFT: Add Cargo form -->
+  <div class="portal-col-left">
+    <div class="card" id="cargo-card">
+      <div class="card-head">📦 Add Cargo Item</div>
+
+      <!-- Step 1: Category picker -->
+      <div id="p-step1">
+        <div class="cat-pick-row">
+          <button class="cat-pick-btn" onclick="portalSetCategory('household')">
+            <span class="cat-pick-icon">🏠</span>
+            <span>Household</span>
+            <small>Furniture, appliances, boxes</small>
+          </button>
+          <button class="cat-pick-btn" onclick="portalSetCategory('industrial')">
+            <span class="cat-pick-icon">🏭</span>
+            <span>Industrial / Business</span>
+            <small>Pallets, machinery, equipment</small>
+          </button>
         </div>
-        <button class="btn btn-primary btn-full" onclick="addTruck()">Add Truck</button>
+        <button class="scan-photo-btn" onclick="openPhotoScan()">
+          <span>📷</span> Scan Photo — AI identifies items &amp; sizes
+        </button>
+        <input type="file" id="scan-file-input" accept="image/*" capture="environment" style="display:none" onchange="handlePhotoFile(this)">
       </div>
-      <div id="truck-list"></div>
-    </div>
 
-    <!-- ── CARRIERS TAB ── -->
-    <div class="tab-panel" id="tab-carriers">
-      <div class="add-form">
-        <div class="add-form-title">+ Add External Carrier</div>
-        <div class="form-grid">
-          <div class="form-group full"><label>Carrier Name</label>
-            <input type="text" id="ca-name" placeholder="e.g. FastFreight LLC"></div>
-        </div>
-        <button class="btn btn-primary btn-full" onclick="addCarrier()">Add Carrier</button>
-      </div>
-      <div style="font-size:11px;color:var(--text2);margin-bottom:10px;padding:7px 9px;background:rgba(139,92,246,0.07);border-radius:6px;border:1px solid rgba(139,92,246,0.2)">
-        ℹ️ External carriers appear in route cost comparisons. Add their truck types and rates to see if they beat your own fleet.
-      </div>
-      <div id="carrier-list"></div>
-    </div>
-
-    <!-- ── CUSTOMERS TAB ── -->
-    <div class="tab-panel" id="tab-customers">
-      <div class="add-form">
-        <div class="add-form-title">+ Add Customer</div>
-        <div class="form-grid">
-          <div class="form-group full"><label>Customer Name</label>
-            <input type="text" id="c-name" placeholder="e.g. Acme Corp"></div>
-          <div class="form-group"><label>Delivery Stop # <span style="font-weight:400;text-transform:none;font-size:10px">(1=first)</span></label>
-            <input type="number" id="c-stop" value="1" min="1" step="1"></div>
-          <div class="form-group"><label>Color</label>
-            <input type="color" id="c-color" value="#3b82f6" style="height:34px;padding:2px 4px;cursor:pointer"></div>
-          <div class="form-group full"><label>Destination Zone / City</label>
-            <input type="text" id="c-zone" placeholder="e.g. Chicago Metro"></div>
-          <div class="form-group"><label id="lbl-cdist">Distance (mi)</label>
-            <input type="number" id="c-distance" value="0" min="0" step="10" placeholder="Miles from depot"></div>
-          <div class="form-group"><label style="visibility:hidden">x</label>
-            <div style="font-size:10px;color:var(--text2);padding-top:8px">From depot to this zone</div>
-          </div>
-          <div class="form-group"><label>Payment Terms</label>
-            <select id="c-pay-terms">
-              <option value="cod">COD</option>
-              <option value="net30" selected>Net 30</option>
-              <option value="net60">Net 60</option>
-              <option value="net90">Net 90</option>
-            </select></div>
-          <div class="form-group"><label>Payment Method</label>
-            <select id="c-pay-method">
-              <option value="invoice" selected>Invoice</option>
-              <option value="bank">Bank Transfer</option>
-              <option value="card">Credit Card</option>
-              <option value="check">Check</option>
-              <option value="cod">COD</option>
-            </select></div>
-          <div class="form-group"><label>Invoice Amount ($)</label>
-            <input type="number" id="c-invoice" value="0" min="0" step="50" placeholder="0"></div>
-        </div>
-        <button class="btn btn-primary btn-full" onclick="addCustomer()">Add Customer</button>
-      </div>
-      <div style="font-size:11px;color:var(--text2);margin-bottom:10px;padding:7px 9px;background:rgba(59,130,246,0.07);border-radius:6px;border:1px solid rgba(59,130,246,0.2)">
-        ℹ️ Stop 1 = first drop-off (near truck doors). Customers with the same <strong>Zone</strong> are grouped for carrier cost comparison and consolidation analysis.
-      </div>
-      <div id="customer-list"></div>
-    </div>
-
-    <!-- ── ITEMS TAB ── -->
-    <div class="tab-panel" id="tab-items">
-      <div class="add-form">
-        <div class="add-form-title">+ Add Item Type</div>
-        <div class="form-grid">
-          <div class="form-group full"><label>Item Name</label>
-            <input type="text" id="i-name" placeholder="e.g. Pallet A"></div>
-          <div class="form-group full"><label>Customer</label>
-            <select id="i-customer"><option value="">— Unassigned —</option></select></div>
-          <div class="form-group"><label id="lbl-il">Length (ft)</label>
-            <input type="number" id="i-length" value="4" min="0.1" step="0.5"></div>
-          <div class="form-group"><label id="lbl-iw">Width (ft)</label>
-            <input type="number" id="i-width" value="4" min="0.1" step="0.5"></div>
-          <div class="form-group"><label id="lbl-ih">Height (ft)</label>
-            <input type="number" id="i-height" value="4" min="0.1" step="0.5"></div>
-          <div class="form-group"><label id="lbl-iwt">Weight (lbs)</label>
-            <input type="number" id="i-weight" value="500" min="0" step="1"></div>
-          <div class="form-group"><label>Quantity</label>
-            <input type="number" id="i-qty" value="10" min="1"></div>
-          <div class="form-group full"><label class="chk-label">
-            <input type="checkbox" id="i-rotate" checked> Allow rotation (all orientations)
-          </label></div>
-          <div class="form-group full"><label class="chk-label">
-            <input type="checkbox" id="i-stackable" checked> Stackable (other items can be placed on top)
-          </label></div>
-        </div>
-        <button class="btn btn-primary btn-full" onclick="addItem()">Add Item</button>
-      </div>
-      <div id="item-catalog"></div>
-      <div id="item-list"></div>
-    </div>
-
-    <!-- ── RATES TAB ── -->
-    <div class="tab-panel" id="tab-rates">
-      <div class="add-form">
-        <div class="add-form-title">+ Add Rate Override</div>
-        <div class="form-grid">
-          <div class="form-group full">
-            <label>Origin City <span style="font-weight:400;text-transform:none;font-size:10px">(optional — blank = any city)</span></label>
-            <input type="text" id="r-city" placeholder="e.g. Chicago">
-          </div>
-          <div class="form-group full">
-            <label>Carrier <span style="font-weight:400;text-transform:none;font-size:10px">(optional)</span></label>
-            <select id="r-carrier" onchange="updateRateTruckDropdown()">
-              <option value="">— Any carrier (incl. own fleet) —</option>
-              <option value="own">Own Fleet</option>
+      <!-- Step 2: Item select + dims -->
+      <div id="p-step2" style="display:none">
+        <div class="field-row" style="margin-bottom:10px">
+          <div class="field">
+            <label>Select Item</label>
+            <select id="p-item-select" onchange="portalPickItem(this.value)">
+              <option value="">— Choose an item —</option>
             </select>
           </div>
-          <div class="form-group full">
-            <label>Truck <span style="font-weight:400;text-transform:none;font-size:10px">(optional)</span></label>
-            <select id="r-truck">
-              <option value="">— Any truck —</option>
-            </select>
-          </div>
-          <div class="form-group full">
-            <label>Rate per km ($/km)</label>
-            <input type="number" id="r-rate-per-km" value="2.50" min="0" step="0.01">
+          <div class="field">
+            <label>&nbsp;</label>
+            <button class="cat-back-btn" onclick="portalResetCategory()">← Change Category</button>
           </div>
         </div>
-        <button class="btn btn-primary btn-full" onclick="addRate()">Add Rate</button>
-      </div>
-      <div style="font-size:11px;color:var(--text2);margin-bottom:10px;padding:7px 9px;background:rgba(234,179,8,0.07);border-radius:6px;border:1px solid rgba(234,179,8,0.2)">
-        💲 Rate overrides replace the default base + per-mile cost for matching city / carrier / truck combinations.
-      </div>
-      <div id="rate-list"></div>
-    </div>
+        <div class="custom-item-hint">
+          Item not in the list?
+          <button class="custom-item-btn" onclick="portalEnterCustomItem()">✏ Enter custom item</button>
+          <button class="custom-item-btn ai-autofill-btn" onclick="aiAutoFill()" title="Describe your item and AI will fill the fields">🤖 AI Auto-Fill</button>
+        </div>
+        <div class="field" style="margin-bottom:10px">
+          <label>Item Name <small style="font-weight:400;color:var(--text2);text-transform:none">(editable)</small></label>
+          <input type="text" id="p-name" placeholder="e.g. Sofa (3-seat)">
+        </div>
+        <div class="dims-row">
+          <div class="field"><label>Length (ft)</label><input type="number" id="p-length" value="4" min="0.1" step="0.5"></div>
+          <div class="field"><label>Width (ft)</label><input type="number" id="p-width"  value="4" min="0.1" step="0.5"></div>
+          <div class="field"><label>Height (ft)</label><input type="number" id="p-height" value="4" min="0.1" step="0.5"></div>
+          <div class="field"><label>Item Wt (lbs)</label><input type="number" id="p-weight" value="500" min="0"></div>
+          <div class="field"><label>Pkg Wt (lbs)</label><input type="number" id="p-pkg-weight" value="0" min="0"></div>
+          <div class="field"><label>Quantity</label><input type="number" id="p-qty" value="1" min="1"></div>
+          <div class="field field-btn"><label>&nbsp;</label>
+            <button class="btn-add" onclick="portalAddItem()">＋ Add</button>
+          </div>
+        </div>
 
-    <!-- ── Load Configuration ── -->
-    <div class="load-config-bar" id="load-config-bar">
-      <button class="load-config-toggle" onclick="toggleLoadConfig()">⚙ Load Configuration ▾</button>
-      <div class="load-config-panel" id="load-config-panel" style="display:none">
-        <div class="load-config-grid">
-          <div class="load-config-field">
-            <label class="lc-label">Stacking Axis Order</label>
-            <select id="lc-stack-axis" class="lc-select">
-              <option value="height_first">Height First (minimize stack height)</option>
-              <option value="length_first">Length First (fill along truck length)</option>
-              <option value="width_first">Width First (fill across truck width)</option>
-            </select>
-          </div>
-          <div class="load-config-field">
-            <label class="lc-label">Load Direction</label>
-            <select id="lc-load-from" class="lc-select">
-              <option value="back">Rear-to-Front (load through back door)</option>
-              <option value="front">Front-to-Rear (fill from cab end first)</option>
-            </select>
-          </div>
-          <div class="load-config-field">
-            <label class="lc-label">Sort Items By</label>
-            <select id="lc-sort-order" class="lc-select">
-              <option value="volume_desc">Largest Volume First</option>
-              <option value="weight_desc">Heaviest First</option>
-            </select>
-          </div>
-          <div class="load-config-field load-config-check">
-            <label class="chk-label">
-              <input type="checkbox" id="lc-center-mass"> Shift Mass to Center
-              <span style="font-size:10px;color:#64748b;display:block;margin-top:2px;">Balance cargo weight along truck length</span>
-            </label>
+        <!-- Stacking option -->
+        <div class="field stackable-row">
+          <label class="stackable-label">
+            <input type="checkbox" id="p-stackable" checked>
+            <span class="stackable-icon">📦</span>
+            <span class="stackable-text">Stackable — other items can be placed on top</span>
+          </label>
+        </div>
+
+        <!-- Handle with care -->
+        <div class="field stackable-row">
+          <label class="stackable-label">
+            <input type="checkbox" id="p-fragile">
+            <span class="stackable-icon">🔔</span>
+            <span class="stackable-text">Handle with care — fragile item</span>
+          </label>
+        </div>
+
+        <!-- DG Declaration -->
+        <div class="dg-section">
+          <label class="dg-toggle-label">
+            <input type="checkbox" id="p-is-dg" onchange="portalToggleDG()">
+            <span class="dg-toggle-icon">⚠</span>
+            <span class="dg-toggle-text">Dangerous Goods (DG)</span>
+          </label>
+          <div id="p-dg-fields" style="display:none">
+            <div class="field-row" style="margin-top:10px">
+              <div class="field">
+                <label>DG Class</label>
+                <select id="p-dg-class">
+                  <option value="">— Select DG Class —</option>
+                  <option>Class 1 — Explosives</option>
+                  <option>Class 2.1 — Flammable Gas</option>
+                  <option>Class 2.2 — Non-Flammable Gas</option>
+                  <option>Class 2.3 — Toxic Gas</option>
+                  <option>Class 3 — Flammable Liquid</option>
+                  <option>Class 4.1 — Flammable Solid</option>
+                  <option>Class 4.2 — Spontaneously Combustible</option>
+                  <option>Class 4.3 — Dangerous When Wet</option>
+                  <option>Class 5.1 — Oxidizer</option>
+                  <option>Class 5.2 — Organic Peroxide</option>
+                  <option>Class 6.1 — Toxic Substance</option>
+                  <option>Class 6.2 — Infectious Substance</option>
+                  <option>Class 7 — Radioactive</option>
+                  <option>Class 8 — Corrosive</option>
+                  <option>Class 9 — Miscellaneous DG</option>
+                </select>
+              </div>
+              <div class="field">
+                <label>Can combine with other items?</label>
+                <select id="p-dg-combine">
+                  <option value="true">Yes — can combine</option>
+                  <option value="false">No — must be isolated</option>
+                </select>
+              </div>
+            </div>
+            <div class="dg-truck-note">🚛 A DG-certified truck will be required for this shipment. A 15% DG surcharge applies.</div>
           </div>
         </div>
       </div>
     </div>
+    <div class="save-status" id="p-save-status" style="text-align:center;margin-top:8px;"></div>
+  </div>
 
-    <div class="opt-bar">
-      <div class="save-status" id="save-status"></div>
-      <div class="data-bar">
-        <button class="btn-data" onclick="exportJSON()" title="Download all data as a JSON file">📥 Export</button>
-        <label class="btn-data" title="Load data from a previously exported JSON file" style="cursor:pointer">
-          📂 Import<input type="file" accept=".json" onchange="importJSON(this)" style="display:none">
-        </label>
-        <button class="btn-data btn-data-danger" onclick="clearAll()" title="Clear all data and start fresh">🗑 Clear</button>
+  <!-- RIGHT: Cargo list -->
+  <div class="portal-col-right">
+    <div class="card cargo-list-card">
+      <div class="card-head">📋 Cargo List</div>
+
+      <!-- Summary strip (hidden when list is empty) -->
+      <div id="p-list-summary" class="list-summary-strip" style="display:none">
+        <div class="lss-cell"><span id="lss-types">0</span><small>Types</small></div>
+        <div class="lss-sep"></div>
+        <div class="lss-cell"><span id="lss-units">0</span><small>Units</small></div>
+        <div class="lss-sep"></div>
+        <div class="lss-cell"><span id="lss-weight">0</span><small>lbs</small></div>
       </div>
-      <div class="opt-counts" id="opt-counts">0 items · 0 trucks · 0 customers · 0 carriers</div>
-      <button class="btn-optimize" onclick="runOptimize()">⚡ Optimize &amp; Analyze Routes</button>
+
+      <!-- Item rows rendered by JS -->
+      <div id="p-item-list"></div>
+
+      <!-- Proceed button (hidden when list is empty) -->
+      <div id="p-proceed-bar" class="proceed-bar" style="display:none">
+        <div style="display:flex;gap:8px;">
+          <button class="btn-viz3d" onclick="openViz3DModal()">🧊 3D Load</button>
+          <button class="btn-proceed" style="flex:1;" onclick="openBookingModal()">Next: Choose Shipping →</button>
+        </div>
+      </div>
     </div>
   </div>
 
-  <!-- ══ MAIN CONTENT ══ -->
-  <div class="main" id="main">
-    <div class="empty-state" id="empty-state">
-      <div class="empty-icon">🚛</div>
-      <h3>Ready to Optimize</h3>
-      <p>Add fleet trucks, external carriers, customers (with zones), and items — then click <strong>Optimize &amp; Analyze Routes</strong>.</p>
+</div>
+
+<!-- ── Admin Panel ── -->
+<div id="admin-panel" class="admin-panel" style="display:none" onclick="adminPanelBackdropClick(event)">
+  <div class="admin-panel-inner">
+    <div class="admin-header">
+      <div class="admin-title">⚙ Admin Panel</div>
+      <div class="admin-stats">
+        <span class="admin-stat"><span id="s-trucks">0</span> Trucks</span>
+        <span class="admin-stat"><span id="s-carriers">0</span> Carriers</span>
+        <span class="admin-stat"><span id="s-customers">0</span> Customers</span>
+        <span class="admin-stat"><span id="s-units">0</span> Items</span>
+      </div>
+      <button class="bm-close" onclick="toggleAdminPanel()" title="Close">✕</button>
     </div>
-    <div id="results" style="display:none"></div>
+    <div class="admin-tabs">
+      <button class="admin-tab-btn active" onclick="showAdminTab('fleet')">🚛 Fleet</button>
+      <button class="admin-tab-btn" onclick="showAdminTab('customers')">👥 Customers</button>
+      <button class="admin-tab-btn" onclick="showAdminTab('bookings')">📋 Bookings</button>
+      <button class="admin-tab-btn" onclick="showAdminTab('import')">📥 Import</button>
+      <button class="admin-tab-btn" onclick="showAdminTab('rates')">💲 Rates</button>
+    </div>
+
+    <!-- Fleet Tab -->
+    <div id="tab-fleet" class="admin-tab-pane">
+      <div class="admin-form-card">
+        <div class="admin-form-title" id="tf-form-title">＋ Add Truck</div>
+        <div class="form-row">
+          <label>Name</label>
+          <input type="text" id="tf-name" placeholder="e.g. Semi Truck 2">
+        </div>
+        <div class="form-grid-3">
+          <div class="form-row"><label>Length (ft)</label><input type="number" id="tf-length" value="53" min="1"></div>
+          <div class="form-row"><label>Width (ft)</label><input type="number" id="tf-width" value="8.5" min="1"></div>
+          <div class="form-row"><label>Height (ft)</label><input type="number" id="tf-height" value="9" min="1"></div>
+        </div>
+        <div class="form-grid-3">
+          <div class="form-row"><label>Max Weight (lbs)</label><input type="number" id="tf-maxwt" value="44000" min="0"></div>
+          <div class="form-row"><label>Base Rate ($)</label><input type="number" id="tf-base-rate" value="600" min="0"></div>
+          <div class="form-row"><label>Rate/Mile ($/mi)</label><input type="number" id="tf-rate-per-mi" value="3.50" step="0.01" min="0"></div>
+        </div>
+        <div class="form-row">
+          <label>License Plate</label>
+          <input type="text" id="tf-plate" placeholder="e.g. ABC-1234" style="text-transform:uppercase">
+        </div>
+        <input type="hidden" id="tf-edit-id" value="">
+        <div style="display:flex;gap:8px;margin-top:12px;">
+          <button class="btn-save-truck" onclick="saveTruck()">Save Truck</button>
+          <button class="btn-cancel-truck" id="tf-cancel-btn" onclick="closeTruckForm()" style="display:none">Cancel</button>
+        </div>
+      </div>
+      <div id="p-fleet-list" class="admin-list"></div>
+    </div>
+
+    <!-- Customers Tab -->
+    <div id="tab-customers" class="admin-tab-pane" style="display:none">
+      <div id="p-customer-list" class="admin-list"></div>
+    </div>
+
+    <!-- Bookings Tab -->
+    <div id="tab-bookings" class="admin-tab-pane" style="display:none">
+      <div id="bookings-list" class="admin-list"></div>
+    </div>
+
+    <!-- Import Tab -->
+    <div id="tab-import" class="admin-tab-pane" style="display:none">
+
+      <!-- ── Trucks / Vehicles ── -->
+      <div class="import-section">
+        <div class="import-section-head">
+          <span class="import-section-title">🚛 Vehicles / Trucks</span>
+          <button class="btn-dl-template" onclick="downloadTemplate('trucks')">⬇ Template</button>
+        </div>
+        <p class="import-section-sub">Columns: <em>Name · Length (ft) · Width (ft) · Height (ft) · Max Weight (lbs) · Base Rate ($) · Rate/Mile ($/mi) · License Plate</em></p>
+        <div class="import-drop" id="import-drop-trucks" onclick="document.getElementById('import-file-trucks').click()" ondragover="importDragOver(event)" ondrop="importDrop(event,'trucks')">
+          <div class="import-drop-icon">📂</div>
+          <div class="import-drop-txt">Click to browse or drag &amp; drop an Excel / CSV file</div>
+          <input type="file" id="import-file-trucks" accept=".xlsx,.xls,.csv" style="display:none" onchange="handleImportFile('trucks',this)">
+        </div>
+        <div id="import-preview-trucks" class="import-preview" style="display:none">
+          <div class="import-preview-head">
+            <span id="import-count-trucks" class="import-count"></span>
+            <div style="display:flex;gap:8px;">
+              <button class="btn-import-confirm" onclick="confirmImport('trucks')">✓ Import</button>
+              <button class="btn-import-cancel" onclick="cancelImport('trucks')">✕ Clear</button>
+            </div>
+          </div>
+          <div class="import-table-wrap"><table id="import-table-trucks" class="import-table"></table></div>
+        </div>
+      </div>
+
+      <!-- ── Cargo Items ── -->
+      <div class="import-section">
+        <div class="import-section-head">
+          <span class="import-section-title">📦 Cargo Items</span>
+          <button class="btn-dl-template" onclick="downloadTemplate('items')">⬇ Template</button>
+        </div>
+        <p class="import-section-sub">Columns: <em>Name · Length (ft) · Width (ft) · Height (ft) · Weight (lbs) · Qty · Stackable · Dangerous Goods</em></p>
+        <div class="import-drop" id="import-drop-items" onclick="document.getElementById('import-file-items').click()" ondragover="importDragOver(event)" ondrop="importDrop(event,'items')">
+          <div class="import-drop-icon">📂</div>
+          <div class="import-drop-txt">Click to browse or drag &amp; drop an Excel / CSV file</div>
+          <input type="file" id="import-file-items" accept=".xlsx,.xls,.csv" style="display:none" onchange="handleImportFile('items',this)">
+        </div>
+        <div id="import-preview-items" class="import-preview" style="display:none">
+          <div class="import-preview-head">
+            <span id="import-count-items" class="import-count"></span>
+            <div style="display:flex;gap:8px;">
+              <button class="btn-import-confirm" onclick="confirmImport('items')">✓ Import</button>
+              <button class="btn-import-cancel" onclick="cancelImport('items')">✕ Clear</button>
+            </div>
+          </div>
+          <div class="import-table-wrap"><table id="import-table-items" class="import-table"></table></div>
+        </div>
+      </div>
+
+      <!-- ── Carriers / Shipping Partners ── -->
+      <div class="import-section">
+        <div class="import-section-head">
+          <span class="import-section-title">🤝 Carriers / Shipping Partners</span>
+          <button class="btn-dl-template" onclick="downloadTemplate('carriers')">⬇ Template</button>
+        </div>
+        <p class="import-section-sub">Columns: <em>Carrier Name · Truck Name · Length (ft) · Width (ft) · Height (ft) · Max Weight (lbs) · Base Rate ($) · Rate/Mile ($/mi)</em></p>
+        <div class="import-drop" id="import-drop-carriers" onclick="document.getElementById('import-file-carriers').click()" ondragover="importDragOver(event)" ondrop="importDrop(event,'carriers')">
+          <div class="import-drop-icon">📂</div>
+          <div class="import-drop-txt">Click to browse or drag &amp; drop an Excel / CSV file</div>
+          <input type="file" id="import-file-carriers" accept=".xlsx,.xls,.csv" style="display:none" onchange="handleImportFile('carriers',this)">
+        </div>
+        <div id="import-preview-carriers" class="import-preview" style="display:none">
+          <div class="import-preview-head">
+            <span id="import-count-carriers" class="import-count"></span>
+            <div style="display:flex;gap:8px;">
+              <button class="btn-import-confirm" onclick="confirmImport('carriers')">✓ Import</button>
+              <button class="btn-import-cancel" onclick="cancelImport('carriers')">✕ Clear</button>
+            </div>
+          </div>
+          <div class="import-table-wrap"><table id="import-table-carriers" class="import-table"></table></div>
+        </div>
+      </div>
+
+      <!-- ── Rate Overrides ── -->
+      <div class="import-section">
+        <div class="import-section-head">
+          <span class="import-section-title">💲 Rate Overrides</span>
+          <button class="btn-dl-template" onclick="downloadTemplate('rates')">⬇ Template</button>
+        </div>
+        <p class="import-section-sub">Columns: <em>City (optional) · Carrier (optional — "Any", "Own Fleet", or carrier name) · Truck (optional — truck name or blank) · Rate per km ($/km)</em></p>
+        <div class="import-drop" id="import-drop-rates" onclick="document.getElementById('import-file-rates').click()" ondragover="importDragOver(event)" ondrop="importDrop(event,'rates')">
+          <div class="import-drop-icon">📂</div>
+          <div class="import-drop-txt">Click to browse or drag &amp; drop an Excel / CSV file</div>
+          <input type="file" id="import-file-rates" accept=".xlsx,.xls,.csv" style="display:none" onchange="handleImportFile('rates',this)">
+        </div>
+        <div id="import-preview-rates" class="import-preview" style="display:none">
+          <div class="import-preview-head">
+            <span id="import-count-rates" class="import-count"></span>
+            <div style="display:flex;gap:8px;">
+              <button class="btn-import-confirm" onclick="confirmImport('rates')">✓ Import</button>
+              <button class="btn-import-cancel" onclick="cancelImport('rates')">✕ Clear</button>
+            </div>
+          </div>
+          <div class="import-table-wrap"><table id="import-table-rates" class="import-table"></table></div>
+        </div>
+      </div>
+
+    </div><!-- /tab-import -->
+
+    <!-- Rates Tab -->
+    <div id="tab-rates" class="admin-tab-pane" style="display:none">
+      <div class="admin-form-card">
+        <div class="admin-form-title" id="rf-form-title">＋ Add Rate</div>
+        <div class="form-row">
+          <label>Origin City <small style="font-weight:400;color:var(--text2)">(optional — blank = any city)</small></label>
+          <input type="text" id="rf-city" placeholder="e.g. Chicago">
+        </div>
+        <div class="form-row">
+          <label>Carrier <small style="font-weight:400;color:var(--text2)">(optional — blank = any carrier)</small></label>
+          <select id="rf-carrier" onchange="onRateCarrierChange()">
+            <option value="">— Any carrier (incl. own fleet) —</option>
+            <option value="own">Own Fleet</option>
+          </select>
+        </div>
+        <div class="form-row">
+          <label>Truck <small style="font-weight:400;color:var(--text2)">(optional — blank = any truck)</small></label>
+          <select id="rf-truck">
+            <option value="">— Any truck —</option>
+          </select>
+        </div>
+        <div class="form-row">
+          <label>Rate per km ($/km)</label>
+          <input type="number" id="rf-rate-per-km" value="2.50" step="0.01" min="0">
+        </div>
+        <input type="hidden" id="rf-edit-id" value="">
+        <div style="display:flex;gap:8px;margin-top:12px;">
+          <button class="btn-save-truck" onclick="saveRate()">Save Rate</button>
+          <button class="btn-cancel-truck" id="rf-cancel-btn" onclick="closeRateForm()" style="display:none">Cancel</button>
+        </div>
+      </div>
+      <div id="p-rates-list" class="admin-list"></div>
+    </div><!-- /tab-rates -->
+
   </div>
 </div>
 
-<script src="app.js"></script>
+<!-- ── Booking Wizard Modal ── -->
+<div id="booking-modal" class="booking-modal-overlay" onclick="bookingOverlayClick(event)">
+  <div class="booking-modal-card">
+
+    <!-- Step 1: Location + Shipping (combined) -->
+    <div id="bm-step-location">
+      <div class="bm-head">
+        <div>
+          <div class="bm-title">🚛 New Booking</div>
+          <div class="bm-sub">Enter locations and choose how to ship</div>
+        </div>
+        <button class="bm-close" onclick="closeBookingModal()">✕</button>
+      </div>
+      <div class="bm-body">
+        <!-- Locations -->
+        <div class="loc-section-label">📍 Route</div>
+        <div class="location-field-wrap">
+          <label class="loc-label">Start Location (Pickup)</label>
+          <div class="loc-input-row">
+            <input type="text" id="bm-start-input" class="loc-input" placeholder="e.g. Berlin, Germany" oninput="onLocationInput('start')">
+            <button class="loc-search-btn" onclick="portalGeocode('start')" id="btn-start-search">🔍</button>
+          </div>
+          <div id="bm-start-suggestions" class="location-suggestions" style="display:none"></div>
+        </div>
+        <div id="bm-start-confirmed" class="loc-confirmed" style="display:none"></div>
+
+        <div class="location-field-wrap">
+          <label class="loc-label">Destination (Delivery)</label>
+          <div class="loc-input-row">
+            <input type="text" id="bm-dest-input" class="loc-input" placeholder="e.g. Munich, Germany" oninput="onLocationInput('dest')">
+            <button class="loc-search-btn" onclick="portalGeocode('dest')" id="btn-dest-search">🔍</button>
+          </div>
+          <div id="bm-dest-suggestions" class="location-suggestions" style="display:none"></div>
+        </div>
+        <div id="bm-dest-confirmed" class="loc-confirmed" style="display:none"></div>
+
+        <!-- Shipping option -->
+        <div class="loc-section-label" style="margin-top:16px;">💡 Want to save on shipping costs?</div>
+        <div class="ship-options">
+          <button class="ship-opt" id="ship-opt-shared" onclick="selectShipping('shared')">
+            <div class="ship-opt-top">
+              <span class="ship-opt-icon">🤝</span>
+              <div>
+                <div class="ship-opt-title">Share the Truck</div>
+                <div class="ship-opt-sub">LTL — Save up to 60%</div>
+              </div>
+              <span class="ship-opt-tag tag-green">Best Value</span>
+            </div>
+            <div class="ship-opt-desc">Your cargo shares space with others. Lower cost, ideal for smaller loads.</div>
+          </button>
+          <button class="ship-opt" id="ship-opt-private" onclick="selectShipping('private')">
+            <div class="ship-opt-top">
+              <span class="ship-opt-icon">🚚</span>
+              <div>
+                <div class="ship-opt-title">Private Truck</div>
+                <div class="ship-opt-sub">FTL — Full truck reserved</div>
+              </div>
+              <span class="ship-opt-tag tag-blue">Fastest</span>
+            </div>
+            <div class="ship-opt-desc">A dedicated truck exclusively for your cargo. Full scheduling control.</div>
+          </button>
+        </div>
+
+        <button class="btn-bm-next" id="btn-find-routes" onclick="portalFindRoutes()" disabled>Find Routes 🗺️</button>
+      </div>
+    </div>
+
+    <!-- Step 2: Customers (LTL only) -->
+    <div id="bm-step-customer" style="display:none">
+      <div class="bm-head">
+        <div>
+          <div class="bm-title">👤 Customers</div>
+          <div class="bm-sub">Add consignees sharing this truck (optional)</div>
+        </div>
+        <button class="bm-close" onclick="showBookingStep('location')">←</button>
+      </div>
+      <div class="bm-body">
+        <div class="wc-form">
+          <div class="field-row">
+            <div class="field"><label>Name *</label><input type="text" id="wc-name" placeholder="Customer name"></div>
+            <div class="field"><label>Phone</label><input type="tel" id="wc-phone" placeholder="Phone number"></div>
+          </div>
+          <div class="field"><label>Delivery Address</label><input type="text" id="wc-address" placeholder="Delivery address"></div>
+          <div class="field-row">
+            <div class="field"><label>Notes</label><input type="text" id="wc-notes" placeholder="Special instructions"></div>
+            <div class="field"><label>Declared Value ($)</label><input type="number" id="wc-value" placeholder="0.00" min="0"></div>
+          </div>
+          <button class="btn-add" onclick="addWizardCustomer()">＋ Add Customer</button>
+        </div>
+        <div id="wc-list" style="margin-top:12px;"></div>
+        <div style="display:flex;gap:8px;margin-top:16px;">
+          <button class="btn-bm-skip" onclick="proceedFromCustomers()">Skip</button>
+          <button class="btn-bm-next" onclick="proceedFromCustomers()">Next: Find Routes 🗺️</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Step 3: Route Selection -->
+    <div id="bm-step-route" style="display:none">
+      <div class="bm-head">
+        <div>
+          <div class="bm-title">🗺️ Select Route</div>
+          <div class="bm-sub" id="bm-route-sub">Choose the best route for your delivery</div>
+        </div>
+        <button class="bm-close" onclick="showBookingStep('location')">←</button>
+      </div>
+      <div class="bm-body">
+        <div id="bm-routes-list"></div>
+        <div id="bm-map"></div>
+        <div id="bm-toll-info" class="bm-toll-info" style="display:none"></div>
+        <button class="btn-bm-confirm" id="btn-confirm-route" onclick="showChargesStep()" disabled>Confirm Route & See Charges →</button>
+      </div>
+    </div>
+
+    <!-- Step 4: Charges -->
+    <div id="bm-step-charges" style="display:none">
+      <div class="bm-head">
+        <div>
+          <div class="bm-title">💰 Estimated Charges</div>
+          <div class="bm-sub" id="bm-charges-sub">Based on actual route distance</div>
+        </div>
+        <button class="bm-close" onclick="showBookingStep('route')">←</button>
+      </div>
+      <div class="bm-body">
+        <div id="bm-charges-content"></div>
+        <button class="btn-bm-confirm" onclick="confirmWebBooking()">✓ Confirm Booking</button>
+      </div>
+    </div>
+
+    <!-- Step 3: Confirmed -->
+    <div id="bm-step-confirm" style="display:none">
+      <div class="bm-body bm-success-body">
+        <div class="bm-success-icon">✅</div>
+        <div class="bm-title" style="font-size:22px;">Booking Confirmed!</div>
+        <div class="bm-sub" style="margin-top:6px;">Your cargo has been submitted successfully.</div>
+        <div id="bm-consolidation-banner" style="display:none;text-align:left;"></div>
+        <div id="bm-confirm-summary" class="bm-confirm-summary"></div>
+        <p style="font-size:12px;color:var(--text2);margin-bottom:24px;line-height:1.7;">
+          Our team will contact you to confirm pickup details and final pricing.
+        </p>
+        <button class="btn-bm-new" onclick="startNewBooking()">＋ Start New Booking</button>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<!-- ── Auth Modal ── -->
+<div id="auth-modal" class="auth-modal-overlay" onclick="authOverlayClick(event)">
+  <div class="auth-modal-card">
+
+    <div id="auth-view-choose">
+      <div class="auth-modal-head">
+        <div>
+          <div class="auth-modal-title">👋 Welcome</div>
+          <div class="auth-modal-sub">Sign in or create a new account</div>
+        </div>
+        <button class="auth-modal-close" onclick="closeAuthModal()">✕</button>
+      </div>
+      <div class="auth-choose-row">
+        <button class="auth-choose-btn" onclick="showAuthView('login')">
+          <span class="auth-choose-icon">🔑</span>
+          <span class="auth-choose-label">Login</span>
+          <small class="auth-choose-sub">Existing account</small>
+        </button>
+        <button class="auth-choose-btn" onclick="showAuthView('register')">
+          <span class="auth-choose-icon">✨</span>
+          <span class="auth-choose-label">Create Account</span>
+          <small class="auth-choose-sub">New user</small>
+        </button>
+      </div>
+    </div>
+
+    <div id="auth-view-login" style="display:none">
+      <div class="auth-modal-head">
+        <div>
+          <div class="auth-modal-title">🔑 Login</div>
+          <div class="auth-modal-sub">Enter your credentials</div>
+        </div>
+        <button class="auth-modal-close" onclick="showAuthView('choose')">←</button>
+      </div>
+      <div class="auth-form">
+        <label class="auth-lbl">Email</label>
+        <input type="email" id="login-email" class="auth-input" placeholder="you@example.com" autocomplete="email">
+        <label class="auth-lbl">Password</label>
+        <input type="password" id="login-password" class="auth-input" placeholder="••••••••" autocomplete="current-password">
+        <div id="login-err" class="auth-err"></div>
+        <button class="auth-submit-btn" onclick="doLogin()">Sign In</button>
+        <div class="auth-switch">No account? <a href="#" onclick="showAuthView('register');return false;">Create one →</a></div>
+      </div>
+    </div>
+
+    <div id="auth-view-register" style="display:none">
+      <div class="auth-modal-head">
+        <div>
+          <div class="auth-modal-title">✨ Create Account</div>
+          <div class="auth-modal-sub">Fill in your details to get started</div>
+        </div>
+        <button class="auth-modal-close" onclick="showAuthView('choose')">←</button>
+      </div>
+      <div class="auth-form">
+        <label class="auth-lbl">Email</label>
+        <input type="email" id="reg-email" class="auth-input" placeholder="you@example.com" autocomplete="email">
+        <label class="auth-lbl">Password</label>
+        <input type="password" id="reg-password" class="auth-input" placeholder="Min 6 characters" autocomplete="new-password">
+        <label class="auth-lbl">Phone Number</label>
+        <input type="tel" id="reg-phone" class="auth-input" placeholder="+1 555 000 0000" autocomplete="tel">
+        <label class="auth-lbl">Address</label>
+        <textarea id="reg-address" class="auth-input auth-textarea" placeholder="123 Main St, City, State, ZIP" autocomplete="street-address"></textarea>
+        <div id="reg-err" class="auth-err"></div>
+        <button class="auth-submit-btn" onclick="doRegister()">Create Account</button>
+        <div class="auth-switch">Have an account? <a href="#" onclick="showAuthView('login');return false;">Sign in →</a></div>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<!-- ── Payment Modal ── -->
+<div id="pay-modal" class="pay-modal-overlay" onclick="payModalOverlayClick(event)">
+  <div class="pay-modal-card">
+    <div class="pay-modal-head">
+      <div>
+        <div class="pay-modal-title">💳 Pay Invoice</div>
+        <div class="pay-modal-cust" id="pay-modal-cust-name"></div>
+      </div>
+      <button class="pay-modal-close" onclick="closePaymentModal()">✕</button>
+    </div>
+    <div class="pay-modal-body">
+      <div class="pay-modal-amount-row">
+        <div>
+          <div class="pay-modal-amount-label">Invoice Amount</div>
+          <div class="pay-modal-terms-line" id="pay-modal-terms"></div>
+        </div>
+        <div class="pay-modal-amount-value" id="pay-modal-amount"></div>
+      </div>
+      <div id="paypal-button-container"></div>
+      <div id="pay-modal-msg"></div>
+      <div class="pay-modal-secure">🔒 Secured by PayPal · 256-bit SSL encryption</div>
+    </div>
+  </div>
+</div>
+
+<!-- ── 3D Load View Modal ── -->
+<div id="viz3d-modal" class="viz3d-modal-overlay" onclick="viz3dOverlayClick(event)">
+  <div class="viz3d-modal-card">
+    <div class="viz3d-modal-head">
+      <div class="bm-title">🧊 3D Load View</div>
+      <button class="bm-close" onclick="closeViz3DModal()">✕</button>
+    </div>
+    <iframe id="viz3d-frame" style="width:100%;flex:1;border:none;"></iframe>
+  </div>
+</div>
+
+<!-- ── AI Chat Widget ── -->
+<div id="ai-chat-btn" class="ai-fab" onclick="toggleAIChat()" title="AI Assistant">
+  <span class="ai-fab-icon">🤖</span>
+  <span class="ai-fab-label">AI Assistant</span>
+</div>
+
+<div id="ai-chat-panel" class="ai-chat-panel" style="display:none">
+  <div class="ai-chat-head">
+    <div class="ai-chat-title">🤖 AI Load Assistant</div>
+    <div style="display:flex;gap:6px;align-items:center">
+      <button class="ai-advise-btn" onclick="getAIAdvice()" title="Get load optimization tips">💡 Advise</button>
+      <button class="ai-chat-close" onclick="toggleAIChat()">✕</button>
+    </div>
+  </div>
+  <div id="ai-chat-messages" class="ai-chat-messages">
+    <div class="ai-msg ai-msg-bot">
+      Hi! I'm your AI load assistant. Describe cargo in plain language (e.g. "5 euro pallets, 800kg each") and I'll fill in the details. Or ask me anything about your shipment!
+    </div>
+  </div>
+  <div class="ai-chat-input-row">
+    <input id="ai-chat-input" class="ai-chat-input" type="text" placeholder="Describe cargo or ask a question…" onkeydown="if(event.key==='Enter')sendAIMessage()">
+    <button class="ai-chat-send" onclick="sendAIMessage()">Send</button>
+  </div>
+</div>
+
+<!-- ── Photo Scan Modal ── -->
+<div id="scan-modal" class="scan-modal-overlay" onclick="scanOverlayClick(event)">
+  <div class="scan-modal-card">
+
+    <!-- Header -->
+    <div class="scan-modal-head">
+      <div>
+        <div class="scan-modal-title">📷 Photo Item Scanner</div>
+        <div class="scan-modal-sub">AI identifies items and estimates dimensions with packaging</div>
+      </div>
+      <button class="scan-modal-close" onclick="closeScanModal()">✕</button>
+    </div>
+
+    <!-- Body -->
+    <div class="scan-modal-body">
+
+      <!-- Preview -->
+      <div id="scan-preview-wrap" class="scan-preview-wrap" style="display:none">
+        <img id="scan-preview-img" class="scan-preview-img" src="" alt="Preview">
+      </div>
+
+      <!-- Loading state -->
+      <div id="scan-loading" class="scan-loading" style="display:none">
+        <div class="scan-spinner"></div>
+        <div class="scan-loading-text">Analyzing photo with AI…<br><small>Identifying items and estimating dimensions</small></div>
+      </div>
+
+      <!-- No results -->
+      <div id="scan-no-results" class="scan-no-results" style="display:none">
+        <div style="font-size:36px;margin-bottom:10px">🤷</div>
+        <div style="font-weight:700;color:var(--text)">No items detected</div>
+        <div style="font-size:12px;color:var(--text2);margin-top:6px">Try a clearer photo showing the items to be shipped.</div>
+      </div>
+
+      <!-- Results list -->
+      <div id="scan-results" style="display:none">
+        <div class="scan-results-header">
+          <span id="scan-count-label"></span>
+          <label class="scan-select-all-label">
+            <input type="checkbox" id="scan-select-all" checked onchange="scanToggleAll(this.checked)"> Select all
+          </label>
+        </div>
+        <div id="scan-items-list" class="scan-items-list"></div>
+      </div>
+
+    </div>
+
+    <!-- Footer -->
+    <div class="scan-modal-footer" id="scan-footer" style="display:none">
+      <button class="scan-retake-btn" onclick="openPhotoScan()">📷 Retake</button>
+      <button class="scan-add-btn" onclick="addScannedItems()" id="scan-add-btn">＋ Add Selected Items</button>
+    </div>
+
+  </div>
+</div>
+
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script src="portal.js"></script>
 </body>
 </html>
