@@ -1,3 +1,6 @@
+// Copyright (c) 2024-2026 Vipul Agrawal. All Rights Reserved.
+// Proprietary and confidential. Unauthorized copying or distribution
+// of this file, via any medium, is strictly prohibited.
 'use strict';
 
 const RES = 0.5;
