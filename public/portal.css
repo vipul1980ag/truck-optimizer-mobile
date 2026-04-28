@@ -10,6 +10,7 @@
   --text2:     #64748b;
   --primary:   #2563eb;
   --primary-h: #1d4ed8;
+  --accent:    #f0a500;
   --success:   #16a34a;
   --warning:   #d97706;
   --danger:    #dc2626;
@@ -32,7 +33,7 @@ body {
 .nav {
   background: linear-gradient(135deg, #0c1f40 0%, #1a2f50 60%, #1e293b 100%);
   padding: 0 24px;
-  height: 56px;
+  height: 100px;
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -57,6 +58,37 @@ body {
   transition: all 0.15s; background: rgba(255,255,255,0.05);
 }
 .nav-link:hover { color: #f1f5f9; border-color: rgba(255,255,255,0.22); background: rgba(255,255,255,0.12); }
+
+/* ── DNW Badge ───────────────────────────────────────────────────────────── */
+.dnw-badge {
+  display: flex; align-items: center; gap: 6px; text-decoration: none;
+  margin-right: 14px; padding: 4px 10px 4px 4px;
+  border-radius: 20px; background: rgba(255,255,255,0.07);
+  border: 1px solid rgba(255,255,255,0.18);
+  transition: background 0.2s ease, box-shadow 0.2s ease;
+}
+.dnw-badge:hover { background: rgba(255,255,255,0.15); box-shadow: 0 0 14px rgba(26,108,240,0.45); }
+.dnw-badge-icon { width: 90px; height: 90px; filter: drop-shadow(0 0 5px rgba(26,108,240,0.55)); flex-shrink: 0; }
+.dnw-globe-svg  { width: 100%; height: 100%; }
+.dnw-badge-text { font-size: 12px; font-weight: 700; color: #fff; letter-spacing: 0.5px; white-space: nowrap; }
+.dnw-badge-text em { font-style: normal; color: var(--accent); }
+.globe-bg { animation: globeBg 8s infinite linear; }
+@keyframes globeBg {
+  0%   { fill: rgba(26,108,240,0.82); }
+  25%  { fill: rgba(124,58,237,0.82); }
+  50%  { fill: rgba(16,185,129,0.82); }
+  75%  { fill: rgba(245,158,11,0.82); }
+  100% { fill: rgba(26,108,240,0.82); }
+}
+.globe-ring-group { transform-box: fill-box; transform-origin: center; animation: globeRingRotate 12s linear infinite; }
+@keyframes globeRingRotate { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
+.globe-ring-text { fill: rgba(255,255,255,0.75); animation: globeRingColor 6s infinite linear; }
+@keyframes globeRingColor {
+  0%, 100% { fill: rgba(255,255,255,0.75); }
+  50%       { fill: rgba(240,165,0,0.95); }
+}
+.globe-dnw { fill: #fff; animation: globeDnwColor 4s infinite alternate; }
+@keyframes globeDnwColor { from { fill: #fff; } to { fill: var(--accent); } }
 
 /* ── Hero ────────────────────────────────────────────────────────────────── */
 .hero {
