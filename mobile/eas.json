@@ -14,7 +14,7 @@
         "buildType": "apk"
       },
       "env": {
-        "EXPO_PUBLIC_API_URL": "https://truck-capacity-optimizer.onrender.com"
+        "EXPO_PUBLIC_API_URL": "https://toc.dnw-ai.com"
       }
     },
     "preview-ios": {
@@ -23,7 +23,7 @@
         "simulator": true
       },
       "env": {
-        "EXPO_PUBLIC_API_URL": "https://truck-capacity-optimizer.onrender.com"
+        "EXPO_PUBLIC_API_URL": "https://toc.dnw-ai.com"
       }
     },
     "production": {
@@ -35,7 +35,7 @@
         "simulator": false
       },
       "env": {
-        "EXPO_PUBLIC_API_URL": "https://truck-capacity-optimizer.onrender.com"
+        "EXPO_PUBLIC_API_URL": "https://toc.dnw-ai.com"
       }
     }
   },
