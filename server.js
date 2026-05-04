@@ -811,7 +811,9 @@ app.post('/api/import/rates', (req, res) => {
 });
 
 // ── AI endpoints ─────────────────────────────────────────────────────────────
-const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
+const anthropic = process.env.ANTHROPIC_API_KEY
+  ? new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY })
+  : null;
 const genAI     = process.env.GOOGLE_AI_API_KEY
   ? new GoogleGenerativeAI(process.env.GOOGLE_AI_API_KEY)
   : null;
@@ -819,6 +821,7 @@ const genAI     = process.env.GOOGLE_AI_API_KEY
 // AI chat assistant — conversational helper for cargo booking
 app.post('/api/ai/chat', async (req, res) => {
   const { messages } = req.body;
+  if (!anthropic) return res.status(503).json({ error: 'AI service unavailable. Check ANTHROPIC_API_KEY.' });
   if (!Array.isArray(messages) || !messages.length) {
     return res.status(400).json({ error: 'messages array required' });
   }
