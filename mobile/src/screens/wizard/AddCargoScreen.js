@@ -7,8 +7,9 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import * as ImagePicker from 'expo-image-picker';
 import { useWizard } from '../../WizardContext';
+import { BASE_URL } from '../../api';
 import { C } from '../../theme';
-const API_BASE = process.env.EXPO_PUBLIC_API_URL || 'https://truck-capacity-optimizer.onrender.com';
+const API_BASE = BASE_URL;
 
 // ── Catalogs ──────────────────────────────────────────────────────────────────
 const MOBILE_HOUSEHOLD = [
@@ -232,9 +233,9 @@ export default function AddCargoScreen({ navigation }) {
 
   async function launchScan(launcher) {
     const result = await launcher({
-      mediaTypes: ImagePicker.MediaTypeOptions.Images,
+      mediaTypes: ImagePicker.MediaType ? [ImagePicker.MediaType.Images] : ImagePicker.MediaTypeOptions.Images,
       base64: true,
-      quality: 0.4,      // lower quality = smaller base64 payload
+      quality: 0.4,
       exif: false,
     });
     if (result.canceled || !result.assets?.[0]) return;
