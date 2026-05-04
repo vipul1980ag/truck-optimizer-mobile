@@ -921,6 +921,7 @@ app.post('/api/ai/scan-items', async (req, res) => {
   }
 
   // ── Fallback: Claude Haiku ────────────────────────────────────────────────
+  if (!anthropic) return res.status(503).json({ error: 'AI service unavailable. No API keys configured.' });
   try {
     const response = await anthropic.messages.create({
       model: 'claude-haiku-4-5',
@@ -945,6 +946,7 @@ app.post('/api/ai/scan-items', async (req, res) => {
 app.post('/api/ai/parse-cargo', async (req, res) => {
   const { description } = req.body;
   if (!description) return res.status(400).json({ error: 'description required' });
+  if (!anthropic) return res.status(503).json({ error: 'AI service unavailable. Check ANTHROPIC_API_KEY.' });
   try {
     const response = await anthropic.messages.create({
       model: 'claude-haiku-4-5',
@@ -972,6 +974,7 @@ Description: "${description}"`,
 
 // AI load advisor — analyze current items and suggest optimal truck + tips
 app.post('/api/ai/advise', async (req, res) => {
+  if (!anthropic) return res.status(503).json({ error: 'AI service unavailable. Check ANTHROPIC_API_KEY.' });
   const store = readStore();
   try {
     const totalVol = store.items.reduce((s, it) => s + it.length * it.width * it.height * (it.qty || 1), 0);
