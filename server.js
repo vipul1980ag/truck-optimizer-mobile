@@ -92,6 +92,7 @@ async function getPayPalToken() {
 const NO_CACHE = { headers: { 'Cache-Control': 'no-cache, no-store, must-revalidate', 'Pragma': 'no-cache', 'Expires': '0' } };
 app.get('/',        (req, res) => res.sendFile(path.join(__dirname, 'public', 'portal.html'), NO_CACHE));
 app.get('/advanced',(req, res) => res.sendFile(path.join(__dirname, 'public', 'index.html'),  NO_CACHE));
+app.get('/privacy', (req, res) => res.sendFile(path.join(__dirname, 'public', 'privacy.html'), NO_CACHE));
 
 app.use(express.static(path.join(__dirname, 'public'), { etag: false, lastModified: false, setHeaders: res => res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate') }));
 
