@@ -1,11 +1,12 @@
 {
   "expo": {
-    "name": "Truck Capacity Optimizer",
+    "name": "Truck Load Optimizer",
     "slug": "truck-optimizer-mobile",
     "version": "1.0.1",
     "orientation": "portrait",
     "userInterfaceStyle": "light",
     "icon": "./assets/icon.png",
+    "scheme": "truckoptimizer",
     "splash": {
       "image": "./assets/splash.png",
       "resizeMode": "contain",
@@ -19,10 +20,16 @@
         "NSLocationWhenInUseUsageDescription": "Used to show your current location on the route map.",
         "NSCameraUsageDescription": "Used to scan and identify cargo items from a photo.",
         "NSPhotoLibraryUsageDescription": "Used to select photos for AI cargo item recognition.",
-        "ITSAppUsesNonExemptEncryption": false
+        "ITSAppUsesNonExemptEncryption": false,
+        "NSAppTransportSecurity": {
+          "NSAllowsArbitraryLoads": false
+        }
       },
       "config": {
         "usesNonExemptEncryption": false
+      },
+      "privacyManifests": {
+        "NSPrivacyAccessedAPITypes": []
       }
     },
     "android": {
@@ -30,9 +37,18 @@
         "foregroundImage": "./assets/adaptive-icon.png",
         "backgroundColor": "#0f172a"
       },
-      "package": "com.truckoptimizer.mobile"
+      "package": "com.truckoptimizer.mobile",
+      "versionCode": 1,
+      "permissions": [
+        "android.permission.INTERNET",
+        "android.permission.CAMERA",
+        "android.permission.READ_EXTERNAL_STORAGE",
+        "android.permission.WRITE_EXTERNAL_STORAGE",
+        "android.permission.ACCESS_NETWORK_STATE"
+      ]
     },
     "plugins": [
+      "expo-updates",
       [
         "expo-image-picker",
         {
@@ -41,6 +57,15 @@
         }
       ]
     ],
+    "updates": {
+      "url": "https://u.expo.dev/cb76151f-4926-4d91-9e32-7997c8682935",
+      "enabled": true,
+      "checkAutomatically": "ON_LOAD",
+      "fallbackToCacheTimeout": 0
+    },
+    "runtimeVersion": {
+      "policy": "appVersion"
+    },
     "newArchEnabled": false,
     "extra": {
       "eas": {
