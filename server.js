@@ -5,6 +5,7 @@ const fs         = require('fs');
 const path       = require('path');
 const crypto     = require('crypto');
 const Anthropic  = require('@anthropic-ai/sdk');
+const { GoogleGenerativeAI } = require('@google/generative-ai');
 
 // ── Route-overlap helpers ────────────────────────────────────────────────────
 function haversineKm(lat1, lng1, lat2, lng2) {
@@ -810,6 +811,9 @@ app.post('/api/import/rates', (req, res) => {
 
 // ── AI endpoints ─────────────────────────────────────────────────────────────
 const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
+const genAI     = process.env.GOOGLE_AI_API_KEY
+  ? new GoogleGenerativeAI(process.env.GOOGLE_AI_API_KEY)
+  : null;
 
 // AI chat assistant — conversational helper for cargo booking
 app.post('/api/ai/chat', async (req, res) => {
@@ -860,24 +864,7 @@ For pricing, use approximate $2-4 per mile as a general estimate.`,
   }
 });
 
-// AI photo scanner — identify items from an image and estimate dimensions + packaging
-app.post('/api/ai/scan-items', async (req, res) => {
-  const { imageBase64, mediaType = 'image/jpeg' } = req.body || {};
-  if (!imageBase64) return res.status(400).json({ error: 'imageBase64 required' });
-  try {
-    const stream = anthropic.messages.stream({
-      model: 'claude-opus-4-6',
-      max_tokens: 2048,
-      messages: [{
-        role: 'user',
-        content: [
-          {
-            type: 'image',
-            source: { type: 'base64', media_type: mediaType, data: imageBase64 },
-          },
-          {
-            type: 'text',
-            text: `You are a professional freight estimator. Analyze this photo and identify every distinct item visible.
+const SCAN_PROMPT = `You are a professional freight estimator. Analyze this photo and identify every distinct item visible.
 
 For each item, estimate:
 - name: common name for the item
@@ -891,21 +878,61 @@ For each item, estimate:
 Return ONLY a JSON array — no explanation, no markdown. Example:
 [{"name":"3-seat sofa","length":7.5,"width":3.5,"height":3.2,"weight":220,"qty":1,"stackable":false,"isFragile":false,"packagingNote":"moving blanket wrap"},{"name":"coffee table","length":4.2,"width":2.2,"height":1.8,"weight":60,"qty":1,"stackable":true,"isFragile":false,"packagingNote":"cardboard corners"}]
 
-If you cannot identify any items (e.g. the image is blurry or not cargo-related), return an empty array: []`,
-          },
+If you cannot identify any items (e.g. the image is blurry or not cargo-related), return an empty array: []`;
+
+function parseItemsJson(text) {
+  const match = (text || '').trim().match(/\[[\s\S]*\]/);
+  if (!match) return [];
+  try {
+    const parsed = JSON.parse(match[0]);
+    return Array.isArray(parsed) ? parsed : [];
+  } catch { return []; }
+}
+
+// AI photo scanner — Gemini Flash primary, Claude Haiku fallback
+app.post('/api/ai/scan-items', async (req, res) => {
+  const { imageBase64, mediaType = 'image/jpeg' } = req.body || {};
+  if (!imageBase64) return res.status(400).json({ error: 'imageBase64 required' });
+
+  // ── Primary: Gemini 2.0 Flash ─────────────────────────────────────────────
+  if (genAI) {
+    try {
+      const model  = genAI.getGenerativeModel({ model: 'gemini-2.0-flash' });
+      const result = await model.generateContent({
+        contents: [{
+          role: 'user',
+          parts: [
+            { inlineData: { mimeType: mediaType, data: imageBase64 } },
+            { text: SCAN_PROMPT },
+          ],
+        }],
+        generationConfig: { maxOutputTokens: 2048, temperature: 0.2 },
+      });
+      const text  = result.response.text();
+      const items = parseItemsJson(text);
+      if (items.length > 0) return res.json(items);
+    } catch (err) {
+      console.error('Gemini scan error:', err.message, '— falling back to Claude');
+    }
+  }
+
+  // ── Fallback: Claude Haiku ────────────────────────────────────────────────
+  try {
+    const response = await anthropic.messages.create({
+      model: 'claude-haiku-4-5',
+      max_tokens: 2048,
+      messages: [{
+        role: 'user',
+        content: [
+          { type: 'image', source: { type: 'base64', media_type: mediaType, data: imageBase64 } },
+          { type: 'text', text: SCAN_PROMPT },
         ],
       }],
     });
-
-    const response = await stream.finalMessage();
     const textBlock = response.content.find(b => b.type === 'text');
-    const text = (textBlock?.text || '').trim();
-    const match = text.match(/\[[\s\S]*\]/);
-    if (!match) return res.json([]);
-    const parsed = JSON.parse(match[0]);
-    res.json(Array.isArray(parsed) ? parsed : []);
+    res.json(parseItemsJson(textBlock?.text));
   } catch (err) {
-    console.error('AI scan error:', err.message);
+    console.error('Claude scan error:', err.message);
     res.status(500).json({ error: 'AI service unavailable' });
   }
 });
