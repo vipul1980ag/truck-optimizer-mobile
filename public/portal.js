@@ -623,10 +623,22 @@ function selectShipping(type) {
   updateFindRoutesBtn();
 }
 
+let _geoDebounce = {};
 function onLocationInput(field) {
   if (field === 'start') { _wizardStart = null; }
   else                   { _wizardDest  = null; }
   updateFindRoutesBtn();
+
+  const inputId = field === 'start' ? 'bm-start-input' : 'bm-dest-input';
+  const query   = document.getElementById(inputId)?.value?.trim();
+  clearTimeout(_geoDebounce[field]);
+  if (!query || query.length < 3) {
+    const sugId = field === 'start' ? 'bm-start-suggestions' : 'bm-dest-suggestions';
+    const sugEl = document.getElementById(sugId);
+    if (sugEl) sugEl.style.display = 'none';
+    return;
+  }
+  _geoDebounce[field] = setTimeout(() => portalGeocode(field), 400);
 }
 
 function updateFindRoutesBtn() {

@@ -360,18 +360,32 @@ app.post('/api/optimize', (req, res) => {
 app.post('/api/geocode', async (req, res) => {
   const { query } = req.body || {};
   if (!query || !query.trim()) return res.status(400).json({ error: 'query is required' });
+  const signal = AbortSignal.timeout(8000);
+  const headers = { 'User-Agent': 'TruckOptimizer/1.0 (vipul.orlando@gmail.com)' };
+
+  // Try Photon first, fall back to Nominatim
   try {
     const url = `https://photon.komoot.io/api/?q=${encodeURIComponent(query.trim())}&limit=5`;
-    const r   = await fetch(url, {
-      headers: { 'User-Agent': 'TruckOptimizer/1.0 (contact@truckoptimizer.com)' },
-    });
+    const r    = await fetch(url, { headers, signal });
     const data = await r.json();
     const results = (data.features || []).map(f => ({
       label: [f.properties.name, f.properties.city, f.properties.state, f.properties.country].filter(Boolean).join(', '),
       lat:   f.geometry.coordinates[1],
       lng:   f.geometry.coordinates[0],
+    })).filter(r => r.label);
+    if (results.length) return res.json(results);
+  } catch (_) { /* fall through to Nominatim */ }
+
+  try {
+    const url = `https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(query.trim())}&format=json&limit=5&addressdetails=1`;
+    const r    = await fetch(url, { headers, signal: AbortSignal.timeout(8000) });
+    const data = await r.json();
+    const results = data.map(p => ({
+      label: p.display_name,
+      lat:   parseFloat(p.lat),
+      lng:   parseFloat(p.lon),
     }));
-    res.json(results);
+    return res.json(results);
   } catch (err) {
     res.status(500).json({ error: 'Geocoding failed: ' + err.message });
   }
@@ -382,8 +396,8 @@ app.post('/api/routes', async (req, res) => {
   if (!from?.lat || !from?.lng || !to?.lat || !to?.lng)
     return res.status(400).json({ error: 'from and to (lat, lng) are required' });
   try {
-    const url = `http://router.project-osrm.org/route/v1/driving/${from.lng},${from.lat};${to.lng},${to.lat}?alternatives=true&geometries=geojson&overview=full&steps=false`;
-    const r   = await fetch(url);
+    const url = `https://router.project-osrm.org/route/v1/driving/${from.lng},${from.lat};${to.lng},${to.lat}?alternatives=true&geometries=geojson&overview=full&steps=false`;
+    const r   = await fetch(url, { signal: AbortSignal.timeout(15000) });
     const data = await r.json();
     if (data.code !== 'Ok' || !data.routes?.length)
       return res.status(400).json({ error: 'No route found between these locations.' });
@@ -391,7 +405,7 @@ app.post('/api/routes', async (req, res) => {
       index,
       distance_km:  Math.round((route.distance / 1000) * 10) / 10,
       duration_min: Math.round(route.duration / 60),
-      geometry:     route.geometry,  // GeoJSON LineString
+      geometry:     route.geometry,
     }));
     res.json(routes);
   } catch (err) {
