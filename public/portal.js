@@ -278,13 +278,44 @@ let _authToken = localStorage.getItem('auth_token') || null;
 let _authUser  = null;
 
 async function checkAuth() {
-  if (!_authToken) { applyAuthState(false); return; }
-  try {
-    const res = await fetch('/api/auth/me', { headers: { Authorization: 'Bearer ' + _authToken } });
-    if (!res.ok) { _authToken = null; localStorage.removeItem('auth_token'); applyAuthState(false); return; }
-    _authUser = (await res.json()).user;
-    applyAuthState(true);
-  } catch { applyAuthState(false); }
+  // Step 1: validate stored token
+  if (_authToken) {
+    try {
+      const res = await fetch('/api/auth/me', { headers: { Authorization: 'Bearer ' + _authToken } });
+      if (res.ok) {
+        _authUser = (await res.json()).user;
+        applyAuthState(true);
+        return;
+      }
+    } catch { /* network error, fall through */ }
+    // Token rejected — clear it and try silent re-login below
+    _authToken = null;
+    localStorage.removeItem('auth_token');
+  }
+
+  // Step 2: silent re-login with stored credentials (survives server restarts)
+  const credsRaw = localStorage.getItem('auth_creds');
+  if (credsRaw) {
+    try {
+      const { email, password } = JSON.parse(credsRaw);
+      const res  = await fetch('/api/auth/login', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email, password })
+      });
+      if (res.ok) {
+        const data = await res.json();
+        _authToken = data.token;
+        _authUser  = data.user;
+        localStorage.setItem('auth_token', _authToken);
+        applyAuthState(true);
+        return;
+      }
+    } catch { /* silent re-login failed */ }
+    // Credentials no longer valid
+    localStorage.removeItem('auth_creds');
+  }
+
+  applyAuthState(false);
 }
 
 function applyAuthState(loggedIn) {
@@ -328,6 +359,7 @@ async function doLogin() {
     _authToken = data.token;
     _authUser  = data.user;
     localStorage.setItem('auth_token', _authToken);
+    localStorage.setItem('auth_creds', JSON.stringify({ email, password }));
     closeAuthModal();
     applyAuthState(true);
   } catch (e) { errEl.textContent = 'Network error: ' + e.message; }
@@ -352,6 +384,7 @@ async function doRegister() {
     _authToken = data.token;
     _authUser  = data.user;
     localStorage.setItem('auth_token', _authToken);
+    localStorage.setItem('auth_creds', JSON.stringify({ email, password }));
     closeAuthModal();
     applyAuthState(true);
   } catch (e) { errEl.textContent = 'Network error: ' + e.message; }
@@ -365,6 +398,7 @@ async function doLogout() {
     _authToken = null;
     _authUser  = null;
     localStorage.removeItem('auth_token');
+    localStorage.removeItem('auth_creds');
   }
   applyAuthState(false);
 }
