@@ -55,7 +55,8 @@
           "photosPermission": "Used to select photos for AI cargo item recognition.",
           "cameraPermission": "Used to scan and identify cargo items from a photo."
         }
-      ]
+      ],
+      "expo-secure-store"
     ],
     "updates": {
       "url": "https://u.expo.dev/cb76151f-4926-4d91-9e32-7997c8682935",
