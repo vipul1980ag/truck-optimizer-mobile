@@ -9,7 +9,7 @@ import { C } from '../../theme';
 
 export default function ChargesScreen({ navigation }) {
   const { items, shippingOption, selectedRoute, selectedTruck,
-          startLocation, destLocation, customers } = useWizard();
+          startLocation, destLocation, customers, pickupDate } = useWizard();
   const [truck,             setTruck]             = useState(null);
   const [allRates,          setAllRates]          = useState([]);
   const [loading,           setLoading]           = useState(true);
@@ -104,8 +104,9 @@ export default function ChargesScreen({ navigation }) {
       if (inferredTruck?.id) {
         try {
           const res = await api.createBooking({
-            truckId:       inferredTruck.id,
+            truckId:        inferredTruck.id,
             shippingOption,
+            pickupDate:     pickupDate || null,
             route: {
               fromLabel:    startLocation?.label,
               fromLat:      startLocation?.lat,
@@ -117,10 +118,11 @@ export default function ChargesScreen({ navigation }) {
               duration_min: selectedRoute?.duration_min,
               geometry:     selectedRoute?.geometry,
             },
-            customers:   customers.map(c => ({ _id: c._id, name: c.name, address: c.address })),
-            items:       items.map(i => ({ name: i.name, length: i.length, width: i.width, height: i.height, weight: i.weight, qty: i.qty })),
+            customers:      customers.map(c => ({ _id: c._id, name: c.name, address: c.address })),
+            items:          items.map(i => ({ name: i.name, length: i.length, width: i.width, height: i.height, weight: i.weight, qty: i.qty })),
             totalWeight,
             totalVol,
+            newGeomCoords:  selectedRoute?.geometry?.coordinates || null,
           });
           consolidationMatches = res?.consolidationMatches || [];
         } catch (_) { /* non-critical — booking save failure should not block confirm */ }
@@ -131,11 +133,15 @@ export default function ChargesScreen({ navigation }) {
       // Notify about overlapping routes after navigation settles
       if (consolidationMatches.length) {
         const m = consolidationMatches[0];
-        const route = m.booking.route ? `${m.booking.route.fromLabel || ''} → ${m.booking.route.toLabel || ''}` : 'overlapping route';
+        const route    = m.booking.route ? `${m.booking.route.fromLabel || ''} → ${m.booking.route.toLabel || ''}` : 'overlapping route';
+        const dateInfo = m.booking.pickupDate ? `\nPickup: ${m.booking.pickupDate}` : '';
+        const stats    = m.overlapPct != null
+          ? `\n\n📊 ${m.overlapPct}% route overlap · ${m.detourPct}% detour (${m.detourKm} km extra)`
+          : '';
         setTimeout(() => {
           Alert.alert(
-            '🔁 Route Overlap Detected',
-            `${m.truck.name}${m.truck.licensePlate ? ` (${m.truck.licensePlate})` : ''} is on a similar route (${route}) with ${Math.round(m.remainingPct)}% capacity available.\n\nConsider consolidating your next shipment to reduce cost.`,
+            '🔁 Shared Truck Match Found!',
+            `${m.truck.name}${m.truck.licensePlate ? ` (${m.truck.licensePlate})` : ''} is heading on a similar route:\n${route}${dateInfo}${stats}\n\n${Math.round(m.remainingPct)}% capacity still available — consolidating can save up to 60%.`,
             [{ text: 'Got it' }]
           );
         }, 600);

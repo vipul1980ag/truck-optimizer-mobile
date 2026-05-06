@@ -1089,6 +1089,7 @@ async function confirmWebBooking() {
       const bookingPayload = {
         truckId,
         shippingOption: _wizardShipping,
+        pickupDate:     document.getElementById('bm-pickup-date')?.value || null,
         route: {
           fromLabel:    _wizardStart?.label,
           fromLat:      _wizardStart?.lat,
@@ -1100,10 +1101,11 @@ async function confirmWebBooking() {
           duration_min: _wizardRoute?.duration_min,
           geometry:     _wizardRoute?.geometry,
         },
-        customers:   _wizardCustomers,
-        items:       items.map(i => ({ name: i.name, length: i.length, width: i.width, height: i.height, weight: i.weight, qty: i.qty })),
-        totalWeight: totalWeight || 0,
-        totalVol:    totalVol    || 0,
+        customers:      _wizardCustomers,
+        items:          items.map(i => ({ name: i.name, length: i.length, width: i.width, height: i.height, weight: i.weight, qty: i.qty })),
+        totalWeight:    totalWeight || 0,
+        totalVol:       totalVol    || 0,
+        newGeomCoords:  _wizardRoute?.geometry?.coordinates || null,
         ...((_wizardConsolidateTo != null) ? { parentBookingId: _wizardConsolidateTo } : {}),
       };
       try {
@@ -1134,19 +1136,28 @@ async function confirmWebBooking() {
     // Show consolidation matches banner if any overlapping routes were detected
     if (consolidationMatches.length) {
       const matchItems = consolidationMatches.map(m => {
-        const plate = m.truck.licensePlate ? ` · ${esc(m.truck.licensePlate)}` : '';
-        const route = m.booking.route ? `${esc(m.booking.route.fromLabel || '')} → ${esc(m.booking.route.toLabel || '')}` : '';
-        return `<li style="margin-bottom:4px;">🚛 <strong>${esc(m.truck.name)}${plate}</strong> — ${Math.round(m.remainingPct)}% capacity free · <span style="font-size:11px;color:var(--text2);">${route}</span></li>`;
+        const plate    = m.truck.licensePlate ? ` · ${esc(m.truck.licensePlate)}` : '';
+        const route    = m.booking.route ? `${esc(m.booking.route.fromLabel || '')} → ${esc(m.booking.route.toLabel || '')}` : '';
+        const dateStr  = m.booking.pickupDate ? ` · 📅 ${m.booking.pickupDate}` : '';
+        const overlap  = m.overlapPct != null ? `<span style="color:#16a34a;font-weight:700;">${m.overlapPct}% overlap</span>` : '';
+        const detour   = m.detourPct  != null ? `<span style="color:#0369a1;font-weight:700;">${m.detourPct}% detour (${m.detourKm} km)</span>` : '';
+        return `<li style="margin-bottom:6px;">
+          🚛 <strong>${esc(m.truck.name)}${plate}</strong> — ${Math.round(m.remainingPct)}% capacity free<br>
+          <span style="font-size:11px;color:var(--text2);">${route}${dateStr}</span><br>
+          <span style="font-size:11px;gap:6px;display:inline-flex;">${overlap}&nbsp;·&nbsp;${detour}</span>
+        </li>`;
       }).join('');
       const consolidationBannerEl = document.getElementById('bm-consolidation-banner');
       if (consolidationBannerEl) {
         consolidationBannerEl.innerHTML = `
           <div class="consolidation-card" style="margin-bottom:14px;">
-            <div class="consolidation-header">🔁 Route overlap detected — consolidation opportunity</div>
+            <div class="consolidation-header">🔁 Shared truck consolidation available!</div>
             <div class="consolidation-body">
-              <p style="font-size:12px;color:var(--text2);margin:0 0 8px;">The following active bookings share a similar route with this shipment:</p>
-              <ul style="margin:0;padding-left:16px;font-size:13px;">${matchItems}</ul>
-              <p style="font-size:11px;color:var(--text2);margin:8px 0 0;">Consider scheduling these shipments together to reduce cost.</p>
+              <p style="font-size:12px;color:var(--text2);margin:0 0 8px;">
+                These active bookings qualify for consolidation — ≥80% route overlap, ≤5% detour, within 2 days of your pickup date:
+              </p>
+              <ul style="margin:0;padding-left:16px;font-size:13px;line-height:1.8;">${matchItems}</ul>
+              <p style="font-size:11px;color:var(--text2);margin:8px 0 0;">Consolidating these shipments can reduce your shipping cost by up to 60%.</p>
             </div>
           </div>`;
         consolidationBannerEl.style.display = 'block';
@@ -1795,6 +1806,7 @@ function openTruckForm(truckId) {
   document.getElementById('tf-base-rate').value   = t.baseRate   || 600;
   document.getElementById('tf-rate-per-mi').value = t.ratePerMi  || 3.50;
   document.getElementById('tf-plate').value        = t.licensePlate || '';
+  document.getElementById('tf-shared').checked     = t.shared === true;
   document.getElementById('tf-edit-id').value      = truckId;
   document.getElementById('tf-cancel-btn').style.display = 'inline-block';
   showAdminTab('fleet');
@@ -1810,6 +1822,7 @@ function closeTruckForm() {
   document.getElementById('tf-base-rate').value   = 600;
   document.getElementById('tf-rate-per-mi').value = 3.50;
   document.getElementById('tf-plate').value        = '';
+  document.getElementById('tf-shared').checked     = false;
   document.getElementById('tf-edit-id').value      = '';
   document.getElementById('tf-cancel-btn').style.display = 'none';
 }
@@ -1823,15 +1836,16 @@ async function saveTruck() {
   const baseRate     = parseFloat(document.getElementById('tf-base-rate').value)   || 600;
   const ratePerMi   = parseFloat(document.getElementById('tf-rate-per-mi').value) || 3.50;
   const licensePlate = document.getElementById('tf-plate').value.trim().toUpperCase();
+  const shared       = document.getElementById('tf-shared').checked;
   const editId       = parseInt(document.getElementById('tf-edit-id').value, 10) || 0;
 
   if (!name) { alert('Truck name is required.'); return; }
 
   const existing = trucks.find(t => t.id === editId);
   if (existing) {
-    Object.assign(existing, { name, length, width, height, maxWt, baseRate, ratePerMi, licensePlate });
+    Object.assign(existing, { name, length, width, height, maxWt, baseRate, ratePerMi, licensePlate, shared });
   } else {
-    trucks.push({ id: nextIds.truck++, name, length, width, height, maxWt, baseRate, ratePerMi, licensePlate });
+    trucks.push({ id: nextIds.truck++, name, length, width, height, maxWt, baseRate, ratePerMi, licensePlate, shared });
   }
   await saveToServer();
   closeTruckForm();

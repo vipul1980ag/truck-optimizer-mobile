@@ -30,33 +30,57 @@ function pointToSegment(lat, lng, aLat, aLng, bLat, bLng) {
 }
 
 // Bidirectional overlap — returns true when either route is a sub-route of the other.
-// Case 1 (new is shorter / same): both new endpoints lie near the existing route's polyline.
-// Case 2 (existing is shorter): both existing endpoints lie near the new route's polyline
-//          (or its straight-line corridor when no polyline is available).
-// newGeomCoords: GeoJSON [[lng,lat], …] for the new route if available.
+// Used for quick pre-filter before the percentage check.
 function routeOverlaps(route, fromLat, fromLng, toLat, toLng, newGeomCoords) {
   const existCoords = route.geometry?.coordinates;
 
-  // Case 1: new endpoints near existing polyline
   if (existCoords?.length) {
     if (pointToPolylineDist(fromLat, fromLng, existCoords) < 80
      && pointToPolylineDist(toLat,   toLng,   existCoords) < 80) return true;
   }
 
-  // Case 2: existing endpoints near new route (existing is a sub-leg of the new route)
   if (route.fromLat != null && route.toLat != null) {
     if (newGeomCoords?.length) {
-      // Use the actual new-route polyline for accuracy
       if (pointToPolylineDist(route.fromLat, route.fromLng, newGeomCoords) < 80
        && pointToPolylineDist(route.toLat,  route.toLng,  newGeomCoords) < 80) return true;
     } else {
-      // Straight-line approximation when no polyline is provided
       if (pointToSegment(route.fromLat, route.fromLng, fromLat, fromLng, toLat, toLng) < 80
        && pointToSegment(route.toLat,  route.toLng,  fromLat, fromLng, toLat, toLng) < 80) return true;
     }
   }
 
   return false;
+}
+
+// Percentage of coordsA (new route) whose midpoints lie within thresholdKm of coordsB (existing route).
+// Returns 0–100.
+function routeOverlapPct(coordsA, coordsB, thresholdKm = 2.0) {
+  if (!coordsA?.length || !coordsB?.length) return 0;
+  let totalLen = 0, coveredLen = 0;
+  for (let i = 0; i < coordsA.length - 1; i++) {
+    const [lngA1, latA1] = coordsA[i];
+    const [lngA2, latA2] = coordsA[i + 1];
+    const segLen = haversineKm(latA1, lngA1, latA2, lngA2);
+    totalLen += segLen;
+    const midLat = (latA1 + latA2) / 2;
+    const midLng = (lngA1 + lngA2) / 2;
+    if (pointToPolylineDist(midLat, midLng, coordsB) <= thresholdKm) coveredLen += segLen;
+  }
+  return totalLen > 0 ? (coveredLen / totalLen) * 100 : 0;
+}
+
+// Extra km the existing truck must drive off its route to service the new pickup/dropoff.
+function estimateDetourKm(existingCoords, newFromLat, newFromLng, newToLat, newToLng) {
+  if (!existingCoords?.length) return Infinity;
+  return pointToPolylineDist(newFromLat, newFromLng, existingCoords)
+       + pointToPolylineDist(newToLat,   newToLng,   existingCoords);
+}
+
+// Absolute calendar days between two YYYY-MM-DD strings (or ISO timestamps).
+function daysDiff(d1, d2) {
+  if (!d1 || !d2) return Infinity;
+  const ms = Math.abs(new Date(d1).setHours(0,0,0,0) - new Date(d2).setHours(0,0,0,0));
+  return ms / 86_400_000;
 }
 
 const { optimize }      = require('./engine/optimizer');
@@ -103,8 +127,8 @@ const STORE_PATH = path.join(DATA_DIR, 'store.json');
 const SEED = {
   version: 1,
   trucks: [
-    { id: 1, name: 'Semi Truck 1', length: 53, width: 8.5, height: 9,   maxWt: 44000, baseRate: 600,  ratePerMi: 3.50, licensePlate: 'TRK-0001' },
-    { id: 2, name: 'Box Truck 1',  length: 20, width: 7.5, height: 7.5, maxWt: 12000, baseRate: 280,  ratePerMi: 2.20, licensePlate: 'BOX-0002' },
+    { id: 1, name: 'Semi Truck 1', length: 53, width: 8.5, height: 9,   maxWt: 44000, baseRate: 600,  ratePerMi: 3.50, licensePlate: 'TRK-0001', shared: true  },
+    { id: 2, name: 'Box Truck 1',  length: 20, width: 7.5, height: 7.5, maxWt: 12000, baseRate: 280,  ratePerMi: 2.20, licensePlate: 'BOX-0002', shared: false },
   ],
   carriers: [
     { id: 1, name: 'FastFreight LLC', trucks: [
@@ -594,28 +618,65 @@ paypal.Buttons({
 // ── Bookings ─────────────────────────────────────────────────────────────────
 
 // Available trucks for consolidation — must be before POST /api/bookings
+// Accepts: fromLat, fromLng, toLat, toLng, newGeomCoords, neededWeight, neededVol, pickupDate
+// For shared bookings: enforces ≥80% route overlap, ≤5% detour, ±2-day date window.
 app.post('/api/bookings/available-trucks', (req, res) => {
-  const { fromLat, fromLng, toLat, toLng, neededWeight = 0, neededVol = 0 } = req.body || {};
-  const store = readStore();
-  const activeBookings = (store.bookings || []).filter(b => b.status === 'active');
+  const {
+    fromLat, fromLng, toLat, toLng,
+    newGeomCoords = null,
+    neededWeight  = 0,
+    neededVol     = 0,
+    pickupDate    = null,
+  } = req.body || {};
+
+  const store          = readStore();
+  const activeBookings = (store.bookings || []).filter(
+    b => b.status === 'active' && b.shippingOption === 'shared'
+  );
 
   const matches = [];
   for (const booking of activeBookings) {
     const truck = (store.trucks || []).find(t => t.id === booking.truckId);
-    if (!truck) continue;
+    if (!truck || !truck.shared) continue;                       // truck must be marked shareable
 
-    const truckVol       = truck.length * truck.width * truck.height;
+    // ── Capacity checks ──────────────────────────────────────────────────────
+    const truckVol        = truck.length * truck.width * truck.height;
     const remainingWeight = truck.maxWt - (booking.totalWeight || 0);
     const remainingVol    = truckVol - (booking.totalVol || 0);
     const remainingPct    = truckVol > 0 ? (remainingVol / truckVol) * 100 : 0;
-
     if (remainingWeight < neededWeight) continue;
     if (remainingVol    < neededVol)    continue;
     if (remainingPct    < 5)            continue;
-    if (!routeOverlaps(booking.route || {}, fromLat, fromLng, toLat, toLng, null)) continue;
 
-    matches.push({ booking, truck, remainingWeight, remainingVol, remainingPct });
+    // ── Date window: ±2 calendar days ────────────────────────────────────────
+    if (pickupDate && booking.pickupDate && daysDiff(pickupDate, booking.pickupDate) > 2) continue;
+
+    const existCoords = booking.route?.geometry?.coordinates;
+
+    // ── Route overlap: ≥80% of new route must lie within 2 km of existing route ──
+    const overlapPct = routeOverlapPct(newGeomCoords, existCoords);
+    if (overlapPct < 80) continue;
+
+    // ── Detour: ≤5% of existing route distance ────────────────────────────────
+    const existDistKm   = booking.route?.distance_km || 0;
+    const detourKm      = estimateDetourKm(existCoords, fromLat, fromLng, toLat, toLng);
+    const detourPct     = existDistKm > 0 ? (detourKm / existDistKm) * 100 : 100;
+    if (detourPct > 5) continue;
+
+    matches.push({
+      booking,
+      truck,
+      remainingWeight,
+      remainingVol,
+      remainingPct:  Math.round(remainingPct),
+      overlapPct:    Math.round(overlapPct),
+      detourPct:     parseFloat(detourPct.toFixed(1)),
+      detourKm:      parseFloat(detourKm.toFixed(1)),
+    });
   }
+
+  // Best matches first: highest overlap, then least detour
+  matches.sort((a, b) => b.overlapPct - a.overlapPct || a.detourPct - b.detourPct);
   res.json(matches);
 });
 
@@ -630,24 +691,51 @@ app.post('/api/bookings', (req, res) => {
   store.bookings.push(b);
   writeStore(store);
 
-  // After saving, find all OTHER active bookings whose routes overlap this one.
-  // This covers both cases: new route is shorter OR longer than the existing route.
+  // After saving, find all OTHER active shared bookings that could consolidate with this one.
+  // For shared bookings: requires ≥80% route overlap, ≤5% detour, ±2-day window, shared truck.
+  // For private bookings: uses legacy loose proximity check (informational only).
   const consolidationMatches = [];
+  const newCoords = b.route?.geometry?.coordinates;
+
   if (b.route?.fromLat != null && b.route?.toLat != null) {
     for (const other of store.bookings) {
       if (other.id === b.id || other.status !== 'active' || !other.route) continue;
+      if (other.shippingOption !== 'shared') continue;           // only shared bookings consolidate
+
       const truck = (store.trucks || []).find(t => t.id === other.truckId);
-      if (!truck) continue;
+      if (!truck || !truck.shared) continue;
+
       const truckVol     = truck.length * truck.width * truck.height;
       const remainingVol = truckVol - (other.totalVol || 0);
       const remainingPct = truckVol > 0 ? (remainingVol / truckVol) * 100 : 0;
       if (remainingPct < 5) continue;
-      if (routeOverlaps(other.route, b.route.fromLat, b.route.fromLng, b.route.toLat, b.route.toLng, b.route.geometry?.coordinates)) {
-        consolidationMatches.push({ booking: other, truck, remainingPct: Math.round(remainingPct) });
-      }
+
+      // Date window ±2 days
+      if (b.pickupDate && other.pickupDate && daysDiff(b.pickupDate, other.pickupDate) > 2) continue;
+
+      const existCoords  = other.route?.geometry?.coordinates;
+      const overlapPct   = routeOverlapPct(newCoords, existCoords);
+      if (overlapPct < 80) continue;
+
+      const existDistKm  = other.route?.distance_km || 0;
+      const detourKm     = estimateDetourKm(
+        existCoords, b.route.fromLat, b.route.fromLng, b.route.toLat, b.route.toLng
+      );
+      const detourPct    = existDistKm > 0 ? (detourKm / existDistKm) * 100 : 100;
+      if (detourPct > 5) continue;
+
+      consolidationMatches.push({
+        booking:      other,
+        truck,
+        remainingPct: Math.round(remainingPct),
+        overlapPct:   Math.round(overlapPct),
+        detourPct:    parseFloat(detourPct.toFixed(1)),
+        detourKm:     parseFloat(detourKm.toFixed(1)),
+      });
     }
   }
 
+  consolidationMatches.sort((a, b) => b.overlapPct - a.overlapPct || a.detourPct - b.detourPct);
   res.json({ ok: true, booking: b, consolidationMatches });
 });
 
@@ -694,6 +782,7 @@ app.post('/api/import/trucks', (req, res) => {
       baseRate:     r.baseRate  || 0,
       ratePerMi:    r.ratePerMi || 0,
       licensePlate: r.licensePlate || '',
+      shared:       r.shared === true,
     });
     imported++;
   }

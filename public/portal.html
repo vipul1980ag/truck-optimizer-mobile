@@ -253,6 +253,11 @@
           <label>License Plate</label>
           <input type="text" id="tf-plate" placeholder="e.g. ABC-1234" style="text-transform:uppercase">
         </div>
+        <div class="form-row" style="align-items:center;gap:10px;">
+          <label style="margin:0;">Allow Load Sharing (LTL)</label>
+          <input type="checkbox" id="tf-shared" title="Enable this truck to accept shared / LTL bookings from multiple customers">
+          <span style="font-size:11px;color:#64748b;">When checked, this truck can consolidate cargo from different users on overlapping routes</span>
+        </div>
         <input type="hidden" id="tf-edit-id" value="">
         <div style="display:flex;gap:8px;margin-top:12px;">
           <button class="btn-save-truck" onclick="saveTruck()">Save Truck</button>
@@ -445,6 +450,12 @@
           <div id="bm-dest-suggestions" class="location-suggestions" style="display:none"></div>
         </div>
         <div id="bm-dest-confirmed" class="loc-confirmed" style="display:none"></div>
+
+        <!-- Pickup date -->
+        <div class="loc-section-label" style="margin-top:16px;">📅 Pickup Date</div>
+        <div class="location-field-wrap">
+          <input type="date" id="bm-pickup-date" class="loc-input" style="max-width:220px;" title="When do you need pickup?">
+        </div>
 
         <!-- Shipping option -->
         <div class="loc-section-label" style="margin-top:16px;">💡 Want to save on shipping costs?</div>

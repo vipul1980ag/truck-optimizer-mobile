@@ -74,6 +74,7 @@ export default function LocationScreen({ navigation }) {
   const {
     setStartLocation, setDestLocation, startLocation, destLocation,
     shippingOption, setShippingOption,
+    pickupDate, setPickupDate,
   } = useWizard();
 
   const [startText,        setStartText]        = useState(startLocation?.label || '');
@@ -145,6 +146,31 @@ export default function LocationScreen({ navigation }) {
         {destLocation && (
           <View style={s.confirmedBadge}>
             <Text style={s.confirmedTxt}>✓ {destLocation.label}</Text>
+          </View>
+        )}
+
+        {/* Pickup date */}
+        <Text style={s.sectionHead}>📅 Pickup Date</Text>
+        <Text style={s.sectionSub}>When do you need pickup? (used to find matching shared trucks)</Text>
+        <TextInput
+          style={[s.input, { marginBottom: 8 }]}
+          value={pickupDate}
+          onChangeText={text => {
+            // Allow typing YYYY-MM-DD; auto-insert dashes
+            const digits = text.replace(/\D/g, '').slice(0, 8);
+            let formatted = digits;
+            if (digits.length > 4) formatted = digits.slice(0,4) + '-' + digits.slice(4);
+            if (digits.length > 6) formatted = digits.slice(0,4) + '-' + digits.slice(4,6) + '-' + digits.slice(6);
+            setPickupDate(formatted);
+          }}
+          placeholder="YYYY-MM-DD  (e.g. 2026-05-10)"
+          placeholderTextColor={C.text3}
+          keyboardType="numeric"
+          maxLength={10}
+        />
+        {pickupDate.length === 10 && (
+          <View style={[s.confirmedBadge, { marginBottom: 16 }]}>
+            <Text style={s.confirmedTxt}>✓ Pickup: {pickupDate}</Text>
           </View>
         )}
 

@@ -11,6 +11,7 @@ export function WizardProvider({ children }) {
   const [selectedRoute,  setSelectedRoute] = useState(null); // {index, distance_km, duration_min, geometry, toll_cost}
   const [cargoCategory,  setCargoCategory] = useState(null); // 'household' | 'industrial' | null
   const [selectedTruck,  setSelectedTruck] = useState(null); // override truck for booking
+  const [pickupDate,     setPickupDate]    = useState('');   // YYYY-MM-DD
 
   function addItem(item) {
     setItems(prev => [...prev, { ...item, _id: Date.now() + Math.random() }]);
@@ -41,6 +42,7 @@ export function WizardProvider({ children }) {
     setSelectedRoute(null);
     setCargoCategory(null);
     setSelectedTruck(null);
+    setPickupDate('');
   }
 
   return (
@@ -53,6 +55,7 @@ export function WizardProvider({ children }) {
       selectedRoute, setSelectedRoute,
       cargoCategory, setCargoCategory,
       selectedTruck, setSelectedTruck,
+      pickupDate,    setPickupDate,
       resetWizard,
     }}>
       {children}
