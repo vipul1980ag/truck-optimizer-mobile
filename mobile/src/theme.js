@@ -1,13 +1,13 @@
 export const C = {
   // Backgrounds
-  bg:          '#f0f4f8',
+  bg:          '#ffffff',
   surface:     '#ffffff',
   surface2:    '#f8fafc',
   surface3:    '#f1f5f9',
 
   // Borders
   border:      '#e2e8f0',
-  borderLight: '#f1f5f9',
+  borderLight: '#f5f7fa',
 
   // Text
   text:        '#0f172a',
