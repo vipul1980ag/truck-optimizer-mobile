@@ -911,6 +911,19 @@ function joinShipment(bookingId) {
   alert('You will join this shipment on confirm. ~15% savings applied.');
 }
 
+function selectOptimizeProposal(idx) {
+  const proposals = window._optimizeProposals || [];
+  const p = proposals[idx];
+  if (!p) return;
+  _wizardConsolidateTo = p.bookings[0]?.bookingId || null;
+  document.querySelectorAll('.opt-proposal').forEach((el, i) => {
+    el.classList.toggle('opt-proposal-selected', i === idx);
+  });
+  if (_bookingEstimate) _bookingEstimate.estimate = p.newUser.sharedCost;
+  const msg = `✅ Joined! Your estimated cost: $${p.newUser.sharedCost.toLocaleString()}\nYou save $${p.newUser.saves.toLocaleString()} (${p.newUser.savesPct}%) vs booking privately.`;
+  alert(msg);
+}
+
 async function showChargesStep() {
   showBookingStep('charges');
   const el = document.getElementById('bm-charges-content');
@@ -959,9 +972,86 @@ async function showChargesStep() {
 
     _bookingEstimate = { estimate, totalUnits, totalWeight, hasDG, distance_km, toll_cost, totalVol, truck };
 
-    // ── B5: Consolidation card ──
+    // ── B5: Optimisation panel (shared) / info card (private) ──
     let consolidationHtml = '';
-    if (_wizardStart && _wizardDest) {
+    if (_wizardShipping === 'shared' && _wizardStart && _wizardDest) {
+      try {
+        const optRes = await fetch('/api/bookings/optimize-shared', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            fromLat: _wizardStart.lat, fromLng: _wizardStart.lng,
+            toLat:   _wizardDest.lat,  toLng:   _wizardDest.lng,
+            newGeomCoords: _wizardRoute?.geometry?.coordinates || null,
+            pickupDate:    document.getElementById('bm-pickup-date')?.value || null,
+            totalWeight, totalVol, distance_km, distance_miles,
+          }),
+        }).then(r => r.json());
+
+        window._optimizeProposals    = optRes.proposals    || [];
+        window._optimizePrivateCost  = optRes.newUserPrivateCost || 0;
+
+        if (optRes.proposals?.length) {
+          const privFmt = `$${(optRes.newUserPrivateCost || 0).toLocaleString()}`;
+          const proposalsHtml = optRes.proposals.map((p, idx) => {
+            const isUpgrade  = p.type === 'upgrade-truck';
+            const tName      = isUpgrade ? p.upgradeTruck.name : p.truck.name;
+            const tPlate     = (isUpgrade ? p.upgradeTruck.licensePlate : p.truck.licensePlate) || '';
+            const upgradeTag = isUpgrade
+              ? `<span class="opt-tag opt-tag-upgrade">⬆ Truck upgraded</span>`
+              : `<span class="opt-tag opt-tag-fit">✓ Fits current truck</span>`;
+            const allSaveTag = p.allSave
+              ? `<span class="opt-tag opt-tag-allsave">🎉 Everyone saves</span>`
+              : `<span class="opt-tag opt-tag-warn">⚠ Not all save</span>`;
+            const sharedCount = p.bookings.length + 1;
+            const bookingRows = p.bookings.map(b => `
+              <div class="opt-user-row">
+                <span class="opt-user-lbl">Existing shipper</span>
+                <span class="opt-save ${b.saves > 0 ? 'green' : 'red'}">
+                  ${b.saves > 0 ? `−$${b.saves.toLocaleString()} (${b.savesPct}% off)` : 'no saving'}
+                </span>
+              </div>`).join('');
+
+            return `
+              <div class="opt-proposal ${p.allSave ? 'opt-proposal-best' : ''}" id="opt-proposal-${idx}">
+                <div class="opt-proposal-header">
+                  <div class="opt-proposal-title">${esc(tName)}${tPlate ? ' · ' + esc(tPlate) : ''}</div>
+                  <div class="opt-tags">${upgradeTag}${allSaveTag}</div>
+                </div>
+                <div class="opt-stats">
+                  <span>👥 ${sharedCount} shippers</span>
+                  <span>📦 ${p.truckUtilPct}% loaded</span>
+                  <span>↔ ${p.overlapPct}% route overlap</span>
+                  <span>📐 ${p.detourPct}% detour</span>
+                </div>
+                <div class="opt-cost-row">
+                  <span class="opt-cost-lbl">Your cost</span>
+                  <span class="opt-your-cost">$${p.newUser.sharedCost.toLocaleString()}</span>
+                  <span class="opt-vs">vs ${privFmt} private</span>
+                  <span class="opt-save green">Save $${p.newUser.saves.toLocaleString()} (${p.newUser.savesPct}%)</span>
+                </div>
+                ${bookingRows}
+                <button class="btn-select-proposal" onclick="selectOptimizeProposal(${idx})">
+                  ${p.allSave ? '🎉 Join — Everyone saves!' : 'Join this group'}
+                </button>
+              </div>`;
+          }).join('');
+
+          consolidationHtml = `
+            <div class="opt-panel">
+              <div class="opt-panel-header">🚛 Shared Truck Cost Optimisation</div>
+              <div class="opt-panel-sub">These groupings minimise cost so every shipper pays less than booking privately.</div>
+              ${proposalsHtml}
+            </div>`;
+        } else {
+          consolidationHtml = `
+            <div class="opt-panel" style="opacity:0.75;">
+              <div class="opt-panel-header">🚛 No matching shared shipments yet</div>
+              <div class="opt-panel-sub">No active bookings match your route/date. You'll be the first on this lane — others may join your shipment later and split the cost.</div>
+            </div>`;
+        }
+      } catch (_) { /* optimisation panel is optional */ }
+    } else if (_wizardShipping !== 'shared' && _wizardStart && _wizardDest) {
       try {
         const matches = await fetch('/api/bookings/available-trucks', {
           method: 'POST',
@@ -969,7 +1059,7 @@ async function showChargesStep() {
           body: JSON.stringify({
             fromLat: _wizardStart.lat, fromLng: _wizardStart.lng,
             toLat:   _wizardDest.lat,  toLng:   _wizardDest.lng,
-            neededWeight: totalWeight,  neededVol: totalVol,
+            neededWeight: totalWeight, neededVol: totalVol,
           }),
         }).then(r => r.json());
         if (matches.length) {

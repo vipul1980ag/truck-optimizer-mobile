@@ -28,6 +28,7 @@ export const api = {
   getTolls:     (geometry, vehicleType) => request('POST', '/api/tolls', { geometry, vehicleType }),
   getAvailableTrucks: (fromLat, fromLng, toLat, toLng, neededWeight, neededVol) =>
     request('POST', '/api/bookings/available-trucks', { fromLat, fromLng, toLat, toLng, neededWeight, neededVol }),
+  optimizeShared: (body) => request('POST', '/api/bookings/optimize-shared', body),
   createBooking: (body) => request('POST', '/api/bookings', body),
 };
 

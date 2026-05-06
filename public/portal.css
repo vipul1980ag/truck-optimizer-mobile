@@ -1537,3 +1537,44 @@ body {
 }
 .park-nav-btn:hover { background: #0284c7; }
 .park-empty { padding: 32px 16px; text-align: center; color: #94a3b8; font-size: 13px; }
+
+/* ── Shared-booking optimisation panel ───────────────────────────────────── */
+.opt-panel { background: var(--surface); border-radius: 14px; padding: 16px; margin-bottom: 14px; border: 1.5px solid var(--border); }
+.opt-panel-header { font-size: 15px; font-weight: 900; color: var(--text); margin-bottom: 4px; }
+.opt-panel-sub { font-size: 12px; color: var(--text2); margin-bottom: 14px; line-height: 1.6; }
+.opt-proposal {
+  background: var(--bg); border-radius: 12px; padding: 14px; margin-bottom: 10px;
+  border: 2px solid var(--border); transition: border-color 0.15s;
+}
+.opt-proposal-best { border-color: #16a34a; background: #f0fdf4; }
+.opt-proposal-selected { border-color: var(--primary) !important; background: #eff6ff !important; }
+.opt-proposal-header { display: flex; align-items: flex-start; gap: 8px; margin-bottom: 8px; flex-wrap: wrap; }
+.opt-proposal-title { font-size: 14px; font-weight: 800; color: var(--text); flex: 1; min-width: 0; }
+.opt-tags { display: flex; gap: 4px; flex-wrap: wrap; }
+.opt-tag { font-size: 10px; font-weight: 700; padding: 2px 8px; border-radius: 20px; }
+.opt-tag-fit { background: #dcfce7; color: #166534; }
+.opt-tag-upgrade { background: #dbeafe; color: #1e40af; }
+.opt-tag-allsave { background: #fef9c3; color: #713f12; }
+.opt-tag-warn { background: #fee2e2; color: #991b1b; }
+.opt-stats { display: flex; flex-wrap: wrap; gap: 6px; font-size: 11px; color: var(--text2); margin-bottom: 10px; }
+.opt-stats span { background: var(--surface); border-radius: 6px; padding: 2px 7px; border: 1px solid var(--border); white-space: nowrap; }
+.opt-cost-row {
+  display: flex; align-items: center; gap: 8px; flex-wrap: wrap;
+  margin-bottom: 8px; padding: 8px 10px; background: var(--surface); border-radius: 8px;
+}
+.opt-cost-lbl  { font-size: 12px; color: var(--text2); }
+.opt-your-cost { font-size: 18px; font-weight: 900; color: var(--primary); }
+.opt-vs        { font-size: 11px; color: var(--text2); flex: 1; }
+.opt-save.green { font-size: 12px; font-weight: 700; color: #16a34a; white-space: nowrap; }
+.opt-save.red   { font-size: 12px; font-weight: 700; color: #dc2626; white-space: nowrap; }
+.opt-user-row {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 5px 0; font-size: 12px; border-top: 1px solid var(--border);
+}
+.opt-user-lbl { color: var(--text2); }
+.btn-select-proposal {
+  width: 100%; margin-top: 10px; padding: 10px 14px;
+  background: var(--primary); color: #fff; border: none; border-radius: 10px;
+  font-size: 13px; font-weight: 800; cursor: pointer; letter-spacing: 0.1px;
+}
+.btn-select-proposal:hover { opacity: 0.88; }

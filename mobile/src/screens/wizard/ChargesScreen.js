@@ -16,6 +16,10 @@ export default function ChargesScreen({ navigation }) {
   const [saving,            setSaving]            = useState(false);
   const [manualTollText,    setManualTollText]    = useState('');
   const [additionalText,    setAdditionalText]    = useState('');
+  const [proposals,         setProposals]         = useState([]);
+  const [privateCostBase,   setPrivateCostBase]   = useState(0);
+  const [selectedProposal,  setSelectedProposal]  = useState(null);
+  const [optLoading,        setOptLoading]        = useState(false);
 
   useEffect(() => {
     api.getData()
@@ -26,6 +30,29 @@ export default function ChargesScreen({ navigation }) {
       .catch(() => setTruck(null))
       .finally(() => setLoading(false));
   }, [selectedTruck]);
+
+  // Fetch optimisation proposals when shipping is shared
+  useEffect(() => {
+    if (shippingOption !== 'shared' || !startLocation || !destLocation) return;
+    setOptLoading(true);
+    const distance_km    = selectedRoute ? selectedRoute.distance_km : 160.9;
+    const distance_miles = distance_km * 0.621371;
+    const tw = items.reduce((s, i) => s + (i.weight + (i.packagingWeight || 0)) * i.qty, 0);
+    const tv = items.reduce((s, i) => s + i.length * i.width * i.height * i.qty, 0);
+    api.optimizeShared({
+      fromLat: startLocation.lat, fromLng: startLocation.lng,
+      toLat:   destLocation.lat,  toLng:   destLocation.lng,
+      newGeomCoords: selectedRoute?.geometry?.coordinates || null,
+      pickupDate:    pickupDate || null,
+      totalWeight:   tw, totalVol: tv, distance_km, distance_miles,
+    })
+      .then(data => {
+        setProposals(data.proposals || []);
+        setPrivateCostBase(data.newUserPrivateCost || 0);
+      })
+      .catch(() => {})
+      .finally(() => setOptLoading(false));
+  }, [shippingOption, startLocation, destLocation, selectedRoute, pickupDate]);
 
   // Cargo totals
   const totalItems  = items.reduce((s, i) => s + i.qty, 0);
@@ -128,7 +155,9 @@ export default function ChargesScreen({ navigation }) {
         } catch (_) { /* non-critical — booking save failure should not block confirm */ }
       }
 
-      navigation.navigate('Confirm', { totalItems, totalWeight, estimate, hasDG, dgCount: dgItems.length, dgSurcharge: Math.round(dgSurcharge), distanceKm: distance_km, tollCost: toll_cost, manualToll, additionalCharge });
+      const selectedP   = selectedProposal != null ? proposals[selectedProposal] : null;
+      const finalEstimate = selectedP ? selectedP.newUser.sharedCost : estimate;
+      navigation.navigate('Confirm', { totalItems, totalWeight, estimate: finalEstimate, hasDG, dgCount: dgItems.length, dgSurcharge: Math.round(dgSurcharge), distanceKm: distance_km, tollCost: toll_cost, manualToll, additionalCharge });
 
       // Notify about overlapping routes after navigation settles
       if (consolidationMatches.length) {
@@ -194,6 +223,75 @@ export default function ChargesScreen({ navigation }) {
             <Text style={s.optDesc}>A dedicated truck for your cargo only. Full truck capacity reserved for you.</Text>
           )}
         </View>
+
+        {/* Shared-booking optimisation proposals */}
+        {shippingOption === 'shared' && (
+          optLoading ? (
+            <View style={[s.card, { alignItems: 'center', paddingVertical: 20 }]}>
+              <ActivityIndicator color={C.primary} />
+              <Text style={[s.optDesc, { marginTop: 8, textAlign: 'center' }]}>Finding best sharing groups…</Text>
+            </View>
+          ) : proposals.length > 0 ? (
+            <View style={s.card}>
+              <Text style={s.cardHead}>🚛 Shared Truck Optimisation</Text>
+              <Text style={[s.disclaimer, { marginBottom: 10 }]}>These groupings minimise your cost while ensuring everyone saves vs. booking privately.</Text>
+              {proposals.map((p, idx) => {
+                const isSelected = selectedProposal === idx;
+                const isUpgrade  = p.type === 'upgrade-truck';
+                const tName      = isUpgrade ? p.upgradeTruck?.name : p.truck?.name;
+                return (
+                  <View key={idx} style={[s.proposalCard, p.allSave && s.proposalBest, isSelected && s.proposalSelected]}>
+                    <View style={s.proposalHeader}>
+                      <Text style={s.proposalTitle}>{tName}</Text>
+                      <View style={s.tagRow}>
+                        {isUpgrade && <View style={s.tagUpgrade}><Text style={s.tagTxt}>⬆ Upgraded</Text></View>}
+                        {p.allSave  && <View style={s.tagAllSave}><Text style={s.tagTxt}>🎉 All save</Text></View>}
+                      </View>
+                    </View>
+                    <View style={s.statsRow}>
+                      <Text style={s.statPill}>👥 {p.bookings.length + 1} shippers</Text>
+                      <Text style={s.statPill}>📦 {p.truckUtilPct}% loaded</Text>
+                      <Text style={s.statPill}>↔ {p.overlapPct}% overlap</Text>
+                    </View>
+                    <View style={s.costBox}>
+                      <Text style={s.costLbl}>Your cost</Text>
+                      <Text style={s.costVal}>${p.newUser.sharedCost.toLocaleString()}</Text>
+                      <Text style={s.costVs}>vs ${privateCostBase.toLocaleString()} private</Text>
+                    </View>
+                    <Text style={s.saveTxt}>Save ${p.newUser.saves.toLocaleString()} ({p.newUser.savesPct}% off)</Text>
+                    {p.bookings.map((b, bi) => (
+                      <View key={bi} style={s.existingRow}>
+                        <Text style={s.existingLbl}>Existing shipper</Text>
+                        <Text style={[s.existingSave, b.saves > 0 ? s.greenTxt : s.redTxt]}>
+                          {b.saves > 0 ? `−$${b.saves.toLocaleString()} (${b.savesPct}% off)` : 'no saving'}
+                        </Text>
+                      </View>
+                    ))}
+                    <TouchableOpacity
+                      style={[s.joinBtn, isSelected && s.joinBtnSelected]}
+                      onPress={() => {
+                        setSelectedProposal(idx);
+                        Alert.alert(
+                          isSelected ? '✅ Already selected' : '✅ Joined!',
+                          `Your estimated cost: $${p.newUser.sharedCost.toLocaleString()}\nYou save $${p.newUser.saves.toLocaleString()} (${p.newUser.savesPct}%) vs booking privately.`
+                        );
+                      }}
+                    >
+                      <Text style={s.joinBtnTxt}>
+                        {isSelected ? '✓ Selected' : p.allSave ? '🎉 Join — Everyone saves!' : 'Join this group'}
+                      </Text>
+                    </TouchableOpacity>
+                  </View>
+                );
+              })}
+            </View>
+          ) : !optLoading ? (
+            <View style={[s.card, { borderStyle: 'dashed' }]}>
+              <Text style={s.cardHead}>🚛 No matching groups yet</Text>
+              <Text style={s.optDesc}>No active shared bookings match your route/date. You'll be the first — others may join your lane later and split the cost.</Text>
+            </View>
+          ) : null
+        )}
 
         {/* DG warning */}
         {hasDG && (
@@ -343,4 +441,30 @@ const s = StyleSheet.create({
   inputRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingVertical: 8, borderBottomWidth: 1, borderBottomColor: C.surface2 },
   inputLbl: { fontSize: 13, color: C.text2, flex: 1 },
   input:    { width: 90, backgroundColor: C.surface2, borderRadius: 8, paddingHorizontal: 10, paddingVertical: 6, fontSize: 13, color: C.text, fontWeight: '700', textAlign: 'right', borderWidth: 1, borderColor: C.border },
+
+  // Optimisation proposals
+  proposalCard:     { backgroundColor: C.surface2, borderRadius: 10, padding: 12, marginBottom: 10, borderWidth: 2, borderColor: C.border },
+  proposalBest:     { borderColor: '#16a34a', backgroundColor: '#f0fdf4' },
+  proposalSelected: { borderColor: C.primary, backgroundColor: '#eff6ff' },
+  proposalHeader:   { flexDirection: 'row', alignItems: 'flex-start', justifyContent: 'space-between', marginBottom: 8, gap: 8 },
+  proposalTitle:    { fontSize: 13, fontWeight: '800', color: C.text, flex: 1 },
+  tagRow:           { flexDirection: 'row', gap: 4, flexWrap: 'wrap' },
+  tagUpgrade:       { backgroundColor: '#dbeafe', borderRadius: 20, paddingHorizontal: 7, paddingVertical: 2 },
+  tagAllSave:       { backgroundColor: '#fef9c3', borderRadius: 20, paddingHorizontal: 7, paddingVertical: 2 },
+  tagTxt:           { fontSize: 10, fontWeight: '700', color: C.text },
+  statsRow:         { flexDirection: 'row', flexWrap: 'wrap', gap: 5, marginBottom: 8 },
+  statPill:         { fontSize: 10, color: C.text2, backgroundColor: C.surface, borderRadius: 6, paddingHorizontal: 7, paddingVertical: 2, borderWidth: 1, borderColor: C.border },
+  costBox:          { flexDirection: 'row', alignItems: 'center', gap: 8, flexWrap: 'wrap', backgroundColor: C.surface, borderRadius: 8, padding: 8, marginBottom: 4 },
+  costLbl:          { fontSize: 11, color: C.text2 },
+  costVal:          { fontSize: 17, fontWeight: '900', color: C.primary },
+  costVs:           { fontSize: 11, color: C.text2, flex: 1 },
+  saveTxt:          { fontSize: 12, fontWeight: '700', color: '#16a34a', marginBottom: 6 },
+  existingRow:      { flexDirection: 'row', justifyContent: 'space-between', paddingVertical: 4, borderTopWidth: 1, borderTopColor: C.border },
+  existingLbl:      { fontSize: 12, color: C.text2 },
+  existingSave:     { fontSize: 12, fontWeight: '700' },
+  greenTxt:         { color: '#16a34a' },
+  redTxt:           { color: '#dc2626' },
+  joinBtn:          { marginTop: 8, backgroundColor: C.primary, borderRadius: 9, paddingVertical: 10, alignItems: 'center' },
+  joinBtnSelected:  { backgroundColor: '#16a34a' },
+  joinBtnTxt:       { color: '#fff', fontSize: 13, fontWeight: '800' },
 });

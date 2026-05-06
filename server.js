@@ -680,6 +680,197 @@ app.post('/api/bookings/available-trucks', (req, res) => {
   res.json(matches);
 });
 
+// ── Shared-booking cost optimisation ─────────────────────────────────────────
+// Finds candidate shared bookings, groups by truck, calculates per-user costs,
+// and returns proposals sorted by "all users save" first, then new-user savings.
+// Returns: { proposals, newUserPrivateCost }
+app.post('/api/bookings/optimize-shared', (req, res) => {
+  const {
+    fromLat, fromLng, toLat, toLng,
+    newGeomCoords  = null,
+    pickupDate     = null,
+    totalWeight    = 0,
+    totalVol       = 0,
+    distance_km    = 0,
+    distance_miles = 0,
+  } = req.body || {};
+
+  const store      = readStore();
+  const allTrucks  = store.trucks   || [];
+  const allBookings = store.bookings || [];
+  const dist_mi    = distance_miles || distance_km * 0.621371;
+
+  function truckFullCost(t) { return t.baseRate + t.ratePerMi * dist_mi; }
+
+  function userSharedCost(userVol, truckVol, fullCost) {
+    const pct = truckVol > 0 ? userVol / truckVol : 0;
+    return Math.max(fullCost * pct, fullCost * 0.20);
+  }
+
+  function calcPrivateCost(weight, vol) {
+    const fitting = allTrucks.filter(t => {
+      const tv = t.length * t.width * t.height;
+      return tv >= vol && t.maxWt >= weight;
+    });
+    const pool = fitting.length ? fitting : allTrucks;
+    if (!pool.length) return 0;
+    return Math.min(...pool.map(t => truckFullCost(t)));
+  }
+
+  const newUserPrivate = calcPrivateCost(totalWeight, totalVol);
+
+  // ── Find candidate shared bookings ───────────────────────────────────────
+  const activeShared = allBookings.filter(b => b.status === 'active' && b.shippingOption === 'shared');
+  const truckGroups  = {};
+
+  for (const booking of activeShared) {
+    const truck = allTrucks.find(t => t.id === booking.truckId);
+    if (!truck || !truck.shared) continue;
+    if (pickupDate && booking.pickupDate && daysDiff(pickupDate, booking.pickupDate) > 2) continue;
+
+    const existCoords = booking.route?.geometry?.coordinates;
+    const overlapPct  = routeOverlapPct(newGeomCoords, existCoords);
+    if (overlapPct < 80) continue;
+
+    const existDistKm = booking.route?.distance_km || distance_km;
+    const detourKm    = estimateDetourKm(existCoords, fromLat, fromLng, toLat, toLng);
+    const detourPct   = existDistKm > 0 ? (detourKm / existDistKm) * 100 : 100;
+    if (detourPct > 5) continue;
+
+    if (!truckGroups[truck.id]) {
+      truckGroups[truck.id] = { truck, bookings: [], overlapPct: 0, detourPct: 0, detourKm: 0 };
+    }
+    if (overlapPct > truckGroups[truck.id].overlapPct) {
+      truckGroups[truck.id].overlapPct = overlapPct;
+      truckGroups[truck.id].detourPct  = detourPct;
+      truckGroups[truck.id].detourKm   = detourKm;
+    }
+    truckGroups[truck.id].bookings.push(booking);
+  }
+
+  // ── Build proposals ───────────────────────────────────────────────────────
+  function buildBookingDetails(t) {
+    const tv = t.length * t.width * t.height;
+    const fc = truckFullCost(t);
+    return truckGroups[t.id]
+      ? truckGroups[t.id].bookings.map(b => {
+          const uVol = b.totalVol    || 0;
+          const uWt  = b.totalWeight || 0;
+          const sc   = userSharedCost(uVol, tv, fc);
+          const pc   = calcPrivateCost(uWt, uVol);
+          return {
+            bookingId:   b.id,
+            vol:         Math.round(uVol),
+            weight:      Math.round(uWt),
+            sharedCost:  Math.round(sc),
+            privateCost: Math.round(pc),
+            saves:       Math.round(pc - sc),
+            savesPct:    pc > 0 ? Math.round((1 - sc / pc) * 100) : 0,
+          };
+        })
+      : [];
+  }
+
+  const proposals = [];
+
+  for (const group of Object.values(truckGroups)) {
+    const { truck, bookings, overlapPct, detourPct, detourKm } = group;
+    const truckVol       = truck.length * truck.width * truck.height;
+    const existingVol    = bookings.reduce((s, b) => s + (b.totalVol    || 0), 0);
+    const existingWeight = bookings.reduce((s, b) => s + (b.totalWeight || 0), 0);
+
+    if ((truckVol - existingVol) >= totalVol && (truck.maxWt - existingWeight) >= totalWeight) {
+      // ── Fits on existing truck ────────────────────────────────────────────
+      const fc           = truckFullCost(truck);
+      const bkDetails    = buildBookingDetails(truck);
+      const newUserSC    = userSharedCost(totalVol, truckVol, fc);
+      const newUserSaves = newUserPrivate - newUserSC;
+      const allSave      = newUserSaves > 0 && bkDetails.every(b => b.saves > 0);
+      const utilPct      = truckVol > 0 ? Math.round(((existingVol + totalVol) / truckVol) * 100) : 0;
+
+      proposals.push({
+        type:     'fit-existing',
+        truck:    { id: truck.id, name: truck.name, licensePlate: truck.licensePlate, vol: Math.round(truckVol), maxWt: truck.maxWt },
+        bookings: bkDetails,
+        newUser:  {
+          vol: Math.round(totalVol), weight: Math.round(totalWeight),
+          sharedCost: Math.round(newUserSC), privateCost: Math.round(newUserPrivate),
+          saves: Math.round(newUserSaves),
+          savesPct: newUserPrivate > 0 ? Math.round((1 - newUserSC / newUserPrivate) * 100) : 0,
+        },
+        truckUtilPct: utilPct, allSave,
+        overlapPct: Math.round(overlapPct),
+        detourPct:  parseFloat(detourPct.toFixed(1)),
+        detourKm:   parseFloat(detourKm.toFixed(1)),
+      });
+
+    } else {
+      // ── Doesn't fit — find a bigger shared truck ──────────────────────────
+      const totalNeededVol    = existingVol + totalVol;
+      const totalNeededWeight = existingWeight + totalWeight;
+      const biggerTrucks = allTrucks
+        .filter(t => t.id !== truck.id && t.shared)
+        .filter(t => {
+          const tv = t.length * t.width * t.height;
+          return tv >= totalNeededVol && t.maxWt >= totalNeededWeight;
+        })
+        .sort((a, b) => truckFullCost(a) - truckFullCost(b));
+
+      if (!biggerTrucks.length) continue;
+      const bigTruck    = biggerTrucks[0];
+      const bigTruckVol = bigTruck.length * bigTruck.width * bigTruck.height;
+      const bigFC       = truckFullCost(bigTruck);
+
+      // Build booking details using bigger truck's rates for all existing users
+      const bkDetails   = group.bookings.map(b => {
+        const uVol = b.totalVol    || 0;
+        const uWt  = b.totalWeight || 0;
+        const sc   = userSharedCost(uVol, bigTruckVol, bigFC);
+        const pc   = calcPrivateCost(uWt, uVol);
+        return {
+          bookingId:   b.id,
+          vol:         Math.round(uVol),
+          weight:      Math.round(uWt),
+          sharedCost:  Math.round(sc),
+          privateCost: Math.round(pc),
+          saves:       Math.round(pc - sc),
+          savesPct:    pc > 0 ? Math.round((1 - sc / pc) * 100) : 0,
+        };
+      });
+
+      const newUserSC    = userSharedCost(totalVol, bigTruckVol, bigFC);
+      const newUserSaves = newUserPrivate - newUserSC;
+      const allSave      = newUserSaves > 0 && bkDetails.every(b => b.saves > 0);
+      const utilPct      = bigTruckVol > 0 ? Math.round(((existingVol + totalVol) / bigTruckVol) * 100) : 0;
+
+      proposals.push({
+        type:         'upgrade-truck',
+        truck:        { id: truck.id,    name: truck.name,    licensePlate: truck.licensePlate,    vol: Math.round(truckVol),    maxWt: truck.maxWt    },
+        upgradeTruck: { id: bigTruck.id, name: bigTruck.name, licensePlate: bigTruck.licensePlate, vol: Math.round(bigTruckVol), maxWt: bigTruck.maxWt },
+        bookings:     bkDetails,
+        newUser: {
+          vol: Math.round(totalVol), weight: Math.round(totalWeight),
+          sharedCost: Math.round(newUserSC), privateCost: Math.round(newUserPrivate),
+          saves: Math.round(newUserSaves),
+          savesPct: newUserPrivate > 0 ? Math.round((1 - newUserSC / newUserPrivate) * 100) : 0,
+        },
+        truckUtilPct: utilPct, allSave,
+        overlapPct: Math.round(overlapPct),
+        detourPct:  parseFloat(detourPct.toFixed(1)),
+        detourKm:   parseFloat(detourKm.toFixed(1)),
+      });
+    }
+  }
+
+  // allSave proposals first, then by new-user savings descending
+  proposals.sort((a, b) => {
+    if (a.allSave !== b.allSave) return b.allSave ? 1 : -1;
+    return b.newUser.saves - a.newUser.saves;
+  });
+
+  res.json({ proposals, newUserPrivateCost: Math.round(newUserPrivate) });
+});
+
 app.post('/api/bookings', (req, res) => {
   const store = readStore();
   const b = {
