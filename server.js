@@ -6,6 +6,113 @@ const path       = require('path');
 const crypto     = require('crypto');
 const Anthropic  = require('@anthropic-ai/sdk');
 const { GoogleGenerativeAI } = require('@google/generative-ai');
+const nodemailer = require('nodemailer');
+const twilio     = require('twilio');
+
+// ── Notification helpers ─────────────────────────────────────────────────────
+
+// Lazy-init email transport (set SMTP_HOST / SMTP_PORT / SMTP_USER / SMTP_PASS / SMTP_FROM)
+let _mailTransport = null;
+function getMailTransport() {
+  if (!_mailTransport && process.env.SMTP_HOST && process.env.SMTP_USER) {
+    _mailTransport = nodemailer.createTransport({
+      host:   process.env.SMTP_HOST,
+      port:   parseInt(process.env.SMTP_PORT || '587'),
+      secure: process.env.SMTP_PORT === '465',
+      auth:   { user: process.env.SMTP_USER, pass: process.env.SMTP_PASS },
+    });
+  }
+  return _mailTransport;
+}
+
+// Lazy-init Twilio client (set TWILIO_SID / TWILIO_TOKEN)
+let _twilioClient = null;
+function getTwilio() {
+  if (!_twilioClient && process.env.TWILIO_SID && process.env.TWILIO_TOKEN) {
+    _twilioClient = twilio(process.env.TWILIO_SID, process.env.TWILIO_TOKEN);
+  }
+  return _twilioClient;
+}
+
+// Normalise phone to E.164 (assumes India +91 prefix if no country code given)
+function toE164(phone) {
+  if (!phone) return null;
+  const digits = phone.replace(/\D/g, '');
+  if (digits.startsWith('91') && digits.length === 12) return '+' + digits;
+  if (digits.length === 10) return '+91' + digits;   // default to India
+  if (digits.length > 10)   return '+' + digits;
+  return null;
+}
+
+async function sendEmail(to, subject, htmlBody) {
+  const transport = getMailTransport();
+  if (!transport || !to) return;
+  try {
+    await transport.sendMail({
+      from:    process.env.SMTP_FROM || process.env.SMTP_USER,
+      to,
+      subject,
+      html:    htmlBody,
+      text:    htmlBody.replace(/<[^>]+>/g, ''),
+    });
+    console.log(`[notify] email → ${to} | ${subject}`);
+  } catch (err) {
+    console.error('[notify] email error:', err.message);
+  }
+}
+
+async function sendSMS(to, body) {
+  const client = getTwilio();
+  const e164   = toE164(to);
+  if (!client || !e164 || !process.env.TWILIO_SMS_FROM) return;
+  try {
+    await client.messages.create({ from: process.env.TWILIO_SMS_FROM, to: e164, body });
+    console.log(`[notify] SMS → ${e164}`);
+  } catch (err) {
+    console.error('[notify] SMS error:', err.message);
+  }
+}
+
+async function sendWhatsApp(to, body) {
+  const client = getTwilio();
+  const e164   = toE164(to);
+  if (!client || !e164 || !process.env.TWILIO_WA_FROM) return;
+  try {
+    await client.messages.create({
+      from: 'whatsapp:' + process.env.TWILIO_WA_FROM,
+      to:   'whatsapp:' + e164,
+      body,
+    });
+    console.log(`[notify] WhatsApp → ${e164}`);
+  } catch (err) {
+    console.error('[notify] WhatsApp error:', err.message);
+  }
+}
+
+// Send email + SMS + WhatsApp to a user (all channels fire in parallel, failures are silent)
+async function notifyUser({ email, phone }, subject, htmlBody, smsBody) {
+  await Promise.allSettled([
+    sendEmail(email, subject, htmlBody),
+    sendSMS(phone,   smsBody || htmlBody.replace(/<[^>]+>/g, '')),
+    sendWhatsApp(phone, smsBody || htmlBody.replace(/<[^>]+>/g, '')),
+  ]);
+}
+
+// Build a styled HTML email body
+function buildEmailHtml(title, lines, footerNote) {
+  const rows = lines.map(l =>
+    `<tr><td style="padding:6px 0;font-size:14px;color:#334155;">${l}</td></tr>`
+  ).join('');
+  return `<!DOCTYPE html><html><body style="font-family:sans-serif;background:#f1f5f9;padding:24px;">
+  <div style="max-width:520px;margin:auto;background:#fff;border-radius:14px;overflow:hidden;box-shadow:0 2px 12px rgba(0,0,0,.08);">
+    <div style="background:#2563eb;padding:20px 24px;">
+      <img src="https://toc.dnw-ai.com/toc-logo.png" alt="TOC" height="32" style="margin-bottom:8px;display:block;" onerror="this.style.display='none'">
+      <div style="color:#fff;font-size:20px;font-weight:900;">${title}</div>
+    </div>
+    <div style="padding:24px;"><table style="width:100%;border-collapse:collapse;">${rows}</table></div>
+    ${footerNote ? `<div style="background:#f8fafc;padding:12px 24px;font-size:11px;color:#94a3b8;">${footerNote}</div>` : ''}
+  </div></body></html>`;
+}
 
 // ── Route-overlap helpers ────────────────────────────────────────────────────
 function haversineKm(lat1, lng1, lat2, lng2) {
@@ -873,25 +980,40 @@ app.post('/api/bookings/optimize-shared', (req, res) => {
 
 app.post('/api/bookings', (req, res) => {
   const store = readStore();
+
+  // Extract caller's user from Bearer token (if sent) — enriches booking with contact info
+  const authHeader = req.headers.authorization || '';
+  const bearerToken = authHeader.startsWith('Bearer ') ? authHeader.slice(7) : null;
+  const callerUser  = bearerToken
+    ? (store.users || []).find(u => u.token === bearerToken) || null
+    : null;
+
   const b = {
     id:            store.nextIds.booking++,
     status:        'active',
     createdAt:     new Date().toISOString(),
     ...req.body,
+    // Store caller's contact info so notifications can reach them later
+    ...(callerUser ? {
+      userId:      callerUser.id,
+      notifyEmail: req.body.notifyEmail || callerUser.email,
+      notifyPhone: req.body.notifyPhone || callerUser.phone,
+    } : {
+      notifyEmail: req.body.notifyEmail || null,
+      notifyPhone: req.body.notifyPhone || null,
+    }),
   };
   store.bookings.push(b);
   writeStore(store);
 
-  // After saving, find all OTHER active shared bookings that could consolidate with this one.
-  // For shared bookings: requires ≥80% route overlap, ≤5% detour, ±2-day window, shared truck.
-  // For private bookings: uses legacy loose proximity check (informational only).
+  // ── Find consolidation matches ───────────────────────────────────────────
   const consolidationMatches = [];
   const newCoords = b.route?.geometry?.coordinates;
 
   if (b.route?.fromLat != null && b.route?.toLat != null) {
     for (const other of store.bookings) {
       if (other.id === b.id || other.status !== 'active' || !other.route) continue;
-      if (other.shippingOption !== 'shared') continue;           // only shared bookings consolidate
+      if (other.shippingOption !== 'shared') continue;
 
       const truck = (store.trucks || []).find(t => t.id === other.truckId);
       if (!truck || !truck.shared) continue;
@@ -901,18 +1023,17 @@ app.post('/api/bookings', (req, res) => {
       const remainingPct = truckVol > 0 ? (remainingVol / truckVol) * 100 : 0;
       if (remainingPct < 5) continue;
 
-      // Date window ±2 days
       if (b.pickupDate && other.pickupDate && daysDiff(b.pickupDate, other.pickupDate) > 2) continue;
 
-      const existCoords  = other.route?.geometry?.coordinates;
-      const overlapPct   = routeOverlapPct(newCoords, existCoords);
+      const existCoords = other.route?.geometry?.coordinates;
+      const overlapPct  = routeOverlapPct(newCoords, existCoords);
       if (overlapPct < 80) continue;
 
-      const existDistKm  = other.route?.distance_km || 0;
-      const detourKm     = estimateDetourKm(
+      const existDistKm = other.route?.distance_km || 0;
+      const detourKm    = estimateDetourKm(
         existCoords, b.route.fromLat, b.route.fromLng, b.route.toLat, b.route.toLng
       );
-      const detourPct    = existDistKm > 0 ? (detourKm / existDistKm) * 100 : 100;
+      const detourPct   = existDistKm > 0 ? (detourKm / existDistKm) * 100 : 100;
       if (detourPct > 5) continue;
 
       consolidationMatches.push({
@@ -928,6 +1049,87 @@ app.post('/api/bookings', (req, res) => {
 
   consolidationMatches.sort((a, b) => b.overlapPct - a.overlapPct || a.detourPct - b.detourPct);
   res.json({ ok: true, booking: b, consolidationMatches });
+
+  // ── Fire milestone notifications (non-blocking) ───────────────────────────
+  if (b.shippingOption === 'shared') {
+    (async () => {
+      try {
+        const routeStr  = `${b.route?.fromLabel || 'Origin'} → ${b.route?.toLabel || 'Destination'}`;
+        const dateStr   = b.pickupDate ? `📅 Pickup: <strong>${b.pickupDate}</strong>` : '';
+        const truckName = (() => {
+          const t = (store.trucks || []).find(t => t.id === b.truckId);
+          return t ? t.name : 'Shared truck';
+        })();
+        const upgradeTruckName = b.upgradeTruckName || null;
+        const groupSize        = consolidationMatches.length + 1;
+
+        // ── Notify the NEW user ──────────────────────────────────────────────
+        const newEmail = b.notifyEmail;
+        const newPhone = b.notifyPhone;
+        if (newEmail || newPhone) {
+          if (consolidationMatches.length > 0) {
+            // Joined an existing group
+            const milestone = upgradeTruckName
+              ? `⬆️ Truck Upgraded — You Joined a Shared Group!`
+              : `🎉 You Joined a Shared Truck Group!`;
+            const truckLine = upgradeTruckName
+              ? `Truck upgraded to <strong>${upgradeTruckName}</strong> to fit everyone.`
+              : `Truck: <strong>${truckName}</strong>`;
+            const html = buildEmailHtml(milestone, [
+              `Route: <strong>${routeStr}</strong>`,
+              dateStr,
+              truckLine,
+              `Group size: <strong>${groupSize} shippers</strong>`,
+              `Sharing this truck splits the cost — you pay less than booking privately! 🚛`,
+            ], 'Truck Load Optimizer · toc.dnw-ai.com');
+            const sms = `TOC: ${upgradeTruckName ? '⬆️ Truck upgraded & you joined a shared group!' : '🎉 You joined a shared truck group!'} Route: ${routeStr}${b.pickupDate ? ', pickup ' + b.pickupDate : ''}. Truck: ${upgradeTruckName || truckName}. ${groupSize} shippers total. toc.dnw-ai.com`;
+            await notifyUser({ email: newEmail, phone: newPhone }, milestone, html, sms);
+          } else {
+            // First on this lane — no group yet
+            const html = buildEmailHtml('🚛 Your Shared-Truck Booking is Confirmed!', [
+              `Route: <strong>${routeStr}</strong>`,
+              dateStr,
+              `Truck: <strong>${truckName}</strong>`,
+              `You're the first shipper on this lane. Others may join and further reduce your cost!`,
+            ], 'Truck Load Optimizer · toc.dnw-ai.com');
+            const sms = `TOC: ✅ Shared truck booking confirmed! Route: ${routeStr}${b.pickupDate ? ', pickup ' + b.pickupDate : ''}. Truck: ${truckName}. You're first on this lane — more shippers = more savings! toc.dnw-ai.com`;
+            await notifyUser({ email: newEmail, phone: newPhone }, '🚛 Shared-Truck Booking Confirmed', html, sms);
+          }
+        }
+
+        // ── Notify each EXISTING user whose booking was just consolidated ──
+        for (const m of consolidationMatches) {
+          const ob = m.booking;
+          // Look up contact: stored on booking, or fall back to user record
+          let existEmail = ob.notifyEmail;
+          let existPhone = ob.notifyPhone;
+          if (!existEmail && ob.userId) {
+            const u = (store.users || []).find(u => u.id === ob.userId);
+            if (u) { existEmail = u.email; existPhone = u.phone; }
+          }
+          if (!existEmail && !existPhone) continue;
+
+          const usedPct   = 100 - m.remainingPct;
+          const milestone = upgradeTruckName
+            ? `⬆️ Your Truck Was Upgraded — New Shipper Joined!`
+            : `🎉 New Shipper Joined Your Shared Truck!`;
+          const html = buildEmailHtml(milestone, [
+            upgradeTruckName
+              ? `Your truck has been upgraded to <strong>${upgradeTruckName}</strong> to fit everyone — same lane, bigger truck.`
+              : `A new shipper just joined your shared truck on this route.`,
+            `Route: <strong>${routeStr}</strong>`,
+            dateStr,
+            `Truck now <strong>${usedPct}% full</strong> (${groupSize} shippers).`,
+            `The more shippers share, the less everyone pays. You're saving vs. private booking! 🎉`,
+          ], 'Truck Load Optimizer · toc.dnw-ai.com');
+          const sms = `TOC: ${upgradeTruckName ? '⬆️ Your truck was upgraded to ' + upgradeTruckName + ' and a' : '🎉 A'} new shipper joined your lane! Route: ${routeStr}. Truck ${usedPct}% full (${groupSize} shippers). More savings for everyone! toc.dnw-ai.com`;
+          await notifyUser({ email: existEmail, phone: existPhone }, milestone, html, sms);
+        }
+      } catch (err) {
+        console.error('[notify] milestone error:', err.message);
+      }
+    })();
+  }
 });
 
 app.get('/api/bookings', (req, res) => {

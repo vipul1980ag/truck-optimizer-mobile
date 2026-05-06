@@ -29,7 +29,7 @@ export const api = {
   getAvailableTrucks: (fromLat, fromLng, toLat, toLng, neededWeight, neededVol) =>
     request('POST', '/api/bookings/available-trucks', { fromLat, fromLng, toLat, toLng, neededWeight, neededVol }),
   optimizeShared: (body) => request('POST', '/api/bookings/optimize-shared', body),
-  createBooking: (body) => request('POST', '/api/bookings', body),
+  createBooking: (body, token) => request('POST', '/api/bookings', body, token),
 };
 
 export const authApi = {

@@ -915,7 +915,8 @@ function selectOptimizeProposal(idx) {
   const proposals = window._optimizeProposals || [];
   const p = proposals[idx];
   if (!p) return;
-  _wizardConsolidateTo = p.bookings[0]?.bookingId || null;
+  _wizardConsolidateTo      = p.bookings[0]?.bookingId || null;
+  window._selectedProposalIdx = idx;
   document.querySelectorAll('.opt-proposal').forEach((el, i) => {
     el.classList.toggle('opt-proposal-selected', i === idx);
   });
@@ -1176,6 +1177,10 @@ async function confirmWebBooking() {
     const truckId = (_wizardTruck || truck)?.id || (fresh.trucks?.[0]?.id);
     let consolidationMatches = [];
     if (truckId) {
+      // Determine if an upgrade-truck proposal was selected (for milestone notification)
+      const selectedP        = (window._optimizeProposals || [])[window._selectedProposalIdx ?? -1];
+      const upgradeTruckName = selectedP?.type === 'upgrade-truck' ? selectedP.upgradeTruck?.name : null;
+
       const bookingPayload = {
         truckId,
         shippingOption: _wizardShipping,
@@ -1191,17 +1196,23 @@ async function confirmWebBooking() {
           duration_min: _wizardRoute?.duration_min,
           geometry:     _wizardRoute?.geometry,
         },
-        customers:      _wizardCustomers,
-        items:          items.map(i => ({ name: i.name, length: i.length, width: i.width, height: i.height, weight: i.weight, qty: i.qty })),
-        totalWeight:    totalWeight || 0,
-        totalVol:       totalVol    || 0,
-        newGeomCoords:  _wizardRoute?.geometry?.coordinates || null,
+        customers:       _wizardCustomers,
+        items:           items.map(i => ({ name: i.name, length: i.length, width: i.width, height: i.height, weight: i.weight, qty: i.qty })),
+        totalWeight:     totalWeight || 0,
+        totalVol:        totalVol    || 0,
+        newGeomCoords:   _wizardRoute?.geometry?.coordinates || null,
+        notifyEmail:     _authUser?.email  || null,
+        notifyPhone:     _authUser?.phone  || null,
+        upgradeTruckName,
         ...((_wizardConsolidateTo != null) ? { parentBookingId: _wizardConsolidateTo } : {}),
       };
       try {
         const bRes = await fetch('/api/bookings', {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
+          headers: {
+            'Content-Type':  'application/json',
+            ...(_authToken ? { 'Authorization': 'Bearer ' + _authToken } : {}),
+          },
           body: JSON.stringify(bookingPayload),
         }).then(r => r.json());
         consolidationMatches = bRes.consolidationMatches || [];

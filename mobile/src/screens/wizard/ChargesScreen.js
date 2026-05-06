@@ -4,10 +4,12 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useWizard } from '../../WizardContext';
+import { useAuth } from '../../AuthContext';
 import { api } from '../../api';
 import { C } from '../../theme';
 
 export default function ChargesScreen({ navigation }) {
+  const { token, user }    = useAuth();
   const { items, shippingOption, selectedRoute, selectedTruck,
           startLocation, destLocation, customers, pickupDate } = useWizard();
   const [truck,             setTruck]             = useState(null);
@@ -126,14 +128,16 @@ export default function ChargesScreen({ navigation }) {
       });
 
       // C5: Save booking record; check for route-overlap consolidation opportunities
-      const inferredTruck = selectedTruck || truck;
+      const inferredTruck    = selectedTruck || truck;
+      const selectedP        = selectedProposal != null ? proposals[selectedProposal] : null;
+      const upgradeTruckName = selectedP?.type === 'upgrade-truck' ? selectedP.upgradeTruck?.name : null;
       let consolidationMatches = [];
       if (inferredTruck?.id) {
         try {
           const res = await api.createBooking({
-            truckId:        inferredTruck.id,
+            truckId:         inferredTruck.id,
             shippingOption,
-            pickupDate:     pickupDate || null,
+            pickupDate:      pickupDate || null,
             route: {
               fromLabel:    startLocation?.label,
               fromLat:      startLocation?.lat,
@@ -145,12 +149,15 @@ export default function ChargesScreen({ navigation }) {
               duration_min: selectedRoute?.duration_min,
               geometry:     selectedRoute?.geometry,
             },
-            customers:      customers.map(c => ({ _id: c._id, name: c.name, address: c.address })),
-            items:          items.map(i => ({ name: i.name, length: i.length, width: i.width, height: i.height, weight: i.weight, qty: i.qty })),
+            customers:       customers.map(c => ({ _id: c._id, name: c.name, address: c.address })),
+            items:           items.map(i => ({ name: i.name, length: i.length, width: i.width, height: i.height, weight: i.weight, qty: i.qty })),
             totalWeight,
             totalVol,
-            newGeomCoords:  selectedRoute?.geometry?.coordinates || null,
-          });
+            newGeomCoords:   selectedRoute?.geometry?.coordinates || null,
+            notifyEmail:     user?.email  || null,
+            notifyPhone:     user?.phone  || null,
+            upgradeTruckName,
+          }, token);
           consolidationMatches = res?.consolidationMatches || [];
         } catch (_) { /* non-critical — booking save failure should not block confirm */ }
       }
