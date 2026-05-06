@@ -37,6 +37,7 @@
   <div class="nav-right">
     <button id="nav-admin-btn" class="nav-auth-btn" onclick="toggleAdminPanel()">⚙ Admin</button>
     <a href="/advanced" class="nav-link" target="_blank">⚙ Advanced</a>
+    <button class="nav-park-btn" onclick="openParkingPanel()" title="Find truck-suitable parking">🅿 Parking</button>
     <button id="nav-login-btn" class="nav-auth-btn" onclick="openAuthModal()">Login</button>
     <div id="nav-user" style="display:none" class="nav-user-row">
       <span id="nav-user-email" class="nav-user-email"></span>
@@ -741,6 +742,37 @@
       <button class="scan-add-btn" onclick="addScannedItems()" id="scan-add-btn">＋ Add Selected Items</button>
     </div>
 
+  </div>
+</div>
+
+<!-- ── Parking Panel ── -->
+<div id="parking-overlay" class="parking-overlay" onclick="parkingOverlayClick(event)">
+  <div class="parking-panel">
+    <div class="parking-panel-head">
+      <span class="parking-panel-icon">🅿️</span>
+      <div>
+        <div class="parking-panel-title">Find Truck Parking</div>
+        <div class="parking-panel-sub" id="park-vehicle-sub">Select a truck to filter by height</div>
+      </div>
+      <button class="parking-panel-close" onclick="closeParkingPanel()">✕</button>
+    </div>
+
+    <div class="parking-controls">
+      <div class="park-ctrl-row">
+        <label class="park-ctrl-lbl">Truck</label>
+        <select id="park-truck-sel" class="park-ctrl-sel" onchange="onParkTruckChange()">
+          <option value="">— Any vehicle —</option>
+        </select>
+      </div>
+      <div class="park-ctrl-row">
+        <label class="park-ctrl-lbl">Location</label>
+        <input id="park-location" class="park-ctrl-input" type="text" placeholder="Enter address or postcode…" />
+      </div>
+      <button class="park-search-btn" onclick="searchParking()">🔍 Find Parking</button>
+    </div>
+
+    <div id="park-status" class="park-status" style="display:none"></div>
+    <div id="park-results" class="park-results"></div>
   </div>
 </div>
 

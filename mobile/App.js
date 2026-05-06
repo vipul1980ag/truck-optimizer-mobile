@@ -8,6 +8,7 @@ import { Text, View, TouchableOpacity, ActivityIndicator, StyleSheet } from 'rea
 import AuthScreen            from './src/screens/AuthScreen';
 import DashboardScreen       from './src/screens/DashboardScreen';
 import AdminScreen           from './src/screens/AdminScreen';
+import ParkingScreen         from './src/screens/ParkingScreen';
 import BookingsScreen        from './src/screens/BookingsScreen';
 import CustomersScreen       from './src/screens/CustomersScreen';
 import PaymentWebViewScreen  from './src/screens/PaymentWebViewScreen';
@@ -63,6 +64,7 @@ const TAB_CONFIG = {
   Home:      { icon: '🏠', label: 'Home' },
   Bookings:  { icon: '📋', label: 'Bookings' },
   New:       { icon: '🚛', label: 'New' },
+  Parking:   { icon: '🅿️', label: 'Parking' },
   Admin:     { icon: '⚙️', label: 'Fleet' },
   Customers: { icon: '👥', label: 'Clients' },
 };
@@ -113,6 +115,9 @@ function MainTabs() {
           },
         })}
       />
+
+      <Tab.Screen name="Parking"   component={ParkingScreen}
+        options={{ title: '🅿️ Find Parking', tabBarLabel: TAB_CONFIG.Parking.label }} />
 
       <Tab.Screen name="Admin"     component={AdminScreen}
         options={{ title: '⚙️ Fleet & Carriers', tabBarLabel: TAB_CONFIG.Admin.label }} />

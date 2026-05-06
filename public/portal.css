@@ -1453,3 +1453,87 @@ body {
   color: #fff !important; border: none !important;
 }
 .ai-autofill-btn:hover { opacity: 0.9; }
+
+/* ── Parking Panel ─────────────────────────────────────────────────────────── */
+.nav-park-btn {
+  background: linear-gradient(135deg, #0ea5e9, #0284c7);
+  color: #fff; border: none; border-radius: 8px;
+  padding: 6px 12px; font-size: 12px; font-weight: 700; cursor: pointer;
+  letter-spacing: 0.3px;
+}
+.nav-park-btn:hover { background: linear-gradient(135deg, #0284c7, #0369a1); }
+
+.parking-overlay {
+  display: none; position: fixed; inset: 0; z-index: 900;
+  background: rgba(0,0,0,0.55); backdrop-filter: blur(3px);
+  align-items: flex-start; justify-content: flex-end; padding: 72px 16px 16px;
+}
+.parking-overlay.open { display: flex; }
+.parking-panel {
+  width: 100%; max-width: 420px; max-height: calc(100vh - 100px);
+  background: #fff; border-radius: 16px; overflow: hidden;
+  box-shadow: 0 20px 60px rgba(0,0,0,0.25); display: flex; flex-direction: column;
+}
+.parking-panel-head {
+  display: flex; align-items: center; gap: 10px;
+  background: linear-gradient(135deg, #0c1f40, #1e3a5f);
+  padding: 14px 16px; flex-shrink: 0;
+}
+.parking-panel-icon { font-size: 28px; }
+.parking-panel-title { font-size: 15px; font-weight: 800; color: #f1f5f9; }
+.parking-panel-sub   { font-size: 11px; color: #94a3b8; margin-top: 1px; }
+.parking-panel-close {
+  margin-left: auto; background: rgba(255,255,255,0.12); border: none;
+  color: #f1f5f9; border-radius: 6px; width: 28px; height: 28px;
+  font-size: 14px; cursor: pointer; line-height: 1;
+}
+.parking-controls { padding: 14px 16px; border-bottom: 1px solid #e2e8f0; flex-shrink: 0; }
+.park-ctrl-row   { display: flex; align-items: center; gap: 8px; margin-bottom: 10px; }
+.park-ctrl-lbl   { font-size: 11px; font-weight: 700; color: #64748b; width: 58px; flex-shrink: 0; text-transform: uppercase; letter-spacing: 0.3px; }
+.park-ctrl-sel, .park-ctrl-input {
+  flex: 1; border: 1px solid #e2e8f0; border-radius: 8px;
+  padding: 7px 10px; font-size: 12px; color: #1e293b; background: #f8fafc;
+}
+.park-ctrl-sel:focus, .park-ctrl-input:focus { outline: none; border-color: #0ea5e9; }
+.park-search-btn {
+  width: 100%; background: linear-gradient(135deg, #0ea5e9, #0284c7);
+  color: #fff; border: none; border-radius: 10px;
+  padding: 10px; font-size: 13px; font-weight: 700; cursor: pointer;
+}
+.park-search-btn:hover { opacity: 0.9; }
+.park-search-btn:disabled { opacity: 0.5; cursor: default; }
+.park-status {
+  padding: 10px 16px; font-size: 12px; color: #64748b; text-align: center; flex-shrink: 0;
+}
+.park-results { overflow-y: auto; flex: 1; }
+.park-spot {
+  padding: 12px 16px; border-bottom: 1px solid #f1f5f9;
+  display: flex; align-items: flex-start; gap: 10px; cursor: default;
+}
+.park-spot:hover { background: #f8fafc; }
+.park-spot-rank {
+  width: 28px; height: 28px; border-radius: 50%; flex-shrink: 0;
+  background: #dbeafe; color: #1d4ed8; font-size: 11px; font-weight: 800;
+  display: flex; align-items: center; justify-content: center;
+}
+.park-spot-rank.hgv { background: #dcfce7; color: #16a34a; }
+.park-spot-body { flex: 1; min-width: 0; }
+.park-spot-name { font-size: 13px; font-weight: 700; color: #1e293b; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.park-spot-addr { font-size: 11px; color: #64748b; margin-top: 2px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.park-spot-tags { display: flex; gap: 5px; flex-wrap: wrap; margin-top: 5px; }
+.park-tag {
+  font-size: 10px; font-weight: 700; padding: 2px 6px;
+  border-radius: 4px; text-transform: uppercase; letter-spacing: 0.3px;
+}
+.park-tag-hgv    { background: #dcfce7; color: #16a34a; }
+.park-tag-surface{ background: #dbeafe; color: #1d4ed8; }
+.park-tag-free   { background: #f0fdf4; color: #15803d; }
+.park-tag-paid   { background: #fff7ed; color: #c2410c; }
+.park-tag-height { background: #fef3c7; color: #b45309; }
+.park-spot-actions { display: flex; flex-direction: column; gap: 4px; flex-shrink: 0; }
+.park-nav-btn {
+  background: #0ea5e9; color: #fff; border: none; border-radius: 7px;
+  padding: 5px 9px; font-size: 10px; font-weight: 700; cursor: pointer; white-space: nowrap;
+}
+.park-nav-btn:hover { background: #0284c7; }
+.park-empty { padding: 32px 16px; text-align: center; color: #94a3b8; font-size: 13px; }

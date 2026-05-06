@@ -2904,3 +2904,117 @@ function escHtml(str) {
 
 // ── Start ─────────────────────────────────────────────────────────────────────
 init();
+
+// ── Parking Panel ─────────────────────────────────────────────────────────────
+const PARKING_API = 'https://parking.dnw-ai.com';
+
+function openParkingPanel() {
+  // Populate truck selector with current fleet
+  const sel = document.getElementById('park-truck-sel');
+  sel.innerHTML = '<option value="">— Any vehicle (car) —</option>';
+  (trucks || []).forEach(t => {
+    const opt = document.createElement('option');
+    opt.value = t.id;
+    opt.textContent = `${t.name} (${t.height} ft tall)`;
+    sel.appendChild(opt);
+  });
+  onParkTruckChange();
+  document.getElementById('parking-overlay').classList.add('open');
+}
+
+function closeParkingPanel() {
+  document.getElementById('parking-overlay').classList.remove('open');
+}
+
+function parkingOverlayClick(e) {
+  if (e.target === document.getElementById('parking-overlay')) closeParkingPanel();
+}
+
+function onParkTruckChange() {
+  const sel      = document.getElementById('park-truck-sel');
+  const truckId  = parseInt(sel.value);
+  const truck    = (trucks || []).find(t => t.id === truckId);
+  const sub      = document.getElementById('park-vehicle-sub');
+  if (truck) {
+    sub.textContent = `Filtering for ${truck.name} — height ${truck.height} ft`;
+  } else {
+    sub.textContent = 'Select a truck to filter by height';
+  }
+}
+
+async function searchParking() {
+  const location = document.getElementById('park-location').value.trim();
+  const sel      = document.getElementById('park-truck-sel');
+  const truckId  = parseInt(sel.value);
+  const truck    = (trucks || []).find(t => t.id === truckId);
+
+  const statusEl  = document.getElementById('park-status');
+  const resultsEl = document.getElementById('park-results');
+  const searchBtn = document.querySelector('.park-search-btn');
+
+  if (!location) { statusEl.style.display = ''; statusEl.textContent = 'Please enter a location.'; return; }
+
+  searchBtn.disabled = true;
+  statusEl.style.display = '';
+  statusEl.textContent = '📍 Geocoding location…';
+  resultsEl.innerHTML = '';
+
+  try {
+    // Geocode the location
+    const geoRes  = await fetch('/api/geocode', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ query: location })
+    });
+    const geoData = await geoRes.json();
+    if (!geoData?.length) { statusEl.textContent = 'Location not found. Try a different address.'; return; }
+    const { lat, lng, label } = geoData[0];
+
+    const vehicle   = truck ? 'truck' : 'car';
+    const minHeight = truck ? truck.height : undefined;
+    const radius    = truck ? 3000 : 800;
+
+    statusEl.textContent = `🔍 Searching ${vehicle === 'truck' ? 'truck-suitable' : ''} parking near ${label}…`;
+
+    const params = new URLSearchParams({ lat, lng, radius, vehicle });
+    if (minHeight) params.set('minHeight', minHeight);
+
+    const parkRes  = await fetch(`${PARKING_API}/api/parkings/nearby?${params}`);
+    const parkData = await parkRes.json();
+    const spots    = parkData.data || [];
+
+    if (!spots.length) {
+      statusEl.textContent = `No ${vehicle === 'truck' ? 'truck-suitable ' : ''}parking found within ${radius / 1000} km.`;
+      return;
+    }
+
+    statusEl.textContent = `Found ${spots.length} spot${spots.length > 1 ? 's' : ''} near ${label}`;
+    resultsEl.innerHTML = spots.slice(0, 15).map((sp, i) => {
+      const isHgv    = sp.hgvDesignated;
+      const typeTag  = `<span class="park-tag park-tag-surface">${sp.type}</span>`;
+      const hgvTag   = isHgv ? '<span class="park-tag park-tag-hgv">HGV ✓</span>' : '';
+      const feeTag   = sp.costPerHour > 0
+        ? `<span class="park-tag park-tag-paid">€${sp.costPerHour.toFixed(1)}/hr</span>`
+        : '<span class="park-tag park-tag-free">Free</span>';
+      const htTag    = sp.maxheight ? `<span class="park-tag park-tag-height">Max ${sp.maxheight} m</span>` : '';
+      const distTxt  = sp.distance < 1 ? `${Math.round(sp.distance * 1000)} m` : `${sp.distance.toFixed(1)} km`;
+      const mapsUrl  = `https://www.google.com/maps/dir/?api=1&destination=${sp.lat},${sp.lng}&travelmode=driving`;
+      return `
+        <div class="park-spot">
+          <div class="park-spot-rank${isHgv ? ' hgv' : ''}">${isHgv ? '★' : i + 1}</div>
+          <div class="park-spot-body">
+            <div class="park-spot-name">${esc(sp.name)}</div>
+            <div class="park-spot-addr">${esc(sp.address)} · ${distTxt}</div>
+            <div class="park-spot-tags">${hgvTag}${typeTag}${feeTag}${htTag}</div>
+          </div>
+          <div class="park-spot-actions">
+            <a href="${mapsUrl}" target="_blank" rel="noopener" class="park-nav-btn">🗺 Navigate</a>
+          </div>
+        </div>`;
+    }).join('');
+
+  } catch (e) {
+    statusEl.textContent = 'Error: ' + e.message;
+  } finally {
+    searchBtn.disabled = false;
+  }
+}
