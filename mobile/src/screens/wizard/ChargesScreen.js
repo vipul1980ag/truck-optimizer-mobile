@@ -162,7 +162,6 @@ export default function ChargesScreen({ navigation }) {
         } catch (_) { /* non-critical — booking save failure should not block confirm */ }
       }
 
-      const selectedP   = selectedProposal != null ? proposals[selectedProposal] : null;
       const finalEstimate = selectedP ? selectedP.newUser.sharedCost : estimate;
       navigation.navigate('Confirm', { totalItems, totalWeight, estimate: finalEstimate, hasDG, dgCount: dgItems.length, dgSurcharge: Math.round(dgSurcharge), distanceKm: distance_km, tollCost: toll_cost, manualToll, additionalCharge });
 
