@@ -35,13 +35,13 @@
     <span class="nav-title">Load Optimizer</span>
   </div>
   <div class="nav-right">
-    <button id="nav-admin-btn" class="nav-auth-btn" onclick="toggleAdminPanel()">⚙ Admin</button>
-    <a href="/advanced" class="nav-link" target="_blank">⚙ Advanced</a>
-    <button class="nav-park-btn" onclick="openParkingPanel()" title="Find truck-suitable parking">🅿 Parking</button>
-    <button id="nav-login-btn" class="nav-auth-btn" onclick="openAuthModal()">Login</button>
+    <button id="nav-admin-btn" class="nav-auth-btn" onclick="toggleAdminPanel()" data-i18n="navAdmin">⚙ Admin</button>
+    <a href="/advanced" class="nav-link" target="_blank" data-i18n="navAdvanced">⚙ Advanced</a>
+    <button class="nav-park-btn" onclick="openParkingPanel()" title="Find truck-suitable parking" data-i18n="navParking">🅿 Parking</button>
+    <button id="nav-login-btn" class="nav-auth-btn" onclick="openAuthModal()" data-i18n="navLogin">Login</button>
     <div id="nav-user" style="display:none" class="nav-user-row">
       <span id="nav-user-email" class="nav-user-email"></span>
-      <button class="nav-logout-btn" onclick="doLogout()">Sign Out</button>
+      <button class="nav-logout-btn" onclick="doLogout()" data-i18n="navSignOut">Sign Out</button>
     </div>
   </div>
 </nav>
@@ -52,32 +52,32 @@
   <!-- Lock overlay — spans both columns -->
   <div id="cargo-lock" class="cargo-lock">
     <div class="cargo-lock-icon">🔒</div>
-    <div class="cargo-lock-title">Sign in to add cargo items</div>
-    <div class="cargo-lock-sub">Create a free account or log in to get started</div>
-    <button class="cargo-lock-btn" onclick="openAuthModal()">Login / Register</button>
+    <div class="cargo-lock-title" data-i18n="lockTitle">Sign in to add cargo items</div>
+    <div class="cargo-lock-sub" data-i18n="lockSub">Create a free account or log in to get started</div>
+    <button class="cargo-lock-btn" onclick="openAuthModal()" data-i18n="lockBtn">Login / Register</button>
   </div>
 
   <!-- LEFT: Add Cargo form -->
   <div class="portal-col-left">
     <div class="card" id="cargo-card">
-      <div class="card-head">📦 Add Cargo Item</div>
+      <div class="card-head" data-i18n="addCargoTitle">📦 Add Cargo Item</div>
 
       <!-- Step 1: Category picker -->
       <div id="p-step1">
         <div class="cat-pick-row">
           <button class="cat-pick-btn" onclick="portalSetCategory('household')">
             <span class="cat-pick-icon">🏠</span>
-            <span>Household</span>
-            <small>Furniture, appliances, boxes</small>
+            <span data-i18n="household">Household</span>
+            <small data-i18n="householdSub">Furniture, appliances, boxes</small>
           </button>
           <button class="cat-pick-btn" onclick="portalSetCategory('industrial')">
             <span class="cat-pick-icon">🏭</span>
-            <span>Industrial / Business</span>
-            <small>Pallets, machinery, equipment</small>
+            <span data-i18n="industrial">Industrial / Business</span>
+            <small data-i18n="industrialSub">Pallets, machinery, equipment</small>
           </button>
         </div>
-        <button class="scan-photo-btn" onclick="openPhotoScan()">
-          <span>📷</span> Scan Photo — AI identifies items &amp; sizes
+        <button class="scan-photo-btn" onclick="openPhotoScan()" data-i18n="scanBtn">
+          📷 Scan Photo — AI identifies items &amp; sizes
         </button>
         <input type="file" id="scan-file-input" accept="image/*" capture="environment" style="display:none" onchange="handlePhotoFile(this)">
       </div>
@@ -122,7 +122,7 @@
           <label class="stackable-label">
             <input type="checkbox" id="p-stackable" checked>
             <span class="stackable-icon">📦</span>
-            <span class="stackable-text">Stackable — other items can be placed on top</span>
+            <span class="stackable-text" data-i18n="stackable">Stackable — other items can be placed on top</span>
           </label>
         </div>
 
@@ -131,7 +131,7 @@
           <label class="stackable-label">
             <input type="checkbox" id="p-fragile">
             <span class="stackable-icon">🔔</span>
-            <span class="stackable-text">Handle with care — fragile item</span>
+            <span class="stackable-text" data-i18n="fragile">Handle with care — fragile item</span>
           </label>
         </div>
 
@@ -173,7 +173,7 @@
                 </select>
               </div>
             </div>
-            <div class="dg-truck-note">🚛 A DG-certified truck will be required for this shipment. A 15% DG surcharge applies.</div>
+            <div class="dg-truck-note" data-i18n="dgNote">🚛 A DG-certified truck will be required for this shipment. A 15% DG surcharge applies.</div>
           </div>
         </div>
       </div>
@@ -184,7 +184,7 @@
   <!-- RIGHT: Cargo list -->
   <div class="portal-col-right">
     <div class="card cargo-list-card">
-      <div class="card-head">📋 Cargo List</div>
+      <div class="card-head" data-i18n="cargoListTitle">📋 Cargo List</div>
 
       <!-- Summary strip (hidden when list is empty) -->
       <div id="p-list-summary" class="list-summary-strip" style="display:none">
@@ -201,8 +201,8 @@
       <!-- Proceed button (hidden when list is empty) -->
       <div id="p-proceed-bar" class="proceed-bar" style="display:none">
         <div style="display:flex;gap:8px;">
-          <button class="btn-viz3d" onclick="openViz3DModal()">🧊 3D Load</button>
-          <button class="btn-proceed" style="flex:1;" onclick="openBookingModal()">Next: Choose Shipping →</button>
+          <button class="btn-viz3d" onclick="openViz3DModal()" data-i18n="btn3D">🧊 3D Load</button>
+          <button class="btn-proceed" style="flex:1;" onclick="openBookingModal()" data-i18n="btnProceed">Next: Choose Shipping →</button>
         </div>
       </div>
     </div>
@@ -214,7 +214,7 @@
 <div id="admin-panel" class="admin-panel" style="display:none" onclick="adminPanelBackdropClick(event)">
   <div class="admin-panel-inner">
     <div class="admin-header">
-      <div class="admin-title">⚙ Admin Panel</div>
+      <div class="admin-title" data-i18n="adminTitle">⚙ Admin Panel</div>
       <div class="admin-stats">
         <span class="admin-stat"><span id="s-trucks">0</span> Trucks</span>
         <span class="admin-stat"><span id="s-carriers">0</span> Carriers</span>
@@ -224,11 +224,11 @@
       <button class="bm-close" onclick="toggleAdminPanel()" title="Close">✕</button>
     </div>
     <div class="admin-tabs">
-      <button class="admin-tab-btn active" onclick="showAdminTab('fleet')">🚛 Fleet</button>
-      <button class="admin-tab-btn" onclick="showAdminTab('customers')">👥 Customers</button>
-      <button class="admin-tab-btn" onclick="showAdminTab('bookings')">📋 Bookings</button>
-      <button class="admin-tab-btn" onclick="showAdminTab('import')">📥 Import</button>
-      <button class="admin-tab-btn" onclick="showAdminTab('rates')">💲 Rates</button>
+      <button class="admin-tab-btn active" onclick="showAdminTab('fleet')" data-i18n="tabFleet">🚛 Fleet</button>
+      <button class="admin-tab-btn" onclick="showAdminTab('customers')" data-i18n="tabCustomers">👥 Customers</button>
+      <button class="admin-tab-btn" onclick="showAdminTab('bookings')" data-i18n="tabBookings">📋 Bookings</button>
+      <button class="admin-tab-btn" onclick="showAdminTab('import')" data-i18n="tabImport">📥 Import</button>
+      <button class="admin-tab-btn" onclick="showAdminTab('rates')" data-i18n="tabRates">💲 Rates</button>
     </div>
 
     <!-- Fleet Tab -->
@@ -575,21 +575,21 @@
     <div id="auth-view-choose">
       <div class="auth-modal-head">
         <div>
-          <div class="auth-modal-title">👋 Welcome</div>
-          <div class="auth-modal-sub">Sign in or create a new account</div>
+          <div class="auth-modal-title" data-i18n="welcome">👋 Welcome</div>
+          <div class="auth-modal-sub" data-i18n="welcomeSub">Sign in or create a new account</div>
         </div>
         <button class="auth-modal-close" onclick="closeAuthModal()">✕</button>
       </div>
       <div class="auth-choose-row">
         <button class="auth-choose-btn" onclick="showAuthView('login')">
           <span class="auth-choose-icon">🔑</span>
-          <span class="auth-choose-label">Login</span>
-          <small class="auth-choose-sub">Existing account</small>
+          <span class="auth-choose-label" data-i18n="loginBtn">Login</span>
+          <small class="auth-choose-sub" data-i18n="loginExisting">Existing account</small>
         </button>
         <button class="auth-choose-btn" onclick="showAuthView('register')">
           <span class="auth-choose-icon">✨</span>
-          <span class="auth-choose-label">Create Account</span>
-          <small class="auth-choose-sub">New user</small>
+          <span class="auth-choose-label" data-i18n="createAccount">Create Account</span>
+          <small class="auth-choose-sub" data-i18n="newUser">New user</small>
         </button>
       </div>
     </div>
@@ -597,42 +597,42 @@
     <div id="auth-view-login" style="display:none">
       <div class="auth-modal-head">
         <div>
-          <div class="auth-modal-title">🔑 Login</div>
-          <div class="auth-modal-sub">Enter your credentials</div>
+          <div class="auth-modal-title" data-i18n="loginTitle">🔑 Login</div>
+          <div class="auth-modal-sub" data-i18n="loginSub">Enter your credentials</div>
         </div>
         <button class="auth-modal-close" onclick="showAuthView('choose')">←</button>
       </div>
       <div class="auth-form">
-        <label class="auth-lbl">Email</label>
+        <label class="auth-lbl" data-i18n="emailLabel">Email</label>
         <input type="email" id="login-email" class="auth-input" placeholder="you@example.com" autocomplete="email">
-        <label class="auth-lbl">Password</label>
+        <label class="auth-lbl" data-i18n="passwordLabel">Password</label>
         <input type="password" id="login-password" class="auth-input" placeholder="••••••••" autocomplete="current-password">
         <div id="login-err" class="auth-err"></div>
-        <button class="auth-submit-btn" onclick="doLogin()">Sign In</button>
-        <div class="auth-switch">No account? <a href="#" onclick="showAuthView('register');return false;">Create one →</a></div>
+        <button class="auth-submit-btn" onclick="doLogin()" data-i18n="signInBtn">Sign In</button>
+        <div class="auth-switch"><span data-i18n="noAccount">No account?</span> <a href="#" onclick="showAuthView('register');return false;" data-i18n="createOne">Create one →</a></div>
       </div>
     </div>
 
     <div id="auth-view-register" style="display:none">
       <div class="auth-modal-head">
         <div>
-          <div class="auth-modal-title">✨ Create Account</div>
-          <div class="auth-modal-sub">Fill in your details to get started</div>
+          <div class="auth-modal-title" data-i18n="registerTitle">✨ Create Account</div>
+          <div class="auth-modal-sub" data-i18n="registerSub">Fill in your details to get started</div>
         </div>
         <button class="auth-modal-close" onclick="showAuthView('choose')">←</button>
       </div>
       <div class="auth-form">
-        <label class="auth-lbl">Email</label>
+        <label class="auth-lbl" data-i18n="emailLabel">Email</label>
         <input type="email" id="reg-email" class="auth-input" placeholder="you@example.com" autocomplete="email">
-        <label class="auth-lbl">Password</label>
-        <input type="password" id="reg-password" class="auth-input" placeholder="Min 6 characters" autocomplete="new-password">
-        <label class="auth-lbl">Phone Number</label>
+        <label class="auth-lbl" data-i18n="passwordLabel">Password</label>
+        <input type="password" id="reg-password" class="auth-input" data-i18n-attr="placeholder" data-i18n="minPassword" placeholder="Min 6 characters" autocomplete="new-password">
+        <label class="auth-lbl" data-i18n="phoneLabel">Phone Number</label>
         <input type="tel" id="reg-phone" class="auth-input" placeholder="+1 555 000 0000" autocomplete="tel">
-        <label class="auth-lbl">Address</label>
+        <label class="auth-lbl" data-i18n="addressLabel">Address</label>
         <textarea id="reg-address" class="auth-input auth-textarea" placeholder="123 Main St, City, State, ZIP" autocomplete="street-address"></textarea>
         <div id="reg-err" class="auth-err"></div>
-        <button class="auth-submit-btn" onclick="doRegister()">Create Account</button>
-        <div class="auth-switch">Have an account? <a href="#" onclick="showAuthView('login');return false;">Sign in →</a></div>
+        <button class="auth-submit-btn" onclick="doRegister()" data-i18n="createBtn">Create Account</button>
+        <div class="auth-switch"><span data-i18n="haveAccount">Have an account?</span> <a href="#" onclick="showAuthView('login');return false;" data-i18n="signInLink">Sign in →</a></div>
       </div>
     </div>
 
@@ -683,7 +683,7 @@
 
 <div id="ai-chat-panel" class="ai-chat-panel" style="display:none">
   <div class="ai-chat-head">
-    <div class="ai-chat-title">🤖 AI Load Assistant</div>
+    <div class="ai-chat-title" data-i18n="aiTitle">🤖 AI Load Assistant</div>
     <div style="display:flex;gap:6px;align-items:center">
       <button class="ai-advise-btn" onclick="getAIAdvice()" title="Get load optimization tips">💡 Advise</button>
       <button class="ai-chat-close" onclick="toggleAIChat()">✕</button>
@@ -691,12 +691,12 @@
   </div>
   <div id="ai-chat-messages" class="ai-chat-messages">
     <div class="ai-msg ai-msg-bot">
-      Hi! I'm your AI load assistant. Describe cargo in plain language (e.g. "5 euro pallets, 800kg each") and I'll fill in the details. Or ask me anything about your shipment!
+<span data-i18n="aiGreeting">Hi! I'm your AI load assistant. Describe cargo in plain language (e.g. "5 euro pallets, 800kg each") and I'll fill in the details. Or ask me anything about your shipment!</span>
     </div>
   </div>
   <div class="ai-chat-input-row">
-    <input id="ai-chat-input" class="ai-chat-input" type="text" placeholder="Describe cargo or ask a question…" onkeydown="if(event.key==='Enter')sendAIMessage()">
-    <button class="ai-chat-send" onclick="sendAIMessage()">Send</button>
+    <input id="ai-chat-input" class="ai-chat-input" type="text" data-i18n-attr="placeholder" data-i18n="aiPlaceholder" placeholder="Describe cargo or ask a question…" onkeydown="if(event.key==='Enter')sendAIMessage()">
+    <button class="ai-chat-send" onclick="sendAIMessage()" data-i18n="aiSend">Send</button>
   </div>
 </div>
 
@@ -707,8 +707,8 @@
     <!-- Header -->
     <div class="scan-modal-head">
       <div>
-        <div class="scan-modal-title">📷 Photo Item Scanner</div>
-        <div class="scan-modal-sub">AI identifies items and estimates dimensions with packaging</div>
+        <div class="scan-modal-title" data-i18n="scanTitle">📷 Photo Item Scanner</div>
+        <div class="scan-modal-sub" data-i18n="scanSub">AI identifies items and estimates dimensions with packaging</div>
       </div>
       <button class="scan-modal-close" onclick="closeScanModal()">✕</button>
     </div>
@@ -724,14 +724,14 @@
       <!-- Loading state -->
       <div id="scan-loading" class="scan-loading" style="display:none">
         <div class="scan-spinner"></div>
-        <div class="scan-loading-text">Analyzing photo with AI…<br><small>Identifying items and estimating dimensions</small></div>
+        <div class="scan-loading-text"><span data-i18n="scanLoading">Analyzing photo with AI…</span><br><small data-i18n="scanLoadingSub">Identifying items and estimating dimensions</small></div>
       </div>
 
       <!-- No results -->
       <div id="scan-no-results" class="scan-no-results" style="display:none">
         <div style="font-size:36px;margin-bottom:10px">🤷</div>
-        <div style="font-weight:700;color:var(--text)">No items detected</div>
-        <div style="font-size:12px;color:var(--text2);margin-top:6px">Try a clearer photo showing the items to be shipped.</div>
+        <div style="font-weight:700;color:var(--text)" data-i18n="scanNone">No items detected</div>
+        <div style="font-size:12px;color:var(--text2);margin-top:6px" data-i18n="scanNoneSub">Try a clearer photo showing the items to be shipped.</div>
       </div>
 
       <!-- Results list -->
@@ -739,7 +739,7 @@
         <div class="scan-results-header">
           <span id="scan-count-label"></span>
           <label class="scan-select-all-label">
-            <input type="checkbox" id="scan-select-all" checked onchange="scanToggleAll(this.checked)"> Select all
+            <input type="checkbox" id="scan-select-all" checked onchange="scanToggleAll(this.checked)"> <span data-i18n="selectAll">Select all</span>
           </label>
         </div>
         <div id="scan-items-list" class="scan-items-list"></div>
@@ -749,8 +749,8 @@
 
     <!-- Footer -->
     <div class="scan-modal-footer" id="scan-footer" style="display:none">
-      <button class="scan-retake-btn" onclick="openPhotoScan()">📷 Retake</button>
-      <button class="scan-add-btn" onclick="addScannedItems()" id="scan-add-btn">＋ Add Selected Items</button>
+      <button class="scan-retake-btn" onclick="openPhotoScan()" data-i18n="scanRetake">📷 Retake</button>
+      <button class="scan-add-btn" onclick="addScannedItems()" id="scan-add-btn" data-i18n="scanAddItems">＋ Add Selected Items</button>
     </div>
 
   </div>
@@ -762,7 +762,7 @@
     <div class="parking-panel-head">
       <span class="parking-panel-icon">🅿️</span>
       <div>
-        <div class="parking-panel-title">Find Truck Parking</div>
+        <div class="parking-panel-title" data-i18n="parkTitle">Find Truck Parking</div>
         <div class="parking-panel-sub" id="park-vehicle-sub">Select a truck to filter by height</div>
       </div>
       <button class="parking-panel-close" onclick="closeParkingPanel()">✕</button>
@@ -770,16 +770,16 @@
 
     <div class="parking-controls">
       <div class="park-ctrl-row">
-        <label class="park-ctrl-lbl">Truck</label>
+        <label class="park-ctrl-lbl" data-i18n="parkTruckLbl">Truck</label>
         <select id="park-truck-sel" class="park-ctrl-sel" onchange="onParkTruckChange()">
-          <option value="">— Any vehicle —</option>
+          <option value="" data-i18n="parkAny">— Any vehicle —</option>
         </select>
       </div>
       <div class="park-ctrl-row">
-        <label class="park-ctrl-lbl">Location</label>
-        <input id="park-location" class="park-ctrl-input" type="text" placeholder="Enter address or postcode…" />
+        <label class="park-ctrl-lbl" data-i18n="parkLocation">Location</label>
+        <input id="park-location" class="park-ctrl-input" type="text" data-i18n-attr="placeholder" data-i18n="parkLocPh" placeholder="Enter address or postcode…" />
       </div>
-      <button class="park-search-btn" onclick="searchParking()">🔍 Find Parking</button>
+      <button class="park-search-btn" onclick="searchParking()" data-i18n="parkSearch">🔍 Find Parking</button>
     </div>
 
     <div id="park-status" class="park-status" style="display:none"></div>
@@ -788,6 +788,7 @@
 </div>
 
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script src="portal-i18n.js"></script>
 <script src="portal.js"></script>
 </body>
 </html>

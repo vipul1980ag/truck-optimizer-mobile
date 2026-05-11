@@ -348,7 +348,7 @@ async function doLogin() {
   const password = document.getElementById('login-password').value;
   const errEl    = document.getElementById('login-err');
   errEl.textContent = '';
-  if (!email || !password) { errEl.textContent = 'Email and password are required.'; return; }
+  if (!email || !password) { errEl.textContent = (window.t && window.t('errEmailPass')) || 'Email and password are required.'; return; }
   try {
     const res  = await fetch('/api/auth/login', {
       method: 'POST', headers: { 'Content-Type': 'application/json' },
@@ -372,8 +372,8 @@ async function doRegister() {
   const address  = document.getElementById('reg-address').value.trim();
   const errEl    = document.getElementById('reg-err');
   errEl.textContent = '';
-  if (!email || !password || !phone || !address) { errEl.textContent = 'All fields are required.'; return; }
-  if (password.length < 6) { errEl.textContent = 'Password must be at least 6 characters.'; return; }
+  if (!email || !password || !phone || !address) { errEl.textContent = (window.t && window.t('errAllFields')) || 'All fields are required.'; return; }
+  if (password.length < 6) { errEl.textContent = (window.t && window.t('errPassLen')) || 'Password must be at least 6 characters.'; return; }
   try {
     const res  = await fetch('/api/auth/register', {
       method: 'POST', headers: { 'Content-Type': 'application/json' },
