@@ -219,13 +219,17 @@ async function getPayPalToken() {
   return data.access_token;
 }
 
-// Portal (simplified dashboard) at root; full optimizer at /advanced
-const NO_CACHE = { headers: { 'Cache-Control': 'no-cache, no-store, must-revalidate', 'Pragma': 'no-cache', 'Expires': '0' } };
-app.get('/',        (req, res) => res.sendFile(path.join(__dirname, 'public', 'portal.html'), NO_CACHE));
-app.get('/advanced',(req, res) => res.sendFile(path.join(__dirname, 'public', 'index.html'),  NO_CACHE));
-app.get('/privacy', (req, res) => res.sendFile(path.join(__dirname, 'public', 'privacy.html'), NO_CACHE));
+// Serve from public-dist/ (obfuscated build) when available, else public/ (dev fallback)
+const PUBLIC_DIR = fs.existsSync(path.join(__dirname, 'public-dist'))
+  ? path.join(__dirname, 'public-dist')
+  : path.join(__dirname, 'public');
 
-app.use(express.static(path.join(__dirname, 'public'), { etag: false, lastModified: false, setHeaders: res => res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate') }));
+const NO_CACHE = { headers: { 'Cache-Control': 'no-cache, no-store, must-revalidate', 'Pragma': 'no-cache', 'Expires': '0' } };
+app.get('/',        (req, res) => res.sendFile(path.join(PUBLIC_DIR, 'portal.html'), NO_CACHE));
+app.get('/advanced',(req, res) => res.sendFile(path.join(PUBLIC_DIR, 'index.html'),  NO_CACHE));
+app.get('/privacy', (req, res) => res.sendFile(path.join(PUBLIC_DIR, 'privacy.html'), NO_CACHE));
+
+app.use(express.static(PUBLIC_DIR, { etag: false, lastModified: false, setHeaders: res => res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate') }));
 
 const DATA_DIR   = process.env.DATA_PATH || path.join(__dirname, 'data');
 const STORE_PATH = path.join(DATA_DIR, 'store.json');

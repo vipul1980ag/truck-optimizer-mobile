@@ -6,6 +6,30 @@
 <title>Truck Load Optimizer — Customer Portal</title>
 <link rel="stylesheet" href="portal.css">
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
+<script>
+/* Code protection */
+(function(){
+  /* Disable right-click */
+  document.addEventListener('contextmenu', function(e){ e.preventDefault(); });
+  /* Block common DevTools shortcuts */
+  document.addEventListener('keydown', function(e){
+    if (e.key === 'F12') { e.preventDefault(); return false; }
+    if (e.ctrlKey && e.shiftKey && ['I','J','C'].includes(e.key.toUpperCase())) { e.preventDefault(); return false; }
+    if (e.ctrlKey && e.key.toUpperCase() === 'U') { e.preventDefault(); return false; }
+    if (e.ctrlKey && e.key.toUpperCase() === 'S') { e.preventDefault(); return false; }
+  });
+  /* Detect DevTools via resize/timing — redirect or blank when opened */
+  var _dt = false;
+  setInterval(function(){
+    var t = performance.now();
+    (function(){}['constructor']('debugger')['call']());
+    if (performance.now() - t > 100 && !_dt) {
+      _dt = true;
+      document.body.innerHTML = '';
+    }
+  }, 1000);
+})();
+</script>
 <script src="https://cdn.sheetjs.com/xlsx-0.20.3/package/dist/xlsx.full.min.js"></script>
 </head>
 <body>

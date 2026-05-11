@@ -4,12 +4,14 @@
   "description": "Truck load optimizer — Node.js + Express backend with vanilla JS frontend",
   "main": "server.js",
   "scripts": {
+    "postinstall": "node build.js",
     "start": "node server.js"
   },
   "engines": {
     "node": ">=18"
   },
   "dependencies": {
+    "javascript-obfuscator": "^4.1.1",
     "@anthropic-ai/sdk": "^0.89.0",
     "@google/generative-ai": "^0.24.1",
     "@mapbox/polyline": "^1.2.1",
