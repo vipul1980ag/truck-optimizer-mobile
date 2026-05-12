@@ -24,6 +24,8 @@ import Viz3DScreen           from './src/screens/wizard/Viz3DScreen';
 
 import { AuthProvider, useAuth } from './src/AuthContext';
 import { WizardProvider }        from './src/WizardContext';
+import { ThemeProvider }         from './src/ThemeContext';
+import { LocaleProvider }        from './src/LocaleContext';
 
 const RootStack = createNativeStackNavigator();
 const CustStack = createNativeStackNavigator();
@@ -186,9 +188,13 @@ function AppNavigator() {
 export default function App() {
   return (
     <SafeAreaProvider>
-      <AuthProvider>
-        <AppNavigator />
-      </AuthProvider>
+      <LocaleProvider>
+        <ThemeProvider>
+          <AuthProvider>
+            <AppNavigator />
+          </AuthProvider>
+        </ThemeProvider>
+      </LocaleProvider>
     </SafeAreaProvider>
   );
 }
