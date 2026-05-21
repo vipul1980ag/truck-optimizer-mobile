@@ -1,0 +1,595 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>DNW Logo — Download</title>
+<style>
+    :root {
+      --bg:      #0d1b2a;
+      --surface: #142033;
+      --surface2:#1c2e44;
+      --border:  #243350;
+      --gold:    #f0a500;
+      --teal:    #0ab5a0;
+      --text:    #e2eaf4;
+      --muted:   #6e92b5;
+    }
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+
+    body {
+      background: var(--bg);
+      color: var(--text);
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 44px;
+      padding: 48px 24px;
+    }
+
+    h1 {
+      font-size: 11px;
+      letter-spacing: 4px;
+      text-transform: uppercase;
+      color: var(--muted);
+    }
+
+    /* ─── ANIMATED GLOBE LOGO — same as allsorter.dnw-ai.com ─── */
+    .logo-stage {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 22px;
+      position: relative;
+    }
+
+    .dnw-globe {
+      width: 192px;
+      height: 192px;
+      display: block;
+      filter: drop-shadow(0 0 28px rgba(26,108,240,0.65));
+    }
+    .globe-bg { animation: globeBgColor 8s infinite linear; }
+    .globe-ring-group { transform-box: fill-box; transform-origin: center; animation: ringRotate 12s infinite linear; }
+    .globe-ring-text { animation: ringColor 6s infinite linear; }
+    .globe-dnw { animation: dnwColor 4s infinite alternate; }
+    @keyframes globeBgColor {
+      0%   { fill: rgba(26,108,240,0.78); }
+      20%  { fill: rgba(124,58,237,0.78); }
+      40%  { fill: rgba(5,150,105,0.78); }
+      60%  { fill: rgba(217,119,6,0.78); }
+      80%  { fill: rgba(239,68,68,0.78); }
+      100% { fill: rgba(26,108,240,0.78); }
+    }
+    @keyframes ringRotate { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
+    @keyframes ringColor {
+      0%   { fill: #ffe066; } 25% { fill: #80ffea; }
+      50%  { fill: #ff80b3; } 75% { fill: #b3ff66; } 100% { fill: #ffe066; }
+    }
+    @keyframes dnwColor {
+      0% { fill: #ffffff; } 50% { fill: #ffe066; } 100% { fill: #80ffea; }
+    }
+
+    .logo-name {
+      font-size: 28px;
+      font-weight: 900;
+      letter-spacing: 9px;
+      color: var(--text);
+      text-align: center;
+    }
+    .logo-sub {
+      font-size: 13px;
+      color: var(--muted);
+      letter-spacing: 0.4px;
+      text-align: center;
+    }
+
+    /* ─── SIZE CHIPS ─── */
+    .size-row {
+      display: flex;
+      gap: 10px;
+      flex-wrap: wrap;
+      justify-content: center;
+    }
+    .chip {
+      padding: 7px 16px;
+      border-radius: 10px;
+      font-size: 11px;
+      letter-spacing: 1px;
+      cursor: pointer;
+      border: 1px solid var(--border);
+      background: var(--surface);
+      color: var(--muted);
+      transition: all .15s;
+    }
+    .chip:hover, .chip.active {
+      border-color: var(--gold);
+      color: var(--gold);
+      background: rgba(240,165,0,0.06);
+    }
+
+    /* ─── BUTTONS ─── */
+    .btn-row {
+      display: flex;
+      gap: 14px;
+      flex-wrap: wrap;
+      justify-content: center;
+    }
+    .btn {
+      padding: 13px 26px;
+      border-radius: 14px;
+      font-size: 13px;
+      font-weight: 600;
+      cursor: pointer;
+      border: none;
+      letter-spacing: 0.3px;
+      transition: all .18s;
+    }
+    .btn-primary {
+      background: var(--gold);
+      color: var(--bg);
+    }
+    .btn-primary:hover { background: #ffc93c; transform: translateY(-2px); box-shadow: 0 8px 24px rgba(240,165,0,0.35); }
+    .btn-outline {
+      background: transparent;
+      color: var(--text);
+      border: 1px solid var(--border);
+    }
+    .btn-outline:hover { border-color: var(--gold); color: var(--gold); transform: translateY(-2px); }
+
+    .hint {
+      font-size: 11px;
+      color: var(--muted);
+      text-align: center;
+      max-width: 360px;
+      letter-spacing: 0.3px;
+    }
+    .hint strong { color: var(--teal); }
+
+    /* hidden export canvas */
+    #export-canvas { display: none; }
+  </style>
+</head>
+<body>
+
+<h1>DNW · DNEXTWELT — Logo</h1>
+
+<!-- ANIMATED GLOBE LOGO — same as allsorter.dnw-ai.com -->
+<div class="logo-stage">
+  <svg class="dnw-globe" viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg">
+    <defs><path id="cPathL" d="M50,8 a42,42 0 1,1 -0.001,0"/></defs>
+    <circle class="globe-bg" cx="50" cy="50" r="48"/>
+    <ellipse cx="50" cy="50" rx="48" ry="15" fill="none" stroke="white" stroke-width="1" opacity="0.18"/>
+    <ellipse cx="50" cy="50" rx="48" ry="30" fill="none" stroke="white" stroke-width="0.7" opacity="0.1"/>
+    <ellipse cx="50" cy="50" rx="15" ry="48" fill="none" stroke="white" stroke-width="1" opacity="0.18"/>
+    <circle cx="35" cy="30" r="14" fill="white" opacity="0.1"/>
+    <circle cx="50" cy="50" r="48" fill="none" stroke="rgba(150,210,255,0.45)" stroke-width="1.5"/>
+    <text class="globe-dnw" x="50" y="57" text-anchor="middle" font-family="'Segoe UI',sans-serif" font-size="21" font-weight="900">DNW</text>
+    <g class="globe-ring-group">
+      <text class="globe-ring-text" font-family="'Segoe UI',sans-serif" font-size="7.5" font-weight="700">
+        <textPath href="#cPathL" textLength="264" lengthAdjust="spacingAndGlyphs">DNEXTWELT&#160;-&#160;DNEXTWELT&#160;-&#160;</textPath>
+      </text>
+    </g>
+  </svg>
+  <div>
+    <div class="logo-name">DNEXTWELT</div>
+    <div class="logo-sub">Designed, coded and implemented by Vipul Agrawal</div>
+  </div>
+</div>
+
+<!-- SIZE SELECTOR -->
+<div class="size-row" id="size-row">
+  <div class="chip active" data-size="512">512 × 512 &nbsp;(WhatsApp / Social)</div>
+  <div class="chip" data-size="256">256 × 256</div>
+  <div class="chip" data-size="1024">1024 × 1024 &nbsp;(HD)</div>
+</div>
+
+<!-- DOWNLOAD BUTTONS -->
+<div class="btn-row">
+  <button class="btn btn-primary" onclick="downloadPNG()">⬇ Download PNG</button>
+  <button class="btn btn-primary" id="gif-btn" onclick="downloadGIF()" style="background:var(--teal);color:#fff;">⬇ Download GIF</button>
+  <button class="btn btn-outline" onclick="downloadSVG()">⬇ Download SVG</button>
+  <button class="btn btn-outline" onclick="window.location.href='dnw-business-card.html'">🪪 Business Card</button>
+</div>
+
+<p class="hint">
+  PNG 512×512 works on <strong>WhatsApp, LinkedIn, Instagram, Twitter</strong> and everywhere else.
+  SVG is infinitely scalable for websites and print.
+</p>
+
+<canvas id="export-canvas"></canvas>
+<div id="gif-preview-box" style="display:none; text-align:center; margin-top:16px;">
+  <img id="gif-preview-img" alt="GIF preview"
+       style="border-radius:14px; max-width:200px; border:2px solid var(--border);"/>
+  <p style="font-size:11px; color:var(--muted); margin-top:6px;">
+    If the animation plays above, the GIF is valid.
+  </p>
+  <a id="gif-save-link" download="dnw-logo-animated.gif"
+     style="display:inline-block; margin-top:4px; color:var(--teal); font-weight:700;
+            text-decoration:underline; cursor:pointer; font-size:13px;">
+    ⬇ Click here to save the GIF
+  </a>
+</div>
+
+<script>
+  let exportSize = 512;
+
+  document.getElementById('size-row').querySelectorAll('.chip').forEach(chip => {
+    chip.addEventListener('click', () => {
+      document.querySelectorAll('.chip').forEach(c => c.classList.remove('active'));
+      chip.classList.add('active');
+      exportSize = parseInt(chip.dataset.size);
+    });
+  });
+
+  /* Draw the globe logo on canvas — matches allsorter.dnw-ai.com */
+  function drawLogo(ctx, S) {
+    const cx = S / 2, cy = S / 2;
+    const r = S * 0.48;
+
+    ctx.fillStyle = '#0d1b2a';
+    ctx.fillRect(0, 0, S, S);
+
+    // globe circle
+    ctx.beginPath();
+    ctx.arc(cx, cy, r, 0, Math.PI * 2);
+    ctx.fillStyle = 'rgba(26,108,240,0.78)';
+    ctx.fill();
+
+    // equator ellipse
+    ctx.beginPath();
+    ctx.save();
+    ctx.translate(cx, cy);
+    ctx.scale(1, 15/48);
+    ctx.arc(0, 0, r, 0, Math.PI * 2);
+    ctx.restore();
+    ctx.strokeStyle = 'rgba(255,255,255,0.18)';
+    ctx.lineWidth = S * 0.002;
+    ctx.stroke();
+
+    // mid ellipse
+    ctx.beginPath();
+    ctx.save();
+    ctx.translate(cx, cy);
+    ctx.scale(1, 30/48);
+    ctx.arc(0, 0, r, 0, Math.PI * 2);
+    ctx.restore();
+    ctx.strokeStyle = 'rgba(255,255,255,0.10)';
+    ctx.lineWidth = S * 0.0014;
+    ctx.stroke();
+
+    // vertical ellipse
+    ctx.beginPath();
+    ctx.save();
+    ctx.translate(cx, cy);
+    ctx.scale(15/48, 1);
+    ctx.arc(0, 0, r, 0, Math.PI * 2);
+    ctx.restore();
+    ctx.strokeStyle = 'rgba(255,255,255,0.18)';
+    ctx.lineWidth = S * 0.002;
+    ctx.stroke();
+
+    // outer rim
+    ctx.beginPath();
+    ctx.arc(cx, cy, r, 0, Math.PI * 2);
+    ctx.strokeStyle = 'rgba(150,210,255,0.45)';
+    ctx.lineWidth = S * 0.003;
+    ctx.stroke();
+
+    // DNW text
+    const fontSize = Math.round(S * 0.21);
+    ctx.fillStyle = '#ffffff';
+    ctx.font = `900 ${fontSize}px "Segoe UI", sans-serif`;
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillText('DNW', cx, cy + fontSize * 0.04);
+
+    // DNEXTWELT around the ring (approximated as text below)
+    const ringTextSize = Math.round(S * 0.038);
+    ctx.fillStyle = '#ffe066';
+    ctx.font = `700 ${ringTextSize}px "Segoe UI", sans-serif`;
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    const ringText = 'DNEXTWELT - DNEXTWELT - ';
+    const step = (Math.PI * 2) / ringText.length;
+    const ringR = r * 0.88;
+    ctx.save();
+    for (let i = 0; i < ringText.length; i++) {
+      const angle = i * step - Math.PI / 2;
+      ctx.save();
+      ctx.translate(cx + ringR * Math.cos(angle), cy + ringR * Math.sin(angle));
+      ctx.rotate(angle + Math.PI / 2);
+      ctx.fillText(ringText[i], 0, 0);
+      ctx.restore();
+    }
+    ctx.restore();
+  }
+
+  function downloadPNG() {
+    const S = exportSize;
+    const canvas = document.getElementById('export-canvas');
+    canvas.width = S;
+    canvas.height = S;
+    const ctx = canvas.getContext('2d');
+    drawLogo(ctx, S);
+    const link = document.createElement('a');
+    link.download = `dnw-logo-${S}x${S}.png`;
+    link.href = canvas.toDataURL('image/png');
+    link.click();
+  }
+
+  function downloadSVG() {
+    const svg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100" width="512" height="512">
+  <defs>
+    <path id="cPathL" d="M50,8 a42,42 0 1,1 -0.001,0"/>
+  </defs>
+  <circle cx="50" cy="50" r="48" fill="rgba(26,108,240,0.78)"/>
+  <ellipse cx="50" cy="50" rx="48" ry="15" fill="none" stroke="white" stroke-width="1" opacity="0.18"/>
+  <ellipse cx="50" cy="50" rx="48" ry="30" fill="none" stroke="white" stroke-width="0.7" opacity="0.1"/>
+  <ellipse cx="50" cy="50" rx="15" ry="48" fill="none" stroke="white" stroke-width="1" opacity="0.18"/>
+  <circle cx="35" cy="30" r="14" fill="white" opacity="0.1"/>
+  <circle cx="50" cy="50" r="48" fill="none" stroke="rgba(150,210,255,0.45)" stroke-width="1.5"/>
+  <text x="50" y="57" text-anchor="middle" font-family="'Segoe UI',sans-serif" font-size="21" font-weight="900" fill="white">DNW</text>
+  <text font-family="'Segoe UI',sans-serif" font-size="7.5" font-weight="700" fill="#ffe066">
+    <textPath href="#cPathL" textLength="264" lengthAdjust="spacingAndGlyphs">DNEXTWELT - DNEXTWELT - </textPath>
+  </text>
+</svg>`;
+
+    const blob = new Blob([svg], { type: 'image/svg+xml' });
+    const link = document.createElement('a');
+    link.download = 'dnw-logo.svg';
+    link.href = URL.createObjectURL(blob);
+    link.click();
+  }
+
+  /* ── GIF GENERATION ── */
+
+  function lerpRGB(a, b, t) {
+    return {
+      r: Math.round(a.r + (b.r - a.r) * t),
+      g: Math.round(a.g + (b.g - a.g) * t),
+      b: Math.round(a.b + (b.b - a.b) * t)
+    };
+  }
+
+  function interpKF(kfs, p) {
+    for (let i = 0; i < kfs.length - 1; i++) {
+      if (p >= kfs[i].p && p <= kfs[i+1].p) {
+        const span = kfs[i+1].p - kfs[i].p;
+        return lerpRGB(kfs[i], kfs[i+1], span === 0 ? 0 : (p - kfs[i].p) / span);
+      }
+    }
+    return kfs[kfs.length - 1];
+  }
+
+  function drawGlobeFrame(ctx, S, t) {
+    const sc = S / 100;
+    const cx = 50 * sc, cy = 50 * sc, r = 48 * sc;
+
+    /* background */
+    ctx.clearRect(0, 0, S, S);
+    ctx.fillStyle = '#0d1b2a';
+    ctx.fillRect(0, 0, S, S);
+
+    /* animated globe fill */
+    const bg = interpKF([
+      {p:0,   r:26,  g:108, b:240},
+      {p:0.2, r:124, g:58,  b:237},
+      {p:0.4, r:5,   g:150, b:105},
+      {p:0.6, r:217, g:119, b:6  },
+      {p:0.8, r:239, g:68,  b:68 },
+      {p:1,   r:26,  g:108, b:240},
+    ], (t % 8) / 8);
+    ctx.beginPath();
+    ctx.arc(cx, cy, r, 0, Math.PI*2);
+    ctx.fillStyle = `rgba(${bg.r},${bg.g},${bg.b},0.78)`;
+    ctx.fill();
+
+    /* equator ellipse */
+    ctx.beginPath(); ctx.ellipse(cx, cy, 48*sc, 15*sc, 0, 0, Math.PI*2);
+    ctx.strokeStyle = 'rgba(255,255,255,0.18)'; ctx.lineWidth = 1*sc; ctx.stroke();
+
+    /* mid ellipse */
+    ctx.beginPath(); ctx.ellipse(cx, cy, 48*sc, 30*sc, 0, 0, Math.PI*2);
+    ctx.strokeStyle = 'rgba(255,255,255,0.10)'; ctx.lineWidth = 0.7*sc; ctx.stroke();
+
+    /* vertical ellipse */
+    ctx.beginPath(); ctx.ellipse(cx, cy, 15*sc, 48*sc, 0, 0, Math.PI*2);
+    ctx.strokeStyle = 'rgba(255,255,255,0.18)'; ctx.lineWidth = 1*sc; ctx.stroke();
+
+    /* highlight */
+    ctx.beginPath(); ctx.arc(35*sc, 30*sc, 14*sc, 0, Math.PI*2);
+    ctx.fillStyle = 'rgba(255,255,255,0.10)'; ctx.fill();
+
+    /* rim */
+    ctx.beginPath(); ctx.arc(cx, cy, r, 0, Math.PI*2);
+    ctx.strokeStyle = 'rgba(150,210,255,0.45)'; ctx.lineWidth = 1.5*sc; ctx.stroke();
+
+    /* DNW text — animated color */
+    const dnwRaw = (t % 4) / 4;
+    const dnwPos = dnwRaw <= 0.5 ? dnwRaw * 2 : (1 - dnwRaw) * 2;
+    const dc = interpKF([
+      {p:0,   r:255, g:255, b:255},
+      {p:0.5, r:255, g:224, b:102},
+      {p:1,   r:128, g:255, b:234},
+    ], dnwPos);
+    ctx.fillStyle = `rgb(${dc.r},${dc.g},${dc.b})`;
+    ctx.font = `900 ${Math.round(21*sc)}px Arial, sans-serif`;
+    ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+    ctx.fillText('DNW', cx, 57*sc);
+
+    /* rotating DNEXTWELT ring */
+    const ringAngle = ((t % 12) / 12) * Math.PI * 2;
+    const rc = interpKF([
+      {p:0,    r:255, g:224, b:102},
+      {p:0.25, r:128, g:255, b:234},
+      {p:0.5,  r:255, g:128, b:179},
+      {p:0.75, r:179, g:255, b:102},
+      {p:1,    r:255, g:224, b:102},
+    ], (t % 6) / 6);
+    ctx.fillStyle = `rgb(${rc.r},${rc.g},${rc.b})`;
+    ctx.font = `700 ${Math.round(7.5*sc)}px Arial, sans-serif`;
+    ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+
+    const ringText = 'DNEXTWELT - DNEXTWELT - ';
+    const ringR = 42 * sc;
+    const step = (Math.PI * 2) / ringText.length;
+    for (let i = 0; i < ringText.length; i++) {
+      const a = ringAngle + i * step - Math.PI / 2;
+      ctx.save();
+      ctx.translate(cx + ringR * Math.cos(a), cy + ringR * Math.sin(a));
+      ctx.rotate(a + Math.PI / 2);
+      ctx.fillText(ringText[i], 0, 0);
+      ctx.restore();
+    }
+  }
+
+  /* ── Pure inline GIF89a encoder — no CDN, no workers ── */
+
+  function gifBuildPalette(allPix) {
+    const freq = new Map();
+    for (const p of allPix) {
+      for (let i = 0; i < p.length; i += 4) {
+        const k = ((p[i] >> 3) << 10) | ((p[i+1] >> 3) << 5) | (p[i+2] >> 3);
+        freq.set(k, (freq.get(k) || 0) + 1);
+      }
+    }
+    const pal = [...freq.entries()].sort((a,b) => b[1]-a[1]).slice(0,256)
+      .map(([k]) => [(k>>10&31)<<3, (k>>5&31)<<3, (k&31)<<3]);
+    while (pal.length < 256) pal.push([0,0,0]);
+    return pal;
+  }
+
+  function gifMapPix(pix, pal, n) {
+    const lut = new Map();
+    pal.forEach(([r,g,b], i) => {
+      const k = ((r>>3)<<10)|((g>>3)<<5)|(b>>3);
+      if (!lut.has(k)) lut.set(k, i);
+    });
+    const idx = new Uint8Array(n);
+    for (let i = 0; i < n; i++) {
+      const k = ((pix[i*4]>>3)<<10)|((pix[i*4+1]>>3)<<5)|(pix[i*4+2]>>3);
+      let c = lut.get(k);
+      if (c === undefined) {
+        let md = Infinity;
+        for (let j = 0; j < pal.length; j++) {
+          const d = (pal[j][0]-pix[i*4])**2 + (pal[j][1]-pix[i*4+1])**2 + (pal[j][2]-pix[i*4+2])**2;
+          if (d < md) { md = d; c = j; }
+        }
+        lut.set(k, c);
+      }
+      idx[i] = c;
+    }
+    return idx;
+  }
+
+  function gifLZW(idx) {
+    const clr = 256, eof = 257;
+    const out = []; let bits = 0, acc = 0, cs = 9, mc = 512, nc = 258;
+    const dict = new Map();
+    function emit(code) {
+      acc |= code << bits; bits += cs;
+      while (bits >= 8) { out.push(acc & 0xFF); acc >>>= 8; bits -= 8; }
+    }
+    function reset() {
+      dict.clear(); nc = 258; cs = 9; mc = 512;
+    }
+    reset(); emit(clr);
+    let pfx = idx[0];
+    for (let i = 1; i < idx.length; i++) {
+      const s = idx[i], key = (pfx << 8) | s;
+      const c = dict.get(key);
+      if (c !== undefined) { pfx = c; }
+      else {
+        emit(pfx);
+        if (nc > 4095) { emit(clr); reset(); }
+        else { dict.set(key, nc++); if (nc >= mc && cs < 12) { cs++; mc <<= 1; } }
+        pfx = s;
+      }
+    }
+    emit(pfx); emit(eof);
+    if (bits > 0) out.push(acc & 0xFF);
+    const res = [8]; // min code size
+    for (let i = 0; i < out.length; ) {
+      const n = Math.min(255, out.length - i);
+      res.push(n);
+      for (let j = 0; j < n; j++) res.push(out[i++]);
+    }
+    res.push(0);
+    return res;
+  }
+
+  /* async encoder — yields between every frame so the browser stays responsive */
+  async function gifEncodeAsync(frames, W, H, onProgress) {
+    const b = [];
+    const w16 = n => b.push(n & 0xFF, n >> 8 & 0xFF);
+    const pal = gifBuildPalette(frames.map(f => f.pix));
+    b.push(71,73,70,56,57,97); w16(W); w16(H);
+    b.push(0xF7, 0, 0);
+    for (const [r,g,bb] of pal) b.push(r, g, bb);
+    b.push(0x21,0xFF,0x0B, 78,69,84,83,67,65,80,69,50,46,48, 3,1,0,0, 0);
+    for (let fi = 0; fi < frames.length; fi++) {
+      if (onProgress) onProgress(fi, frames.length);
+      await new Promise(r => setTimeout(r, 0));
+      const {pix, delay} = frames[fi];
+      const cs = Math.max(2, Math.round(delay / 10));
+      const idx = gifMapPix(pix, pal, W * H);
+      b.push(0x21,0xF9,0x04,0x00); w16(cs); b.push(0, 0);
+      b.push(0x2C); w16(0); w16(0); w16(W); w16(H); b.push(0);
+      const lzw = gifLZW(idx);
+      for (let i = 0; i < lzw.length; i++) b.push(lzw[i]);
+    }
+    b.push(0x3B);
+    return new Uint8Array(b);
+  }
+
+  async function downloadGIF() {
+    const btn = document.getElementById('gif-btn');
+    const box  = document.getElementById('gif-preview-box');
+    const img  = document.getElementById('gif-preview-img');
+    const link = document.getElementById('gif-save-link');
+    box.style.display = 'none';
+    btn.disabled = true;
+    try {
+      const S = exportSize;
+      const fps = 12, dur = 2.5, total = Math.round(fps * dur);
+      const delay = Math.round(1000 / fps);
+      const cv = document.createElement('canvas');
+      cv.width = S; cv.height = S;
+      const ctx = cv.getContext('2d');
+      const frames = [];
+      for (let i = 0; i < total; i++) {
+        btn.textContent = `Rendering ${i+1}/${total}…`;
+        drawGlobeFrame(ctx, S, (i / total) * dur);
+        frames.push({ pix: new Uint8ClampedArray(ctx.getImageData(0,0,S,S).data), delay });
+        await new Promise(r => setTimeout(r, 0));
+      }
+      const data = await gifEncodeAsync(frames, S, S, (fi, tot) => {
+        btn.textContent = `Encoding ${fi+1}/${tot}…`;
+      });
+      const url = URL.createObjectURL(new Blob([data], {type:'image/gif'}));
+      /* show preview img — if it animates, the GIF is valid */
+      img.src = url;
+      link.href = url;
+      link.download = `dnw-logo-animated.gif`;
+      box.style.display = 'block';
+      /* also attempt auto-download */
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `dnw-logo-animated.gif`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+    } catch(e) {
+      console.error(e);
+      alert('GIF failed: ' + e.message);
+    }
+    btn.textContent = '⬇ Download GIF';
+    btn.disabled = false;
+  }
+</script>
+</body>
+</html>
