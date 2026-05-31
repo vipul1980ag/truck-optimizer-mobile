@@ -31,8 +31,17 @@
 })();
 </script>
 <script src="https://cdn.sheetjs.com/xlsx-0.20.3/package/dist/xlsx.full.min.js"></script>
+<script src="https://accounts.google.com/gsi/client" async defer></script>
 </head>
 <body>
+<!-- Google One Tap — auto-detects the signed-in Google account on any device -->
+<div id="g_id_onload"
+  data-client_id="162412530588-g8iv5oghooqdvh9te8agmvnjc3159686.apps.googleusercontent.com"
+  data-callback="handleGoogleCredential"
+  data-auto_select="true"
+  data-use_fedcm_for_prompt="true"
+  data-cancel_on_tap_outside="false">
+</div>
 
 <!-- ── Navigation ── -->
 <nav class="nav">
@@ -253,6 +262,7 @@
       <button class="admin-tab-btn" onclick="showAdminTab('bookings')" data-i18n="tabBookings">📋 Bookings</button>
       <button class="admin-tab-btn" onclick="showAdminTab('import')" data-i18n="tabImport">📥 Import</button>
       <button class="admin-tab-btn" onclick="showAdminTab('rates')" data-i18n="tabRates">💲 Rates</button>
+      <button class="admin-tab-btn" id="tab-btn-users" onclick="showAdminTab('users')" style="display:none">👤 Users</button>
     </div>
 
     <!-- Fleet Tab -->
@@ -436,6 +446,15 @@
       <div id="p-rates-list" class="admin-list"></div>
     </div><!-- /tab-rates -->
 
+    <!-- Users Tab (admin only) -->
+    <div id="tab-users" class="admin-tab-pane" style="display:none">
+      <div style="padding:8px 0 12px;display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px;">
+        <div style="font-size:13px;color:var(--text2)">All registered accounts on this platform</div>
+        <button class="btn-save-truck" onclick="loadAdminUsers()" style="padding:6px 14px;font-size:12px;">↻ Refresh</button>
+      </div>
+      <div id="admin-users-list"></div>
+    </div><!-- /tab-users -->
+
   </div>
 </div>
 
@@ -616,6 +635,15 @@
           <small class="auth-choose-sub" data-i18n="newUser">New user</small>
         </button>
       </div>
+      <div style="display:flex;align-items:center;gap:8px;margin:14px 0 4px;">
+        <div style="flex:1;height:1px;background:var(--border)"></div>
+        <span style="font-size:11px;color:var(--text2)">or</span>
+        <div style="flex:1;height:1px;background:var(--border)"></div>
+      </div>
+      <button onclick="triggerGoogleSignIn()" style="width:100%;display:flex;align-items:center;justify-content:center;gap:10px;padding:10px 16px;border:1.5px solid var(--border);border-radius:8px;background:#fff;color:#3c4043;font-size:14px;font-weight:600;cursor:pointer;transition:box-shadow .15s;" onmouseover="this.style.boxShadow='0 2px 8px rgba(0,0,0,0.15)'" onmouseout="this.style.boxShadow=''">
+        <svg width="18" height="18" viewBox="0 0 18 18"><path fill="#4285F4" d="M16.51 8H8.98v3h4.3c-.18 1-.74 1.48-1.6 2.04v2.01h2.6a7.8 7.8 0 0 0 2.38-5.88c0-.57-.05-.66-.15-1.18z"/><path fill="#34A853" d="M8.98 17c2.16 0 3.97-.72 5.3-1.94l-2.6-2.01c-.72.48-1.63.76-2.7.76-2.08 0-3.84-1.4-4.47-3.29H1.85v2.07A8 8 0 0 0 8.98 17z"/><path fill="#FBBC05" d="M4.51 10.52A4.8 4.8 0 0 1 4.26 9c0-.53.09-1.04.25-1.52V5.41H1.85A8 8 0 0 0 .98 9c0 1.29.31 2.51.87 3.59l2.66-2.07z"/><path fill="#EA4335" d="M8.98 3.58c1.17 0 2.23.4 3.06 1.2l2.3-2.3A8 8 0 0 0 8.98 1a8 8 0 0 0-7.13 4.41l2.66 2.07c.63-1.89 2.4-3.3 4.47-3.3z"/></svg>
+        Continue with Google
+      </button>
     </div>
 
     <div id="auth-view-login" style="display:none">

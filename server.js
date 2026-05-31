@@ -292,6 +292,9 @@ function writeStore(data) {
 }
 
 // ── Auth helpers ───────────────────────────────────────────────────────────
+const GOOGLE_CLIENT_ID = '162412530588-g8iv5oghooqdvh9te8agmvnjc3159686.apps.googleusercontent.com';
+const ADMIN_EMAILS     = ['vipul.orlando@gmail.com', 'vipulaccenture2018@gmail.com'];
+
 function hashPassword(plain, salt) {
   return crypto.pbkdf2Sync(plain, salt, 100_000, 64, 'sha512').toString('hex');
 }
@@ -301,6 +304,30 @@ function genToken() { return crypto.randomBytes(32).toString('hex'); }
 function getTokenFromHeader(req) {
   const auth = req.headers.authorization || '';
   return auth.startsWith('Bearer ') ? auth.slice(7) : null;
+}
+
+function parseDeviceInfo(req) {
+  const ua  = req.headers['user-agent'] || '';
+  const ip  = ((req.headers['x-forwarded-for'] || '').split(',')[0].trim()) || req.socket?.remoteAddress || 'unknown';
+  const device = /iPad/i.test(ua) ? 'iPad'
+    : /iPhone/i.test(ua) ? 'iPhone'
+    : /Android.*Mobile/i.test(ua) ? 'Android Phone'
+    : /Android/i.test(ua) ? 'Android Tablet'
+    : /Mobile/i.test(ua) ? 'Mobile'
+    : 'Desktop';
+  const os = /Windows/i.test(ua) ? 'Windows'
+    : /iPhone|iPad/i.test(ua) ? 'iOS'
+    : /Mac OS X/i.test(ua) ? 'macOS'
+    : /Android/i.test(ua) ? 'Android'
+    : /Linux/i.test(ua) ? 'Linux'
+    : 'Unknown';
+  const browser = /Edg\//i.test(ua) ? 'Edge'
+    : /OPR|Opera/i.test(ua) ? 'Opera'
+    : /Chrome/i.test(ua) ? 'Chrome'
+    : /Firefox/i.test(ua) ? 'Firefox'
+    : /Safari/i.test(ua) ? 'Safari'
+    : 'Other';
+  return { device, os, browser, ip, at: new Date().toISOString() };
 }
 
 // ── Auth Routes ────────────────────────────────────────────────────────────
@@ -322,15 +349,19 @@ app.post('/api/auth/register', (req, res) => {
   const salt         = genSalt();
   const passwordHash = hashPassword(password, salt);
   const token        = genToken();
+  const now          = new Date().toISOString();
   const newUser      = {
     id: store.nextIds.user++,
     email: email.toLowerCase().trim(),
     passwordHash,
     salt,
-    phone:     phone.trim(),
-    address:   address.trim(),
+    phone:      phone.trim(),
+    address:    address.trim(),
     token,
-    createdAt: new Date().toISOString(),
+    createdAt:  now,
+    lastLogin:  now,
+    loginCount: 1,
+    lastDevice: parseDeviceInfo(req),
   };
   store.users.push(newUser);
   writeStore(store);
@@ -352,7 +383,10 @@ app.post('/api/auth/login', (req, res) => {
   const hash = hashPassword(password, user.salt);
   if (hash !== user.passwordHash) return res.status(401).json({ error: 'Invalid email or password.' });
 
-  user.token = genToken();
+  user.token      = genToken();
+  user.loginCount = (user.loginCount || 0) + 1;
+  user.lastLogin  = new Date().toISOString();
+  user.lastDevice = parseDeviceInfo(req);
   writeStore(store);
 
   res.json({ token: user.token, user: { id: user.id, email: user.email, phone: user.phone, address: user.address } });
@@ -377,6 +411,85 @@ app.get('/api/auth/me', (req, res) => {
   if (!user) return res.status(401).json({ error: 'Invalid or expired token.' });
 
   res.json({ user: { id: user.id, email: user.email, phone: user.phone, address: user.address } });
+});
+
+// Google Sign-In — verify Google ID token and create/link account
+app.post('/api/auth/google', async (req, res) => {
+  const { credential } = req.body || {};
+  if (!credential) return res.status(400).json({ error: 'credential required' });
+  try {
+    const r    = await fetch(`https://oauth2.googleapis.com/tokeninfo?id_token=${encodeURIComponent(credential)}`, { signal: AbortSignal.timeout(8000) });
+    const data = await r.json();
+    if (!r.ok || data.error_description) return res.status(401).json({ error: 'Invalid Google token' });
+    if (data.aud !== GOOGLE_CLIENT_ID)   return res.status(401).json({ error: 'Token client mismatch' });
+
+    const { sub: googleId, email, name, picture } = data;
+    if (!email) return res.status(400).json({ error: 'No email in Google token' });
+
+    const store = readStore();
+    if (!store.users)        store.users = [];
+    if (!store.nextIds.user) store.nextIds.user = 1;
+
+    let user = store.users.find(u => u.googleId === googleId)
+             || store.users.find(u => u.email.toLowerCase() === email.toLowerCase());
+
+    const now        = new Date().toISOString();
+    const deviceInfo = parseDeviceInfo(req);
+
+    if (!user) {
+      user = {
+        id: store.nextIds.user++,
+        email: email.toLowerCase().trim(),
+        googleId, googleName: name, googlePicture: picture,
+        passwordHash: null, salt: null,
+        phone: '', address: '',
+        token:      genToken(),
+        createdAt:  now, loginCount: 1, lastLogin: now, lastDevice: deviceInfo,
+      };
+      store.users.push(user);
+    } else {
+      user.googleId      = googleId;
+      user.googleName    = name;
+      user.googlePicture = picture;
+      user.token         = genToken();
+      user.loginCount    = (user.loginCount || 0) + 1;
+      user.lastLogin     = now;
+      user.lastDevice    = deviceInfo;
+    }
+    writeStore(store);
+    res.json({
+      token: user.token,
+      user: { id: user.id, email: user.email, phone: user.phone || '', address: user.address || '', googleName: name, googlePicture: picture },
+    });
+  } catch (err) {
+    console.error('Google auth error:', err.message);
+    res.status(500).json({ error: 'Google auth failed: ' + err.message });
+  }
+});
+
+// Admin — list all registered users (admin emails only)
+app.get('/api/admin/users', (req, res) => {
+  const token = getTokenFromHeader(req);
+  if (!token) return res.status(401).json({ error: 'Unauthorized' });
+  const store  = readStore();
+  const caller = (store.users || []).find(u => u.token === token);
+  if (!caller || !ADMIN_EMAILS.includes(caller.email.toLowerCase()))
+    return res.status(403).json({ error: 'Admin access required' });
+
+  const users = (store.users || []).map(u => ({
+    id:            u.id,
+    email:         u.email,
+    phone:         u.phone  || '',
+    address:       u.address || '',
+    createdAt:     u.createdAt  || null,
+    lastLogin:     u.lastLogin  || null,
+    loginCount:    u.loginCount || 0,
+    lastDevice:    u.lastDevice || null,
+    googleLinked:  !!u.googleId,
+    googleName:    u.googleName    || null,
+    googlePicture: u.googlePicture || null,
+  }));
+  res.json(users);
 });
 
 // ── API Routes ─────────────────────────────────────────────────────────────

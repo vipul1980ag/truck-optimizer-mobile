@@ -274,6 +274,8 @@ function portalResetCategory() {
 }
 
 // ── Auth State ────────────────────────────────────────────────────────────────
+const ADMIN_EMAILS = ['vipul.orlando@gmail.com', 'vipulaccenture2018@gmail.com'];
+
 let _authToken = localStorage.getItem('auth_token') || null;
 let _authUser  = null;
 
@@ -324,9 +326,40 @@ function applyAuthState(loggedIn) {
   document.getElementById('cargo-lock').style.display     = loggedIn ? 'none' : '';
   document.getElementById('cargo-card').style.opacity     = loggedIn ? '1' : '0.35';
   document.getElementById('cargo-card').style.pointerEvents = loggedIn ? '' : 'none';
-  // Admin button is always visible — not tied to customer login state
   if (loggedIn && _authUser) {
-    document.getElementById('nav-user-email').textContent = _authUser.email;
+    document.getElementById('nav-user-email').textContent = _authUser.googleName || _authUser.email;
+    // Show Users tab only to admins
+    const isAdmin = ADMIN_EMAILS.includes((_authUser.email || '').toLowerCase());
+    const usersBtn = document.getElementById('tab-btn-users');
+    if (usersBtn) usersBtn.style.display = isAdmin ? '' : 'none';
+  } else {
+    const usersBtn = document.getElementById('tab-btn-users');
+    if (usersBtn) usersBtn.style.display = 'none';
+  }
+}
+
+// Google One Tap / Sign-In callback
+async function handleGoogleCredential(response) {
+  try {
+    const res  = await fetch('/api/auth/google', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ credential: response.credential }),
+    });
+    const data = await res.json();
+    if (!res.ok) { console.error('Google auth failed:', data.error); return; }
+    _authToken = data.token;
+    _authUser  = data.user;
+    localStorage.setItem('auth_token', _authToken);
+    localStorage.removeItem('auth_creds'); // Google users don't need stored creds
+    closeAuthModal();
+    applyAuthState(true);
+  } catch (e) { console.error('Google auth error:', e.message); }
+}
+
+function triggerGoogleSignIn() {
+  if (window.google?.accounts?.id) {
+    google.accounts.id.prompt();
   }
 }
 
@@ -399,6 +432,8 @@ async function doLogout() {
     _authUser  = null;
     localStorage.removeItem('auth_token');
     localStorage.removeItem('auth_creds');
+    // Revoke Google session so One Tap doesn't auto-sign back in
+    if (window.google?.accounts?.id) google.accounts.id.disableAutoSelect();
   }
   applyAuthState(false);
 }
@@ -1893,6 +1928,57 @@ function showAdminTab(tab) {
   btns.forEach(b => { if (b.textContent.toLowerCase().includes(tab.slice(0, 4))) b.classList.add('active'); });
   if (tab === 'bookings') renderBookings();
   if (tab === 'rates') renderRates();
+  if (tab === 'users') loadAdminUsers();
+}
+
+async function loadAdminUsers() {
+  const el = document.getElementById('admin-users-list');
+  if (!el) return;
+  el.innerHTML = '<div style="text-align:center;padding:20px;color:var(--text2);font-size:13px;">Loading...</div>';
+  try {
+    const res  = await fetch('/api/admin/users', { headers: { Authorization: 'Bearer ' + _authToken } });
+    const data = await res.json();
+    if (!res.ok) { el.innerHTML = `<div style="color:#ef4444;padding:12px;border-radius:8px;background:#fef2f2;">${data.error || 'Error loading users'}</div>`; return; }
+    if (!data.length) { el.innerHTML = '<div style="text-align:center;padding:20px;color:var(--text2);font-size:13px;">No registered users yet.</div>'; return; }
+
+    const rows = data.map(u => {
+      const initials = (u.googleName || u.email).charAt(0).toUpperCase();
+      const avatar   = u.googlePicture
+        ? `<img src="${u.googlePicture}" style="width:36px;height:36px;border-radius:50%;object-fit:cover;flex-shrink:0;" onerror="this.outerHTML='<div style=\\'width:36px;height:36px;border-radius:50%;background:#3b82f6;color:#fff;display:flex;align-items:center;justify-content:center;font-weight:700;font-size:14px;flex-shrink:0;\\'>${initials}</div>'">`
+        : `<div style="width:36px;height:36px;border-radius:50%;background:#3b82f6;color:#fff;display:flex;align-items:center;justify-content:center;font-weight:700;font-size:14px;flex-shrink:0;">${initials}</div>`;
+      const badge    = u.googleLinked
+        ? `<span style="background:#4285F4;color:#fff;border-radius:3px;padding:0 5px;font-size:10px;font-weight:700;letter-spacing:.3px;">G</span>`
+        : `<span style="background:#64748b;color:#fff;border-radius:3px;padding:0 5px;font-size:10px;font-weight:700;">PW</span>`;
+      const name     = u.googleName ? `<div style="font-weight:700;font-size:13px;color:var(--text1)">${u.googleName}</div>` : '';
+      const device   = u.lastDevice ? `${u.lastDevice.device} · ${u.lastDevice.browser}/${u.lastDevice.os}` : '—';
+      const ip       = u.lastDevice?.ip || '';
+      const regDate  = u.createdAt  ? new Date(u.createdAt).toLocaleDateString()  : '—';
+      const lastDate = u.lastLogin  ? new Date(u.lastLogin).toLocaleString()       : '—';
+      const addr     = (u.address || '').slice(0, 55) + ((u.address||'').length > 55 ? '…' : '');
+
+      return `<div style="background:var(--card);border:1px solid var(--border);border-radius:10px;padding:12px 14px;margin-bottom:10px;display:flex;gap:12px;align-items:flex-start;">
+        ${avatar}
+        <div style="flex:1;min-width:0;">
+          ${name}
+          <div style="display:flex;align-items:center;gap:6px;font-size:12px;color:var(--text1);flex-wrap:wrap;">
+            <span>${u.email}</span>${badge}
+          </div>
+          <div style="font-size:11px;color:var(--text2);margin-top:2px;">${u.phone || '<em>no phone</em>'}</div>
+          <div style="font-size:11px;color:var(--text2);" title="${u.address||''}">${addr || '<em>no address</em>'}</div>
+        </div>
+        <div style="text-align:right;font-size:11px;color:var(--text2);flex-shrink:0;line-height:1.7;">
+          <div>Registered: <strong>${regDate}</strong></div>
+          <div>Last login: <strong>${lastDate}</strong></div>
+          <div>Logins: <strong>${u.loginCount}</strong></div>
+          <div title="${ip}">${device}</div>
+        </div>
+      </div>`;
+    }).join('');
+
+    el.innerHTML = `<div style="font-size:12px;color:var(--text2);margin-bottom:10px;">${data.length} registered user${data.length !== 1 ? 's' : ''}</div>${rows}`;
+  } catch (e) {
+    el.innerHTML = `<div style="color:#ef4444;padding:12px;">Network error: ${e.message}</div>`;
+  }
 }
 
 function openTruckForm(truckId) {
